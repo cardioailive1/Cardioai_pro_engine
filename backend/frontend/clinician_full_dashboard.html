@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CardioAI Pro — Clinician Dashboard</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  /* ---- CardioAI brand palette: ocean blue / navy blue / clinical blue ---- */
+  --navy-deep: #071B36; --navy: #0E2E5C; --ocean: #0B6E99; --blue: #1C7EC4; --cyan: #5DC3E8;
+  --sky: #EAF5FC; --bg: #DCEBF8; --panel: #ffffff; --ink: #0E2440; --ink-soft: #4C6683;
+  --line: #D8E7F3; --ok: #16915F; --warn: #C9820A; --err: #C0392B; --indigo: #5B6FD6;
+  --radius: 12px; --shadow-sm: 0 1px 2px rgba(14,46,92,0.06), 0 1px 1px rgba(14,46,92,0.04);
+  --shadow-md: 0 4px 14px rgba(14,46,92,0.08), 0 1px 3px rgba(14,46,92,0.06);
+  --mono: "IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; line-height:1.5; }
+
+.sidebar-brand {
+  display:flex; align-items:center; gap:10px; padding:6px 4px 16px;
+}
+.brand-mark {
+  width:34px; height:34px; border-radius:9px; background:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:1.15rem; box-shadow:var(--shadow-sm);
+  flex: 0 0 auto;
+}
+.sidebar-brand-text h1 { margin:0; font-size:0.86rem; font-weight:700; color:#fff; }
+.sidebar-brand-text p { margin:0; font-size:0.68rem; color:#a9d4ec; }
+.demo-banner {
+  font-size:0.68rem; line-height:1.4; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:#cfe8f5;
+  padding:7px 10px; border-radius:10px; margin: 0 0 12px;
+}
+.nav-scroll { display:flex; flex-direction:column; gap:3px; flex:1; overflow-y:auto; }
+
+.app-shell { display:flex; align-items:flex-start; max-width:1440px; margin:0 auto; }
+.sidebar {
+  position:sticky; top:0; flex:0 0 220px; display:flex; flex-direction:column; gap:3px;
+  padding:18px 12px; height:100vh; background: linear-gradient(180deg, var(--navy-deep) 0%, #0A4B6E 100%);
+  border-right:1px solid rgba(255,255,255,0.08);
+}
+.nav-item {
+  display:flex; align-items:center; gap:9px; text-align:left; background:transparent; border:none;
+  border-left: 3px solid transparent;
+  padding:10px 11px; border-radius:8px; font-size:0.8rem; font-weight:600; color:#bfdcee; cursor:pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.nav-item .ic { width:18px; text-align:center; color:var(--cyan); }
+.nav-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
+.nav-item.active { background:rgba(255,255,255,0.14); color:#fff; border-left-color:var(--cyan); }
+.nav-item.active .ic { color:var(--cyan); }
+@media (max-width:900px) {
+  .app-shell { flex-direction:column; }
+  .sidebar { position:static; flex-direction:row; flex-wrap:wrap; width:100%; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+  .sidebar-brand { flex:1 1 100%; margin:0 0 8px; padding:4px; }
+  .demo-banner { flex:1 1 100%; }
+  .nav-scroll { display:contents; }
+  .nav-item { flex:1 1 auto; justify-content:center; }
+}
+
+main { flex:1; min-width:0; padding:24px 26px 60px; display:grid; gap:18px; }
+.page { display:none; } .page.active { display:grid; gap:18px; }
+
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; box-shadow:var(--shadow-sm); }
+.panel h2 { margin:0 0 4px; font-size:0.98rem; color:var(--navy); font-weight:700; }
+.panel .sub { margin:0 0 12px; font-size:0.78rem; color:var(--ink-soft); line-height:1.55; }
+.tag { display:inline-block; font-size:0.66rem; padding:2px 9px; border-radius:20px; background:var(--sky); color:var(--blue); border:1px solid #cfe8f5; margin-left:6px; font-weight:600; }
+.tag.demo { background:#fff3e6; color:#b3691a; border-color:#ffe0b8; }
+
+.grid-2 { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+@media (max-width:980px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } }
+
+/* KPI cards */
+.kpi { border:1px solid var(--line); border-radius:var(--radius); padding:14px; background:var(--panel); }
+.kpi .kpi-label { font-size:0.7rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
+.kpi .kpi-value { font-size:1.7rem; font-weight:800; color:var(--navy); font-family:var(--mono); margin-top:4px; }
+.kpi .kpi-sub { font-size:0.7rem; color:var(--ink-soft); margin-top:2px; }
+.kpi.warn .kpi-value { color:var(--warn); }
+.kpi.err .kpi-value { color:var(--err); }
+.kpi.ok .kpi-value { color:var(--ok); }
+
+/* Tables */
+.table-wrap { overflow-x:auto; }
+table.dt { width:100%; border-collapse:collapse; font-size:0.79rem; }
+.dt th { text-align:left; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--ink-soft); border-bottom:1px solid var(--line); padding:8px 9px; white-space:nowrap; }
+.dt td { padding:8px 9px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.dt tr:hover { background:var(--sky); cursor:default; }
+.dt tr.clickable:hover { cursor:pointer; }
+.mono { font-family:var(--mono); }
+
+.pill { font-size:0.66rem; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+.pill.low { background:#e5f7ee; color:var(--ok); }
+.pill.moderate { background:#fff5e0; color:var(--warn); }
+.pill.high { background:#fde7e5; color:var(--err); }
+.pill.submitted { background:var(--sky); color:var(--blue); }
+.pill.pending { background:#fff5e0; color:var(--warn); }
+.pill.approved { background:#e5f7ee; color:var(--ok); }
+.pill.denied { background:#fde7e5; color:var(--err); }
+.pill.scheduled { background:var(--sky); color:var(--blue); }
+.pill.completed { background:#e5f7ee; color:var(--ok); }
+.pill.ordered { background:#ecebfc; color:var(--indigo); }
+
+.chip { display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:0.7rem; background:var(--sky); border:1px solid #cfe8f5; color:var(--navy); padding:3px 8px; border-radius:6px; margin:2px 3px 2px 0; }
+.chip small { color:var(--ink-soft); font-family:inherit; }
+
+button.btn { background:var(--blue); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-size:0.76rem; cursor:pointer; font-weight:600; transition:background 0.12s ease, box-shadow 0.12s ease; }
+button.btn:hover { background:var(--navy); box-shadow:var(--shadow-sm); }
+button.btn.ghost { background:transparent; color:var(--blue); border:1px solid var(--blue); }
+button.btn.ghost:hover { background:var(--sky); }
+button.btn.sm { padding:5px 10px; font-size:0.7rem; }
+button.btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+input[type=text], input[type=search], select, textarea {
+  font-size:0.79rem; padding:7px 10px; border-radius:7px; border:1px solid var(--line); font-family:inherit; background:var(--panel); color:var(--ink);
+}
+input[type=text]:focus, input[type=search]:focus, select:focus, textarea:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(28,126,196,0.15); }
+textarea { width:100%; resize:vertical; }
+
+.toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.toolbar-left { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+.disclaimer { font-size:0.71rem; color:#b3691a; background:#fff8ec; border:1px solid #ffe0b8; border-radius:8px; padding:8px 10px; margin-top:10px; }
+.form-result { font-size:0.8rem; border-radius:9px; padding:10px 12px; }
+.form-result.success { background:#e5f7ee; color:var(--ok); border:1px solid #b9e8cf; }
+.form-result.error { background:#fde7e5; color:var(--err); border:1px solid #f5c3c1; }
+.form-result.info { background:var(--sky); color:var(--ink-soft); border:1px solid #cfe8f5; }
+
+/* Patient detail drawer */
+.drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(7,27,54,0.5); z-index:50; }
+.drawer-backdrop.open { display:block; }
+.drawer { position:fixed; top:0; right:0; height:100vh; width:min(440px,92vw); background:#fff; z-index:51;
+  box-shadow:-6px 0 28px rgba(7,27,54,0.28); padding:20px; overflow-y:auto;
+  transform:translateX(100%); transition:transform 0.2s ease; }
+.drawer.open { transform:translateX(0); }
+.drawer-close { float:right; background:none; border:none; font-size:1.1rem; cursor:pointer; color:var(--ink-soft); }
+.drawer h3 { margin:0 0 2px; color:var(--navy); }
+.drawer .mrn { font-family:var(--mono); font-size:0.76rem; color:var(--ink-soft); }
+.drawer-section { margin-top:16px; }
+.drawer-section h4 { margin:0 0 6px; font-size:0.78rem; color:var(--navy); text-transform:uppercase; letter-spacing:0.03em; }
+.vital-row { display:flex; gap:14px; flex-wrap:wrap; }
+.vital-mini { text-align:center; }
+.vital-mini .vv { font-family:var(--mono); font-weight:700; font-size:1rem; color:var(--navy); }
+.vital-mini .vl { font-size:0.66rem; color:var(--ink-soft); }
+
+/* Task checklist */
+.task-row { display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line); }
+.task-row:last-child { border-bottom:none; }
+.task-row.done { opacity:0.45; }
+.task-row.done .task-label { text-decoration:line-through; }
+.task-label { flex:1; font-size:0.8rem; }
+.task-meta { font-size:0.68rem; color:var(--ink-soft); font-family:var(--mono); }
+
+footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); padding:20px; }
+
+.staff-card { display:flex; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-bottom:8px; background:var(--panel); }
+.staff-card .who { font-size:0.82rem; font-weight:600; color:var(--navy); }
+.staff-card .meta { font-size:0.7rem; color:var(--ink-soft); }
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
+.status-dot.on { background:var(--ok); } .status-dot.off { background:#c7d6e3; }
+
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">❤️</div>
+      <div class="sidebar-brand-text">
+        <h1>CardioScan Pro</h1>
+        <p>Clinician Dashboard</p>
+      </div>
+    </div>
+    <div class="demo-banner" id="demoBanner">⚠ Synthetic demo data — no real patient information</div>
+
+    <div class="nav-scroll">
+    <button class="nav-item active" data-page="command"><span class="ic">&#9673;</span> Command Center</button>
+    <button class="nav-item" data-page="admin"><span class="ic">&#9881;</span> Admin Center</button>
+    <button class="nav-item" data-page="nurses"><span class="ic">&#10010;</span> Nurses</button>
+    <button class="nav-item" data-page="physician"><span class="ic">&#9877;</span> Cardiologist / Physician</button>
+    <button class="nav-item" data-page="ehr"><span class="ic">&#9636;</span> EHR &amp; Patients</button>
+    <button class="nav-item" data-page="diagnostics"><span class="ic">&#9678;</span> Diagnostics &amp; Treatment</button>
+    <button class="nav-item" data-page="billing"><span class="ic">&#36;</span> Billing &amp; Payer</button>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- ============ COMMAND CENTER ============ -->
+    <section class="page active" data-page="command">
+      <section class="panel">
+        <h2>Command Center</h2>
+        <p class="sub">Program-wide view across all roles and both customer segments (hospital + payer) from the use-case diagram.</p>
+        <div class="grid-4" id="kpiRow"></div>
+      </section>
+      <div class="grid-2">
+        <section class="panel">
+          <h2>Today's Priority Alerts</h2>
+          <p class="sub">Highest-MACE-risk patients across the roster, newest first.</p>
+          <div class="table-wrap"><table class="dt" id="commandAlertsTable"></table></div>
+        </section>
+        <section class="panel">
+          <h2>Program Snapshot</h2>
+          <p class="sub">Roll-up across nursing, diagnostics, and billing.</p>
+          <div id="commandSnapshot"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ============ ADMIN CENTER ============ -->
+    <section class="page" data-page="admin">
+      <section class="panel">
+        <h2>Admin Center <span class="tag">hospital IT / program admin</span></h2>
+        <p class="sub">Staffing roster, integration status, and alert configuration.</p>
+        <div class="grid-2">
+          <div>
+            <h4 style="font-size:0.8rem;color:var(--navy);margin:0 0 8px;">Staff on record</h4>
+            <div id="staffList"></div>
+          </div>
+          <div>
+            <h4 style="font-size:0.8rem;color:var(--navy);margin:0 0 8px;">Integration status</h4>
+            <div class="staff-card"><div><div class="who">Epic / Cerner FHIR R4 API</div><div class="meta">Observation · RiskAssessment · DiagnosticReport</div></div><span class="pill submitted">interface ready</span></div>
+            <div class="staff-card"><div><div class="who">HL7 v2.x (MLLP)</div><div class="meta">ADT^A01 · ORU^R01</div></div><span class="pill submitted">interface ready</span></div>
+            <div class="staff-card"><div><div class="who">PACS / DICOM</div><div class="meta">Metadata extraction live</div></div><span class="pill submitted">interface ready</span></div>
+            <div class="staff-card"><div><div class="who">Payer clearinghouse (837/835)</div><div class="meta">Claims submission</div></div><span class="pill pending">scaffolded</span></div>
+            <h4 style="font-size:0.8rem;color:var(--navy);margin:16px 0 8px;">Alert thresholds</h4>
+            <div class="staff-card"><div class="who">High-risk MACE cutoff</div><span class="mono">score ≥ 0.60</span></div>
+            <div class="staff-card"><div class="who">Moderate-risk MACE cutoff</div><span class="mono">score ≥ 0.30</span></div>
+            <div class="staff-card"><div class="who">Data quality pass threshold</div><span class="mono">score ≥ 70</span></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ============ NURSES ============ -->
+    <section class="page" data-page="nurses">
+      <section class="panel">
+        <h2>Record Manual Vitals <span class="tag">bedside entry — no connected device</span></h2>
+        <p class="sub">The intake path this dashboard was missing: a nurse charting a reading by hand, for a new or existing patient. Submits through the real engine pipeline — quality check, risk scoring, diagnosis, automation tier — exactly like a device-sourced record.</p>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID</label>
+            <input type="text" id="manualPatientId" placeholder="existing MRN or new, e.g. P-0099" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Heart rate (bpm)</label>
+            <input type="text" id="manualHr" placeholder="e.g. 92" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">QTc (ms)</label>
+            <input type="text" id="manualQtc" placeholder="e.g. 420" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">HRV SDNN (ms)</label>
+            <input type="text" id="manualHrv" placeholder="e.g. 45" style="width:100%;" />
+          </div>
+        </div>
+        <button class="btn" id="submitManualVitalsBtn" style="margin-top:10px;">Record vitals</button>
+        <div id="manualVitalsResult" style="margin-top:12px;"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Nursing Worklist <span class="tag">hospital floor persona</span></h2>
+        <p class="sub">Rounding and monitoring tasks generated from the same patient roster the cardiologist and admin views use.</p>
+        <div class="toolbar">
+          <span class="mono" id="nurseTaskCount" style="font-size:0.8rem;color:var(--navy);font-weight:700;"></span>
+          <button class="btn ghost sm" id="clearDoneTasksBtn">Clear completed</button>
+        </div>
+        <div id="nurseTaskList"></div>
+      </section>
+    </section>
+
+    <!-- ============ CARDIOLOGIST / PHYSICIAN ============ -->
+    <section class="page" data-page="physician">
+      <section class="panel">
+        <h2>Request Analysis <span class="tag">the real entry point — a clinician's request, not raw data</span></h2>
+        <p class="sub">This is what triggers the 9-agent pipeline on demand: a cardiologist asks for a patient to be analyzed, and that request — not a device feed — is what enters Ingestion. "ECG risk re-analysis" actually re-runs the real pipeline against the patient's latest captured vitals; other order types are honestly recorded as pending, since this engine has no real data pathway for imaging or lab modalities yet.</p>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID</label>
+            <input type="text" id="orderPatientId" placeholder="existing MRN" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Order type</label>
+            <select id="orderType" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+              <option>ECG risk re-analysis</option>
+              <option>Echocardiogram</option>
+              <option>Stress test</option>
+              <option>Holter monitor</option>
+              <option>Coronary angiography</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Ordered by</label>
+            <select id="orderBy" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+              <option>Dr. Alvarez</option>
+              <option>Dr. Chen</option>
+              <option>Dr. Okafor</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn" id="submitOrderBtn" style="width:100%;">Place order</button>
+          </div>
+        </div>
+        <div id="orderResult" style="margin-top:12px;"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Cardiologist Worklist <span class="tag">"reviews high-risk patient list in EHR dashboard"</span></h2>
+        <p class="sub">Sorted by MACE risk score. Opening a row shows the full chart in the EHR &amp; Patients drawer.</p>
+        <div class="table-wrap"><table class="dt" id="physicianTable"></table></div>
+        <div class="disclaimer">Demo scoring only — risk scores come from the placeholder heuristic in <code>inference/models.py</code>, not a trained model. Not for real clinical use.</div>
+      </section>
+    </section>
+
+    <!-- ============ EHR & PATIENTS ============ -->
+    <section class="page" data-page="ehr">
+      <section class="panel">
+        <h2>EHR &amp; Patient Directory</h2>
+        <p class="sub">Search across the roster; click a patient to open their chart.</p>
+        <div class="toolbar">
+          <input type="search" id="patientSearch" placeholder="Search name, MRN, or diagnosis…" style="width:280px;" />
+          <span class="mono" id="patientCount" style="font-size:0.78rem;color:var(--ink-soft);"></span>
+        </div>
+        <div class="table-wrap"><table class="dt" id="ehrTable"></table></div>
+      </section>
+    </section>
+
+    <!-- ============ DIAGNOSTICS & TREATMENT ============ -->
+    <section class="page" data-page="diagnostics">
+      <section class="panel">
+        <h2>Diagnostic Orders Queue</h2>
+        <p class="sub">Orders placed from the physician worklist flow here; advance status as they're completed.</p>
+        <div class="table-wrap"><table class="dt" id="diagnosticsTable"></table></div>
+      </section>
+      <section class="panel">
+        <h2>Active Treatment Plans</h2>
+        <p class="sub">One plan per patient — illustrative, not a prescribing tool.</p>
+        <div id="treatmentList"></div>
+      </section>
+    </section>
+
+    <!-- ============ BILLING & PAYER ============ -->
+    <section class="page" data-page="billing">
+      <section class="panel">
+        <h2>Billing &amp; Payer — Automated ICD-10 <span class="tag demo">suggestions, not final coding</span></h2>
+        <p class="sub">Maps each patient's primary diagnosis to a suggested ICD-10 and CPT code, tracks payer submission status — mirrors the "population risk report / medical cost avoidance" payer flow from the use-case diagram.</p>
+        <div class="toolbar">
+          <button class="btn" id="autoCodeBtn">Auto-code all patients</button>
+          <span class="mono" id="billingSummary" style="font-size:0.78rem;color:var(--ink-soft);"></span>
+        </div>
+        <div class="table-wrap"><table class="dt" id="billingTable"></table></div>
+        <div class="disclaimer">Auto-suggested ICD-10/CPT codes require review and sign-off by a certified medical coder before submission — this is a workflow accelerator, not a substitute for professional coding judgment.</div>
+      </section>
+    </section>
+
+  </main>
+</div>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="patientDrawer">
+  <button class="drawer-close" id="drawerClose">✕ close</button>
+  <div id="drawerContent"></div>
+</div>
+
+<footer class="foot">Cardio AI · invest@cardioailive.com · cardioailive.com · +1 614-967-8728</footer>
+
+<script>
+(() => {
+  // ============================================================
+  // Shared synthetic roster — every section below reads from this
+  // one source of truth, the way the real backend's patient/claims
+  // store would feed all these views in production.
+  // ============================================================
+  const DIAGNOSES = {
+    "Atrial fibrillation":            { icd10: "I48.91", icd10_desc: "Atrial fibrillation, unspecified", cpt: "93000", cpt_desc: "ECG w/ interpretation" },
+    "Heart failure, systolic":        { icd10: "I50.9",  icd10_desc: "Heart failure, unspecified",       cpt: "93306", cpt_desc: "Echocardiogram, complete" },
+    "Coronary artery disease":        { icd10: "I25.10", icd10_desc: "Atherosclerotic heart disease",    cpt: "93454", cpt_desc: "Coronary angiography" },
+    "History of myocardial infarction": { icd10: "I25.2", icd10_desc: "Old myocardial infarction",       cpt: "93017", cpt_desc: "Cardiovascular stress test" },
+    "Hypertension":                   { icd10: "I10",    icd10_desc: "Essential (primary) hypertension", cpt: "99214", cpt_desc: "Office visit, established patient" },
+    "Hyperlipidemia":                 { icd10: "E78.5",  icd10_desc: "Hyperlipidemia, unspecified",      cpt: "80061", cpt_desc: "Lipid panel" },
+    "Supraventricular tachycardia":   { icd10: "I47.1",  icd10_desc: "Supraventricular tachycardia",     cpt: "93224", cpt_desc: "Holter monitor, 24-48hr" },
+    "Unspecified chest pain":         { icd10: "R07.9",  icd10_desc: "Chest pain, unspecified",           cpt: "93000", cpt_desc: "ECG w/ interpretation" },
+  };
+  const PAYERS = ["Aetna", "UnitedHealthcare", "Medicare", "Cigna", "Anthem BCBS", "Humana"];
+  const CARDIOLOGISTS = ["Dr. Alvarez", "Dr. Chen", "Dr. Okafor"];
+  const NURSES = ["Nurse Kim", "Nurse Dubois", "Nurse Larsen"];
+  const NAMES = ["Demo Patient A","Demo Patient B","Demo Patient C","Demo Patient D","Demo Patient E","Demo Patient F","Demo Patient G","Demo Patient H","Demo Patient I","Demo Patient J","Demo Patient K","Demo Patient L"];
+
+  function seededRand(seed) { let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+  function riskTierFromScore(s) { return s >= 0.6 ? "high" : s >= 0.3 ? "moderate" : "low"; }
+  const diagKeys = Object.keys(DIAGNOSES);
+
+  function generateSyntheticPatients() {
+    const rnd = seededRand(42);
+    const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+    return NAMES.map((name, i) => {
+      const diag = diagKeys[i % diagKeys.length];
+      const score = Math.round((0.15 + rnd() * 0.8) * 1000) / 1000;
+      const d = DIAGNOSES[diag];
+      return {
+        mrn: `MRN-${10230 + i}`,
+        name, age: 42 + Math.floor(rnd() * 40), sex: rnd() > 0.5 ? "F" : "M",
+        room: `${3 + (i % 4)}${String.fromCharCode(65 + (i % 3))}-${10 + i}`,
+        cardiologist: pick(CARDIOLOGISTS), nurse: pick(NURSES),
+        diagnosis: diag,
+        mace_score: score, risk_tier: riskTierFromScore(score),
+        vitals: { hr: 58 + Math.floor(rnd() * 70), bp: `${105 + Math.floor(rnd()*35)}/${65+Math.floor(rnd()*20)}`, spo2: 92 + Math.floor(rnd()*7), qtc: 380 + Math.floor(rnd()*140) },
+        allergies: rnd() > 0.7 ? ["Penicillin"] : rnd() > 0.5 ? ["Sulfa drugs"] : ["NKDA"],
+        medications: rnd() > 0.5 ? ["Metoprolol 25mg BID", "Atorvastatin 40mg QD"] : ["Lisinopril 10mg QD", "Aspirin 81mg QD"],
+        diagnostic_order: { type: pick(["ECG","Echocardiogram","Stress test","Holter monitor","Coronary angiography"]), status: pick(["ordered","scheduled","completed"]) },
+        treatment_plan: `Guideline-directed medical therapy for ${diag.toLowerCase()}; follow-up in ${pick([2,4,6,12])} weeks.`,
+        payer: pick(PAYERS),
+        claim_status: pick(["pending","submitted","approved","denied"]),
+        icd10: { code: d.icd10, desc: d.icd10_desc },
+        cpt: { code: d.cpt, desc: d.cpt_desc },
+        est_reimbursement: 180 + Math.floor(rnd() * 2400),
+        last_visit: `2026-0${1+Math.floor(rnd()*8)}-${10+Math.floor(rnd()*18)}`,
+        coded: rnd() > 0.4,
+        orders: [],
+        tasks: [
+          { id: `t${i}-1`, label: `Vitals check — ${name}`, meta: "Q4H", done: rnd() > 0.6 },
+          { id: `t${i}-2`, label: `Medication administration — ${name}`, meta: "per MAR", done: rnd() > 0.7 },
+          { id: `t${i}-3`, label: `Escalate if MACE ≥ 0.6 — ${name}`, meta: riskTierFromScore(score) === "high" ? "ACTION NEEDED" : "monitoring", done: false },
+        ],
+      };
+    });
+  }
+
+  const STATIC_STAFF = [
+    { name: "Dr. R. Alvarez", role: "Cardiologist", dept: "Cardiology", on: true },
+    { name: "Dr. M. Chen", role: "Cardiologist", dept: "Cardiology", on: true },
+    { name: "Dr. T. Okafor", role: "Cardiologist", dept: "Cardiology", on: false },
+    { name: "Nurse J. Kim", role: "RN", dept: "Cardiac Unit 4B", on: true },
+    { name: "Nurse S. Dubois", role: "RN", dept: "Cardiac Unit 4B", on: true },
+    { name: "Nurse P. Larsen", role: "RN", dept: "Cardiac Unit 3A", on: false },
+    { name: "A. Reyes", role: "Medical Coder", dept: "Billing", on: true },
+    { name: "H. Novak", role: "Program Admin", dept: "IT / Administration", on: true },
+  ];
+
+  // ============================================================
+  // Live data connection to the CardioAI Pro engine, with a
+  // synthetic fallback when no engine is reachable (e.g. this file
+  // previewed standalone). Same pattern as the main engine dashboard.
+  // ============================================================
+  const API = "/api";
+  let PATIENTS = [];
+  let STAFF = STATIC_STAFF;
+  let DATA_SOURCE = "loading";
+  let currentEhrFilter = "";
+
+  function setDataSource(source, detail) {
+    DATA_SOURCE = source;
+    const banner = document.getElementById("demoBanner");
+    if (source === "live") {
+      banner.textContent = `\u25CF Live engine data — ${detail}`;
+      banner.style.background = "rgba(30,166,114,0.15)";
+      banner.style.borderColor = "rgba(30,166,114,0.4)";
+    } else {
+      banner.textContent = "\u26A0 Synthetic demo data — no real patient information (engine not reachable)";
+      banner.style.background = "";
+      banner.style.borderColor = "";
+    }
+  }
+
+  async function fetchWithTimeout(url, opts = {}) {
+    const res = await fetch(url, { ...opts, signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { const body = await res.json(); if (body.detail) detail = body.detail; } catch { /* body wasn't JSON — keep the status */ }
+      throw new Error(detail);
+    }
+    return res.json();
+  }
+
+  async function loadAllData() {
+    try {
+      const [patientsRes, staffRes] = await Promise.all([
+        fetchWithTimeout(`${API}/patients`),
+        fetchWithTimeout(`${API}/staff`),
+      ]);
+      hasLoadedLiveOnce = true;
+      if (!patientsRes.patients.length) {
+        // Engine reachable but no patients yet — this is the honest state,
+        // not a reason to quietly substitute fake data. Show it as such.
+        setDataSource("live", "0 patients yet — open the Main Engine console's Live Data Streams page to start traffic");
+        PATIENTS = [];
+      } else {
+        setDataSource("live", `${patientsRes.patients.length} patient(s) tracked`);
+        PATIENTS = patientsRes.patients;
+      }
+      STAFF = staffRes.staff;
+    } catch {
+      // A transient network hiccup after we've already loaded live data
+      // shouldn't flash the dashboard over to fake patients — only fall
+      // back to synthetic data if we've never successfully reached the
+      // engine AND haven't already generated a synthetic roster (otherwise
+      // every 6s poll while offline would silently wipe out local edits —
+      // task toggles, claim advances — by regenerating from the same seed).
+      if (!hasLoadedLiveOnce && !PATIENTS.length) {
+        setDataSource("local");
+        PATIENTS = generateSyntheticPatients();
+        STAFF = STATIC_STAFF;
+      } else if (!hasLoadedLiveOnce) {
+        setDataSource("local");
+      }
+    }
+    renderAll();
+  }
+  let hasLoadedLiveOnce = false;
+
+  function renderAll() {
+    renderCommandCenter();
+    renderAdmin();
+    renderNurses();
+    renderPhysician();
+    renderEHR(currentEhrFilter);
+    renderDiagnostics();
+    renderBilling();
+  }
+
+  // ============================================================
+  // Navigation
+  // ============================================================
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelector(`.page[data-page="${btn.dataset.page}"]`).classList.add("active");
+    });
+  });
+
+  // ============================================================
+  // Command Center
+  // ============================================================
+  function renderCommandCenter() {
+    const highRisk = PATIENTS.filter(p => p.risk_tier === "high").length;
+    const pendingDx = PATIENTS.filter(p => p.diagnostic_order.status !== "completed").length;
+    const pendingClaims = PATIENTS.filter(p => p.claim_status === "pending").length;
+    const avgQuality = 87; // mirrors the engine console's data-quality panel
+
+    document.getElementById("kpiRow").innerHTML = `
+      <div class="kpi ${highRisk ? "err" : "ok"}"><div class="kpi-label">High-risk patients</div><div class="kpi-value">${highRisk}</div><div class="kpi-sub">of ${PATIENTS.length} monitored</div></div>
+      <div class="kpi"><div class="kpi-label">Pending diagnostics</div><div class="kpi-value">${pendingDx}</div><div class="kpi-sub">ordered or scheduled</div></div>
+      <div class="kpi ${pendingClaims ? "warn" : "ok"}"><div class="kpi-label">Claims pending</div><div class="kpi-value">${pendingClaims}</div><div class="kpi-sub">awaiting payer response</div></div>
+      <div class="kpi ok"><div class="kpi-label">Avg data quality</div><div class="kpi-value">${avgQuality}</div><div class="kpi-sub">ingestion score, 0-100</div></div>`;
+
+    const top = [...PATIENTS].sort((a,b) => b.mace_score - a.mace_score).slice(0, 6);
+    document.getElementById("commandAlertsTable").innerHTML = `
+      <thead><tr><th>Patient</th><th>MRN</th><th>MACE</th><th>Tier</th><th>Cardiologist</th></tr></thead>
+      <tbody>${top.map(p => `
+        <tr class="clickable" data-open="${p.mrn}">
+          <td>${p.name}</td><td class="mono">${p.mrn}</td><td class="mono">${p.mace_score.toFixed(3)}</td>
+          <td><span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()}</span></td><td>${p.cardiologist}</td>
+        </tr>`).join("")}</tbody>`;
+
+    const nurseTasksOpen = PATIENTS.flatMap(p => p.tasks).filter(t => !t.done).length;
+    const claimsApproved = PATIENTS.filter(p => p.claim_status === "approved").length;
+    document.getElementById("commandSnapshot").innerHTML = `
+      <div class="staff-card"><div class="who">Open nursing tasks</div><span class="mono">${nurseTasksOpen}</span></div>
+      <div class="staff-card"><div class="who">Claims approved</div><span class="mono">${claimsApproved} / ${PATIENTS.length}</span></div>
+      <div class="staff-card"><div class="who">Staff on shift now</div><span class="mono">${STAFF.filter(s=>s.on).length} / ${STAFF.length}</span></div>
+      <div class="staff-card"><div class="who">Auto-coded patients</div><span class="mono">${PATIENTS.filter(p=>p.coded).length} / ${PATIENTS.length}</span></div>`;
+
+    bindOpenButtons();
+  }
+
+  // ============================================================
+  // Admin Center
+  // ============================================================
+  function renderAdmin() {
+    document.getElementById("staffList").innerHTML = STAFF.map(s => `
+      <div class="staff-card">
+        <div><div class="who"><span class="status-dot ${s.on ? "on" : "off"}"></span>${s.name}</div><div class="meta">${s.role} · ${s.dept}</div></div>
+        <span class="pill ${s.on ? "approved" : "pending"}">${s.on ? "On shift" : "Off shift"}</span>
+      </div>`).join("");
+  }
+
+  // ============================================================
+  // Nurses
+  // ============================================================
+  function renderNurses() {
+    const allTasks = PATIENTS.flatMap(p => p.tasks.map(t => ({ ...t, room: p.room })));
+    const open = allTasks.filter(t => !t.done).length;
+    document.getElementById("nurseTaskCount").textContent = `${open} open task${open === 1 ? "" : "s"} of ${allTasks.length}`;
+    document.getElementById("nurseTaskList").innerHTML = allTasks.map(t => `
+      <div class="task-row ${t.done ? "done" : ""}" data-task="${t.id}">
+        <input type="checkbox" ${t.done ? "checked" : ""} data-toggle-task="${t.id}" />
+        <span class="task-label">${t.label}</span>
+        <span class="task-meta">${t.room} · ${t.meta}</span>
+      </div>`).join("");
+
+    document.querySelectorAll("[data-toggle-task]").forEach(cb => {
+      cb.addEventListener("change", async () => {
+        const id = cb.dataset.toggleTask;
+        let patientMrn = null;
+        for (const p of PATIENTS) {
+          const t = p.tasks.find(t => t.id === id);
+          if (t) { patientMrn = p.mrn; break; }
+        }
+        if (DATA_SOURCE === "live" && patientMrn) {
+          try {
+            const updated = await fetchWithTimeout(`${API}/patients/${encodeURIComponent(patientMrn)}/tasks/${encodeURIComponent(id)}/toggle`, { method: "POST" });
+            PATIENTS = PATIENTS.map(p => p.mrn === updated.mrn ? updated : p);
+          } catch {
+            for (const p of PATIENTS) {
+              const t = p.tasks.find(t => t.id === id);
+              if (t) { t.done = cb.checked; break; }
+            }
+          }
+        } else {
+          for (const p of PATIENTS) {
+            const t = p.tasks.find(t => t.id === id);
+            if (t) { t.done = cb.checked; break; }
+          }
+        }
+        renderNurses();
+        renderCommandCenter();
+      });
+    });
+  }
+  document.getElementById("clearDoneTasksBtn").addEventListener("click", () => {
+    PATIENTS.forEach(p => { p.tasks = p.tasks.filter(t => !t.done); });
+    renderNurses(); renderCommandCenter();
+  });
+
+  // ============================================================
+  // Cardiologist / Physician
+  // ============================================================
+  function renderPhysician() {
+    const sorted = [...PATIENTS].sort((a,b) => b.mace_score - a.mace_score);
+    document.getElementById("physicianTable").innerHTML = `
+      <thead><tr><th>Patient</th><th>MRN</th><th>Diagnosis</th><th>MACE</th><th>Tier</th><th>HR</th><th>QTc</th><th>Order</th><th></th></tr></thead>
+      <tbody>${sorted.map(p => `
+        <tr class="clickable" data-open="${p.mrn}">
+          <td>${p.name}</td><td class="mono">${p.mrn}</td><td>${p.diagnosis}</td>
+          <td class="mono">${p.mace_score.toFixed(3)}</td><td><span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()}</span></td>
+          <td class="mono">${p.vitals.hr}</td><td class="mono">${p.vitals.qtc}</td>
+          <td><span class="pill ${p.diagnostic_order.status}">${p.diagnostic_order.type}</span></td>
+          <td><button class="btn sm ghost" data-open="${p.mrn}">Open chart</button></td>
+        </tr>`).join("")}</tbody>`;
+    bindOpenButtons();
+  }
+
+  // ============================================================
+  // EHR & Patients
+  // ============================================================
+  function renderEHR(filter = "") {
+    const f = filter.trim().toLowerCase();
+    const rows = PATIENTS.filter(p =>
+      !f || p.name.toLowerCase().includes(f) || p.mrn.toLowerCase().includes(f) || p.diagnosis.toLowerCase().includes(f)
+    );
+    document.getElementById("patientCount").textContent = `${rows.length} of ${PATIENTS.length} patients`;
+    document.getElementById("ehrTable").innerHTML = `
+      <thead><tr><th>Patient</th><th>MRN</th><th>Age/Sex</th><th>Diagnosis</th><th>Tier</th><th>Last visit</th></tr></thead>
+      <tbody>${rows.map(p => `
+        <tr class="clickable" data-open="${p.mrn}">
+          <td>${p.name}</td><td class="mono">${p.mrn}</td><td>${p.age}/${p.sex}</td>
+          <td>${p.diagnosis}</td><td><span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()}</span></td>
+          <td class="mono">${p.last_visit}</td>
+        </tr>`).join("")}</tbody>`;
+    bindOpenButtons();
+  }
+  document.getElementById("patientSearch").addEventListener("input", (e) => {
+    currentEhrFilter = e.target.value;
+    renderEHR(currentEhrFilter);
+  });
+
+  // ============================================================
+  // Diagnostics & Treatment
+  // ============================================================
+  const STATUS_ORDER = ["ordered", "scheduled", "completed"];
+  function renderDiagnostics() {
+    document.getElementById("diagnosticsTable").innerHTML = `
+      <thead><tr><th>Patient</th><th>Order</th><th>Ordered by</th><th>Status</th><th></th></tr></thead>
+      <tbody>${PATIENTS.map(p => `
+        <tr>
+          <td>${p.name}</td><td>${p.diagnostic_order.type}</td><td>${p.cardiologist}</td>
+          <td><span class="pill ${p.diagnostic_order.status}">${p.diagnostic_order.status}</span></td>
+          <td><button class="btn sm ghost" data-advance="${p.mrn}" ${p.diagnostic_order.status === "completed" ? "disabled" : ""}>Advance status</button></td>
+        </tr>`).join("")}</tbody>`;
+
+    document.querySelectorAll("[data-advance]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const mrn = btn.dataset.advance;
+        if (DATA_SOURCE === "live") {
+          try {
+            const updated = await fetchWithTimeout(`${API}/patients/${encodeURIComponent(mrn)}/diagnostic-order/advance`, { method: "POST" });
+            PATIENTS = PATIENTS.map(p => p.mrn === updated.mrn ? updated : p);
+          } catch {
+            const p = PATIENTS.find(p => p.mrn === mrn);
+            const idx = STATUS_ORDER.indexOf(p.diagnostic_order.status);
+            if (idx < STATUS_ORDER.length - 1) p.diagnostic_order.status = STATUS_ORDER[idx + 1];
+          }
+        } else {
+          const p = PATIENTS.find(p => p.mrn === mrn);
+          const idx = STATUS_ORDER.indexOf(p.diagnostic_order.status);
+          if (idx < STATUS_ORDER.length - 1) p.diagnostic_order.status = STATUS_ORDER[idx + 1];
+        }
+        renderDiagnostics(); renderPhysician(); renderCommandCenter();
+      });
+    });
+
+    document.getElementById("treatmentList").innerHTML = PATIENTS.map(p => `
+      <div class="staff-card">
+        <div><div class="who">${p.name} <span class="mono" style="font-weight:400;color:var(--ink-soft);">· ${p.mrn}</span></div><div class="meta">${p.treatment_plan}</div></div>
+        <span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()}</span>
+      </div>`).join("");
+  }
+
+  // ============================================================
+  // Billing & Payer / ICD-10
+  // ============================================================
+  const CLAIM_ORDER = ["pending", "submitted", "approved"];
+  function renderBilling() {
+    const coded = PATIENTS.filter(p => p.coded).length;
+    const totalEst = PATIENTS.reduce((sum, p) => sum + p.est_reimbursement, 0);
+    document.getElementById("billingSummary").textContent = `${coded}/${PATIENTS.length} coded · est. $${totalEst.toLocaleString()} total`;
+
+    document.getElementById("billingTable").innerHTML = `
+      <thead><tr><th>Patient</th><th>Diagnosis</th><th>ICD-10</th><th>CPT</th><th>Payer</th><th>Claim</th><th>Est. reimb.</th><th></th></tr></thead>
+      <tbody>${PATIENTS.map(p => `
+        <tr>
+          <td>${p.name}</td><td>${p.diagnosis}</td>
+          <td>${p.coded ? `<span class="chip">${p.icd10.code}<small>${p.icd10.desc}</small></span>` : `<span class="mono" style="color:var(--ink-soft);">not coded</span>`}</td>
+          <td>${p.coded ? `<span class="chip">${p.cpt.code}<small>${p.cpt.desc}</small></span>` : "—"}</td>
+          <td>${p.payer}</td>
+          <td><span class="pill ${p.claim_status}">${p.claim_status}</span></td>
+          <td class="mono">$${p.est_reimbursement.toLocaleString()}</td>
+          <td><button class="btn sm ghost" data-advance-claim="${p.mrn}" ${p.claim_status === "approved" || p.claim_status === "denied" ? "disabled" : ""}>Advance</button></td>
+        </tr>`).join("")}</tbody>`;
+
+    document.querySelectorAll("[data-advance-claim]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const mrn = btn.dataset.advanceClaim;
+        if (DATA_SOURCE === "live") {
+          try {
+            const updated = await fetchWithTimeout(`${API}/patients/${encodeURIComponent(mrn)}/claim/advance`, { method: "POST" });
+            PATIENTS = PATIENTS.map(p => p.mrn === updated.mrn ? updated : p);
+          } catch {
+            const p = PATIENTS.find(p => p.mrn === mrn);
+            const idx = CLAIM_ORDER.indexOf(p.claim_status);
+            if (idx >= 0 && idx < CLAIM_ORDER.length - 1) p.claim_status = CLAIM_ORDER[idx + 1];
+          }
+        } else {
+          const p = PATIENTS.find(p => p.mrn === mrn);
+          const idx = CLAIM_ORDER.indexOf(p.claim_status);
+          if (idx >= 0 && idx < CLAIM_ORDER.length - 1) p.claim_status = CLAIM_ORDER[idx + 1];
+        }
+        renderBilling(); renderCommandCenter();
+      });
+    });
+  }
+  document.getElementById("autoCodeBtn").addEventListener("click", async () => {
+    if (DATA_SOURCE === "live") {
+      // Coding already happens automatically server-side, via the Diagnostic
+      // Agent, the moment a finding exists — this just re-syncs the view
+      // rather than force-assigning fake codes to patients with no finding.
+      await loadAllData();
+    } else {
+      PATIENTS.forEach(p => { p.coded = true; });
+      renderBilling(); renderCommandCenter();
+    }
+  });
+
+  // ============================================================
+  // Patient detail drawer (shared across Command/Physician/EHR)
+  // ============================================================
+  function openDrawer(mrn) {
+    const p = PATIENTS.find(p => p.mrn === mrn);
+    if (!p) return;
+    document.getElementById("drawerContent").innerHTML = `
+      <h3>${p.name}</h3>
+      <div class="mrn">${p.mrn} · ${p.age}/${p.sex} · Room ${p.room}</div>
+      <div style="margin-top:8px;"><span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()} RISK</span> <span class="mono" style="font-size:0.75rem;color:var(--ink-soft);">MACE ${p.mace_score.toFixed(3)}</span></div>
+
+      <div class="drawer-section">
+        <h4>Vitals</h4>
+        <div class="vital-row">
+          <div class="vital-mini"><div class="vv">${p.vitals.hr}</div><div class="vl">HR bpm</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.bp}</div><div class="vl">BP mmHg</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.spo2}%</div><div class="vl">SpO2</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.qtc}</div><div class="vl">QTc ms</div></div>
+        </div>
+      </div>
+
+      <div class="drawer-section"><h4>Diagnosis &amp; care team</h4>
+        <div style="font-size:0.82rem;">${p.diagnosis}</div>
+        <div style="font-size:0.76rem;color:var(--ink-soft);margin-top:2px;">${p.cardiologist} · ${p.nurse}</div>
+      </div>
+
+      <div class="drawer-section"><h4>Medications</h4>
+        ${p.medications.map(m => `<div style="font-size:0.8rem;">• ${m}</div>`).join("")}
+      </div>
+
+      <div class="drawer-section"><h4>Allergies</h4>
+        <div style="font-size:0.8rem;">${p.allergies.join(", ")}</div>
+      </div>
+
+      <div class="drawer-section"><h4>Diagnostic order</h4>
+        <span class="pill ${p.diagnostic_order.status}">${p.diagnostic_order.type} — ${p.diagnostic_order.status}</span>
+      </div>
+
+      <div class="drawer-section"><h4>Treatment plan</h4>
+        <div style="font-size:0.8rem;">${p.treatment_plan}</div>
+      </div>
+
+      <div class="drawer-section"><h4>Order history</h4>
+        ${(p.orders && p.orders.length) ? p.orders.map(o => `
+          <div style="font-size:0.78rem; padding:6px 0; border-bottom:1px solid var(--line);">
+            <div><strong>${o.order_type}</strong> <span class="pill ${o.status === "completed" ? "approved" : o.status === "failed" ? "denied" : "pending"}">${o.status}</span></div>
+            <div style="color:var(--ink-soft); font-size:0.72rem;">by ${o.ordered_by} · ${new Date(o.created_at * 1000).toLocaleString()}</div>
+            <div style="margin-top:2px;">${o.result_summary}</div>
+          </div>`).join("") : `<div style="font-size:0.78rem; color:var(--ink-soft);">No orders placed yet.</div>`}
+      </div>
+
+      <div class="drawer-section"><h4>Billing</h4>
+        <div style="font-size:0.8rem;">${p.payer} · <span class="pill ${p.claim_status}">${p.claim_status}</span> · est. $${p.est_reimbursement.toLocaleString()}</div>
+        ${p.coded ? `<div style="margin-top:6px;"><span class="chip">${p.icd10.code}<small>${p.icd10.desc}</small></span></div>` : ""}
+      </div>
+    `;
+    document.getElementById("patientDrawer").classList.add("open");
+    document.getElementById("drawerBackdrop").classList.add("open");
+  }
+  function closeDrawer() {
+    document.getElementById("patientDrawer").classList.remove("open");
+    document.getElementById("drawerBackdrop").classList.remove("open");
+  }
+  document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+  document.getElementById("drawerBackdrop").addEventListener("click", closeDrawer);
+  function bindOpenButtons() {
+    document.querySelectorAll("[data-open]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        if (ev.target.tagName === "BUTTON" && !ev.target.dataset.open) return;
+        openDrawer(el.dataset.open);
+      });
+    });
+  }
+
+  // ============================================================
+  // Request Analysis — a cardiologist's ORDER is the trigger, not data
+  // arriving. "ECG risk re-analysis" actually re-runs the real 9-agent
+  // pipeline server-side; other order types are honestly recorded as
+  // pending since the engine has no real ingestion pathway for them yet.
+  // ============================================================
+  document.getElementById("submitOrderBtn").addEventListener("click", async () => {
+    const resultEl = document.getElementById("orderResult");
+    const patientId = document.getElementById("orderPatientId").value.trim();
+    const orderType = document.getElementById("orderType").value;
+    const orderedBy = document.getElementById("orderBy").value;
+
+    if (!patientId) {
+      resultEl.innerHTML = `<div class="form-result error">Patient ID is required.</div>`;
+      return;
+    }
+    if (DATA_SOURCE !== "live") {
+      resultEl.innerHTML = `<div class="form-result info">Placing an order needs the live engine — this preview has no backend to submit to. Deploy <code>cardioai-pro.zip</code> and open this page from that server to use it.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("submitOrderBtn");
+    btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.textContent = "Submitting…";
+
+    try {
+      const res = await fetchWithTimeout(`${API}/patients/${encodeURIComponent(patientId)}/orders`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_type: orderType, ordered_by: orderedBy }),
+      });
+      const order = res.order;
+      const dispatch = res.dispatch_result;
+      const cls = order.status === "completed" ? "success" : order.status === "failed" ? "error" : "info";
+      resultEl.innerHTML = `
+        <div class="form-result ${cls}">
+          <strong>${order.order_id}</strong> — <span class="pill ${order.status === "completed" ? "approved" : order.status === "failed" ? "denied" : "pending"}">${order.status}</span><br/>
+          ${order.result_summary}
+          ${dispatch ? `<div style="margin-top:6px; font-size:0.72rem; opacity:0.8;">Pipeline trace: ${dispatch.trace.map(t => t.agent).join(" → ")}</div>` : ""}
+        </div>`;
+      await loadAllData();
+    } catch (err) {
+      resultEl.innerHTML = `<div class="form-result error">Could not place order — ${err.message}.</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+  // ============================================================
+  // Manual vitals entry — the intake path that was missing: a nurse or
+  // physician charting a reading by hand rather than a connected device
+  // pushing it in. Submits through the real engine pipeline via the same
+  // /api/ingest endpoint the simulated streams use — it's fully generic on
+  // `source`, so this needs no new backend endpoint.
+  // ============================================================
+  document.getElementById("submitManualVitalsBtn").addEventListener("click", async () => {
+    const resultEl = document.getElementById("manualVitalsResult");
+    const patientId = document.getElementById("manualPatientId").value.trim();
+    const hr = parseFloat(document.getElementById("manualHr").value);
+    const qtc = parseFloat(document.getElementById("manualQtc").value);
+    const hrv = parseFloat(document.getElementById("manualHrv").value);
+
+    if (!patientId) {
+      resultEl.innerHTML = `<div class="form-result error">Patient ID is required.</div>`;
+      return;
+    }
+    if ([hr, qtc, hrv].some(v => Number.isNaN(v))) {
+      resultEl.innerHTML = `<div class="form-result error">Heart rate, QTc, and HRV must all be numbers.</div>`;
+      return;
+    }
+
+    if (DATA_SOURCE !== "live") {
+      resultEl.innerHTML = `<div class="form-result info">Manual entry needs the live engine — this preview has no backend to record into. Deploy <code>cardioai-pro.zip</code> and open this page from that server to use it.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("submitManualVitalsBtn");
+    btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.textContent = "Recording…";
+
+    try {
+      const res = await fetchWithTimeout(`${API}/ingest`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modality: "ecg",
+          source: "manual entry — nurse",
+          record: { patient_id: patientId, heart_rate_bpm: hr, qt_interval_ms: qtc, hrv_sdnn_ms: hrv },
+        }),
+      });
+      if (!res.ok) throw new Error("engine rejected the record");
+      const finding = res.result?.diagnostic_finding;
+      const automation = res.result?.automation;
+      const prediction = res.result?.prediction;
+      resultEl.innerHTML = `
+        <div class="form-result success">
+          Recorded for <strong>${patientId}</strong> — MACE score ${prediction ? prediction.score.toFixed(3) : "n/a"},
+          tier <span class="pill ${prediction ? prediction.risk_tier : "low"}">${prediction ? prediction.risk_tier.toUpperCase() : "LOW"}</span>.
+          ${finding && finding.specialist_review_required
+            ? `Diagnostic finding: "${finding.diagnosis}"${automation ? ` — ${automation.action_label}.` : "."}`
+            : "No significant finding — routine, no escalation."}
+        </div>`;
+      document.getElementById("manualHr").value = "";
+      document.getElementById("manualQtc").value = "";
+      document.getElementById("manualHrv").value = "";
+      await loadAllData(); // so the new/updated patient shows up everywhere immediately
+    } catch (err) {
+      resultEl.innerHTML = `<div class="form-result error">Could not record — ${err.message}.</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+  // ============================================================
+  // Initial load + live polling
+  // ============================================================
+  loadAllData();
+  setInterval(loadAllData, 6000);
+})();
+</script>
+</body>
+</html>

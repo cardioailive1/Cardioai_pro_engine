@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CardioAI Pro — Main Engine</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="assets/logo.jpg" alt="CardioAI logo" />
+      <div class="sidebar-brand-text">
+        <h1>CardioScan Pro</h1>
+        <p>Main Engine</p>
+      </div>
+    </div>
+    <div class="sidebar-conn-status">
+      <span class="dot" id="connDot"></span>
+      <span id="connText">Connecting…</span>
+    </div>
+
+    <div class="nav-scroll">
+    <button class="nav-item active" data-page="agents">
+      <span class="nav-ic">&#9678;</span> Orchestrator &amp; Agents
+    </button>
+    <button class="nav-item" data-page="streams">
+      <span class="nav-ic">&#9638;</span> Live Data Streams
+    </button>
+    <button class="nav-item" data-page="quality">
+      <span class="nav-ic">&#10003;</span> Data Quality
+    </button>
+    <button class="nav-item" data-page="inference">
+      <span class="nav-ic">&#9651;</span> Model Inference
+    </button>
+    <button class="nav-item" data-page="fhir">
+      <span class="nav-ic">&#8644;</span> FHIR &amp; HL7
+    </button>
+    <button class="nav-item" data-page="dicom">
+      <span class="nav-ic">&#9638;</span> PACS &amp; DICOM
+    </button>
+    <button class="nav-item" data-page="continuum">
+      <span class="nav-ic">&#8674;</span> Care Continuum
+    </button>
+    <button class="nav-item" data-page="automation">
+      <span class="nav-ic">&#9889;</span> Automation Tiers
+    </button>
+    <button class="nav-item" data-page="bias">
+      <span class="nav-ic">&#9878;</span> Bias Audit
+    </button>
+    <button class="nav-item" data-page="clinician">
+      <span class="nav-ic">&#9877;</span> Clinician Worklist
+    </button>
+    <button class="nav-item" data-page="outputs">
+      <span class="nav-ic">&#128202;</span> Business Outputs
+    </button>
+    <button class="nav-item" data-page="deploy">
+      <span class="nav-ic">&#9729;</span> Deployment
+    </button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-foot-label">Engine status</div>
+      <div class="sidebar-foot-value" id="sidebarMode">connecting…</div>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- ================= AGENTS / ORCHESTRATOR ================= -->
+    <section class="page active" data-page="agents">
+
+      <section class="panel">
+        <h2>Central Orchestrator <span class="tag">multi-agent</span></h2>
+        <p class="sub">Every record — hospital, payer, or consumer — is dispatched through the same coordinator to a fixed agent pipeline. Nodes pulse as work moves through them.</p>
+        <div class="orchestrator-map" id="orchestratorMap">
+          <div class="agent-node" data-agent="ingestion"><span class="led" id="led-ingestion"></span><div class="name">Ingestion</div><div class="stat" id="stat-ingestion">0 runs</div></div>
+          <div class="agent-node" data-agent="quality"><span class="led" id="led-quality"></span><div class="name">Quality</div><div class="stat" id="stat-quality">0 runs</div></div>
+          <div class="orchestrator-core">CENTRAL<br>ORCHESTRATOR</div>
+          <div class="agent-node" data-agent="fhir"><span class="led" id="led-fhir"></span><div class="name">FHIR Mapper</div><div class="stat" id="stat-fhir">0 runs</div></div>
+          <div class="agent-node" data-agent="dicom"><span class="led" id="led-dicom"></span><div class="name">DICOM</div><div class="stat" id="stat-dicom">0 runs</div></div>
+          <div class="agent-node" data-agent="inference"><span class="led" id="led-inference"></span><div class="name">Inference</div><div class="stat" id="stat-inference">0 runs</div></div>
+          <div class="agent-node" data-agent="intake"><span class="led" id="led-intake"></span><div class="name">Intake</div><div class="stat" id="stat-intake">0 runs</div></div>
+          <div class="agent-node" data-agent="longitudinal"><span class="led" id="led-longitudinal"></span><div class="name">Longitudinal</div><div class="stat" id="stat-longitudinal">0 runs</div></div>
+          <div class="agent-node" data-agent="fusion"><span class="led" id="led-fusion"></span><div class="name">Fusion</div><div class="stat" id="stat-fusion">0 runs</div></div>
+          <div class="agent-node" data-agent="diagnostic"><span class="led" id="led-diagnostic"></span><div class="name">Diagnostic</div><div class="stat" id="stat-diagnostic">0 runs</div></div>
+          <div class="agent-node" data-agent="automation"><span class="led" id="led-automation"></span><div class="name">Automation</div><div class="stat" id="stat-automation">0 runs</div></div>
+          <div class="agent-node" data-agent="report"><span class="led" id="led-report"></span><div class="name">Report</div><div class="stat" id="stat-report">0 runs</div></div>
+          <div class="agent-node" data-agent="alert"><span class="led" id="led-alert"></span><div class="name">Alert</div><div class="stat" id="stat-alert">0 runs</div></div>
+          <div class="agent-node" data-agent="continuum"><span class="led" id="led-continuum"></span><div class="name">Continuum</div><div class="stat" id="stat-continuum">0 runs</div></div>
+          <div class="agent-node" data-agent="registry"><span class="led" id="led-registry"></span><div class="name">Registry</div><div class="stat" id="stat-registry">0 runs</div></div>
+          <div class="agent-node" data-agent="claims_aggregator"><span class="led" id="led-claims_aggregator"></span><div class="name">Claims Aggr.</div><div class="stat" id="stat-claims_aggregator">0 runs</div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Agent Roster</h2>
+        <p class="sub">Six single-responsibility agents. The orchestrator is the only thing that calls them — they never call each other.</p>
+        <div class="agent-card-grid">
+
+          <div class="agent-card" data-agent-card="ingestion">
+            <div class="ac-head">
+              <span class="ac-idx">1</span>
+              <span class="ac-name">Ingestion Agent</span>
+              <span class="led" id="ledc-ingestion"></span>
+            </div>
+            <p class="ac-desc">Entry point for every modality. Normalizes shape and stamps provenance (source, record id, timestamp) before anything downstream sees the record.</p>
+            <div class="ac-stats" id="acstat-ingestion">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="quality">
+            <div class="ac-head">
+              <span class="ac-idx">2</span>
+              <span class="ac-name">Quality Agent</span>
+              <span class="led" id="ledc-quality"></span>
+            </div>
+            <p class="ac-desc">Runs schema, range, completeness and statistical drift checks. Records below threshold are flagged, not dropped, so review is possible.</p>
+            <div class="ac-stats" id="acstat-quality">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="fhir">
+            <div class="ac-head">
+              <span class="ac-idx">3</span>
+              <span class="ac-name">FHIR Mapper Agent</span>
+              <span class="led" id="ledc-fhir"></span>
+            </div>
+            <p class="ac-desc">Maps a normalized, quality-passed record onto FHIR R4 resources — Observation, RiskAssessment, DiagnosticReport — ready for EHR exchange.</p>
+            <div class="ac-stats" id="acstat-fhir">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="dicom">
+            <div class="ac-head">
+              <span class="ac-idx">4</span>
+              <span class="ac-name">DICOM Agent</span>
+              <span class="led" id="ledc-dicom"></span>
+            </div>
+            <p class="ac-desc">Handles imaging-modality records only — extracts DICOM study metadata for a PACS-forwarded study. No-ops for non-imaging records.</p>
+            <div class="ac-stats" id="acstat-dicom">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="inference">
+            <div class="ac-head">
+              <span class="ac-idx">5</span>
+              <span class="ac-name">Inference Agent</span>
+              <span class="led" id="ledc-inference"></span>
+            </div>
+            <p class="ac-desc">Routes the record to the model registered for its modality and returns a risk prediction. Flags the task when risk comes back high.</p>
+            <div class="ac-stats" id="acstat-inference">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="intake">
+            <div class="ac-head">
+              <span class="ac-idx">6</span>
+              <span class="ac-name">Patient Intake Agent</span>
+              <span class="led" id="ledc-intake"></span>
+            </div>
+            <p class="ac-desc">Resolves patient identity and appends this record to their reading history — runs BEFORE diagnosis now, not after, so longitudinal trend and fusion can be computed in time to actually influence the diagnosis.</p>
+            <div class="ac-stats" id="acstat-intake">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="longitudinal">
+            <div class="ac-head">
+              <span class="ac-idx">7</span>
+              <span class="ac-name">Longitudinal Agent</span>
+              <span class="led" id="ledc-longitudinal"></span>
+            </div>
+            <p class="ac-desc">Computes real trend statistics (baseline deviation, slope over time, volatility) from a patient's accumulated reading history — the mechanism that makes genuine early detection possible, not just single-reading abnormality.</p>
+            <div class="ac-stats" id="acstat-longitudinal">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="fusion">
+            <div class="ac-head">
+              <span class="ac-idx">8</span>
+              <span class="ac-name">Fusion Agent</span>
+              <span class="led" id="ledc-fusion"></span>
+            </div>
+            <p class="ac-desc">Transparently combines ECG score + longitudinal trend into one fused assessment — now BEFORE the diagnosis, so it genuinely feeds the decision instead of just observing it. Imaging features are surfaced alongside, never folded into the score.</p>
+            <div class="ac-stats" id="acstat-fusion">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="diagnostic">
+            <div class="ac-head">
+              <span class="ac-idx">9</span>
+              <span class="ac-name">Diagnostic Agent</span>
+              <span class="led" id="ledc-diagnostic"></span>
+            </div>
+            <p class="ac-desc">Turns the FUSED risk score (ECG + trend, when trend data exists) into an actual diagnosis + ICD-10 coding candidate. Deliberately conservative: assigns only a generic abnormal-finding code (R94.31), never a disease-specific one.</p>
+            <div class="ac-stats" id="acstat-diagnostic">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="automation">
+            <div class="ac-head">
+              <span class="ac-idx">10</span>
+              <span class="ac-name">Automation Tier Agent</span>
+              <span class="led" id="ledc-automation"></span>
+            </div>
+            <p class="ac-desc">Decides how much autonomy the engine exercises: auto-escalate, queue as a clinician recommendation, or log only. Requires a confirmed, coded diagnosis to ever reach auto-escalate — structurally unreachable from raw vitals alone.</p>
+            <div class="ac-stats" id="acstat-automation">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="report">
+            <div class="ac-head">
+              <span class="ac-idx">11</span>
+              <span class="ac-name">Clinical Report Agent</span>
+              <span class="led" id="ledc-report"></span>
+            </div>
+            <p class="ac-desc">Formats everything upstream — quality, risk score, diagnosis, automation tier — into one structured, human-readable clinical report. Formatting only; every fact already exists elsewhere in the pipeline.</p>
+            <div class="ac-stats" id="acstat-report">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="alert">
+            <div class="ac-head">
+              <span class="ac-idx">12</span>
+              <span class="ac-name">Alert Agent</span>
+              <span class="led" id="ledc-alert"></span>
+            </div>
+            <p class="ac-desc">Decides whether a prediction should raise a clinical alert routed to the cardiologist worklist, with a review window.</p>
+            <div class="ac-stats" id="acstat-alert">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="continuum">
+            <div class="ac-head">
+              <span class="ac-idx">13</span>
+              <span class="ac-name">Continuum Agent</span>
+              <span class="led" id="ledc-continuum"></span>
+            </div>
+            <p class="ac-desc">Stamps this record's outcome onto the patient's longitudinal care-continuum stage — screening → diagnostic review → care decision → treatment → monitoring — so isolated readings become a patient journey.</p>
+            <div class="ac-stats" id="acstat-continuum">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="registry">
+            <div class="ac-head">
+              <span class="ac-idx">14</span>
+              <span class="ac-name">Patient Registry Agent</span>
+              <span class="led" id="ledc-registry"></span>
+            </div>
+            <p class="ac-desc">Final hop: saves everything this run computed — quality, prediction, diagnosis, automation tier, and the longitudinal/fusion assessment — onto the patient chart the clinician dashboard reads from. Does not touch reading history again; Intake already did that.</p>
+            <div class="ac-stats" id="acstat-registry">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+          <div class="agent-card" data-agent-card="claims_aggregator">
+            <div class="ac-head">
+              <span class="ac-idx">15</span>
+              <span class="ac-name">Claims Aggregator Agent</span>
+              <span class="led" id="ledc-claims_aggregator"></span>
+            </div>
+            <p class="ac-desc">Rolls each claims-pipeline record into the payer population report — a payer's covered members, not a single patient's chart.</p>
+            <div class="ac-stats" id="acstat-claims_aggregator">0 runs · 0 flagged · 0 errors · — avg</div>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Orchestrator Event Log</h2>
+        <p class="sub">Raw hops as the orchestrator dispatches tasks — same feed driving the pulses above.</p>
+        <div class="log" id="agentEventLog"></div>
+      </section>
+
+    </section>
+
+    <!-- ================= LIVE STREAMS ================= -->
+    <section class="page" data-page="streams">
+      <section class="panel">
+        <h2>Live Data Streams <span class="tag" id="streamModeTag">connecting…</span></h2>
+        <p class="sub">Hospital EHR/ECG, payer claims, and consumer wearable feeds — ingested continuously through the orchestrator.</p>
+        <div class="tabs">
+          <button class="tab-btn active" data-stream="ecg">Hospital · ECG</button>
+          <button class="tab-btn" data-stream="wearable">Consumer · Wearable</button>
+          <button class="tab-btn" data-stream="claims">Payer · Claims</button>
+        </div>
+        <canvas id="ecgCanvas" width="900" height="110"></canvas>
+        <div class="vitals-row" id="vitalsRow" style="margin-top:12px;">
+          <div class="vital"><div class="label">Heart rate</div><div class="value" id="v-hr">—</div><div class="unit">bpm</div></div>
+          <div class="vital"><div class="label">Metric 2</div><div class="value" id="v-2">—</div><div class="unit" id="v-2-unit">—</div></div>
+          <div class="vital"><div class="label">Metric 3</div><div class="value" id="v-3">—</div><div class="unit" id="v-3-unit">—</div></div>
+        </div>
+        <div class="log" id="streamLog" style="margin-top:12px;"></div>
+      </section>
+    </section>
+
+    <!-- ================= DATA QUALITY ================= -->
+    <section class="page" data-page="quality">
+      <section class="panel">
+        <h2>Data Quality at Ingestion</h2>
+        <p class="sub">Every record is scored before it reaches FHIR mapping or inference — schema, range, completeness, drift.</p>
+        <div class="gauge-row" id="gaugeRow">
+          <div class="gauge" data-g="schema"><svg viewBox="0 0 100 100"></svg><div class="g-label">Schema</div></div>
+          <div class="gauge" data-g="range"><svg viewBox="0 0 100 100"></svg><div class="g-label">Range</div></div>
+          <div class="gauge" data-g="completeness"><svg viewBox="0 0 100 100"></svg><div class="g-label">Completeness</div></div>
+          <div class="gauge" data-g="drift"><svg viewBox="0 0 100 100"></svg><div class="g-label">Drift</div></div>
+        </div>
+        <div id="qualityIssues" style="margin-top:10px; font-size:0.8rem; color:var(--ink-soft);">No issues on latest record.</div>
+      </section>
+    </section>
+
+    <!-- ================= INFERENCE ================= -->
+    <section class="page" data-page="inference">
+      <section class="panel">
+        <h2>Model Inference Points <span class="tag demo">placeholder logic — awaiting trained models</span></h2>
+        <p class="sub">These three outputs mirror the customer use-case diagram. The interface, routing, and downstream FHIR/alert wiring are real; the scores below come from a transparent heuristic, not a trained model.</p>
+        <div class="grid-3">
+          <div class="result-card">
+            <div class="head"><strong>Clinical alert (EHR)</strong><span class="risk-pill low" id="ecg-tier">—</span></div>
+            <div class="bar-track"><div class="bar-fill" id="ecg-bar" style="width:0%"></div></div>
+            <div style="font-size:0.72rem; color:var(--ink-soft); margin-top:6px;" id="ecg-detail">Waiting for ECG data…</div>
+          </div>
+          <div class="result-card">
+            <div class="head"><strong>Population risk report</strong><span class="risk-pill low" id="claims-tier">—</span></div>
+            <div class="bar-track"><div class="bar-fill" id="claims-bar" style="width:0%"></div></div>
+            <div style="font-size:0.72rem; color:var(--ink-soft); margin-top:6px;" id="claims-detail">Waiting for claims data…</div>
+          </div>
+          <div class="result-card">
+            <div class="head"><strong>Personal cardiac score</strong><span class="risk-pill low" id="wearable-tier">—</span></div>
+            <div class="bar-track"><div class="bar-fill" id="wearable-bar" style="width:0%"></div></div>
+            <div style="font-size:0.72rem; color:var(--ink-soft); margin-top:6px;" id="wearable-detail">Waiting for wearable data…</div>
+          </div>
+        </div>
+        <div class="disclaimer">Demo scoring only — not clinically validated, not for diagnostic or care decisions. Swap in a trained model via <code>load_trained_model()</code> in <code>inference/models.py</code>.</div>
+      </section>
+    </section>
+
+    <!-- ================= FHIR / HL7 ================= -->
+    <section class="page" data-page="fhir">
+      <section class="panel">
+        <h2>FHIR R4 &amp; HL7 Integration</h2>
+        <p class="sub">Resource and message shapes CardioScan Pro exchanges with Epic/Cerner-class EHRs.</p>
+        <div class="tabs">
+          <button class="tab-btn active" data-fhir="ecg">Observation (ECG)</button>
+          <button class="tab-btn" data-fhir="claims">RiskAssessment</button>
+          <button class="tab-btn" data-fhir="hl7adt">HL7 ADT^A01</button>
+          <button class="tab-btn" data-fhir="hl7oru">HL7 ORU^R01</button>
+        </div>
+        <pre class="code-block" id="fhirBlock">Loading sample…</pre>
+        <div class="integration-list" style="margin-top:12px;">
+          <div class="integration-row"><div><div class="name">Epic / Cerner FHIR R4 API</div><div class="meta">Observation · RiskAssessment · DiagnosticReport</div></div><span class="badge scaffold">interface built · needs live credentials</span></div>
+          <div class="integration-row"><div><div class="name">HL7 v2.x (MLLP)</div><div class="meta">ADT^A01 · ORU^R01</div></div><span class="badge scaffold">message builder ready · listener not deployed</span></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ================= PACS / DICOM ================= -->
+    <section class="page" data-page="dicom">
+      <section class="panel">
+        <h2>PACS &amp; DICOM</h2>
+        <p class="sub">Upload a DICOM (.dcm) file to extract study metadata through the DICOM agent.</p>
+        <input type="file" id="dicomFile" accept=".dcm" />
+        <button class="btn" id="dicomUploadBtn" style="margin-left:8px;">Extract metadata</button>
+        <pre class="code-block" id="dicomBlock" style="margin-top:12px;">No file processed yet.</pre>
+        <div class="integration-row" style="margin-top:10px;">
+          <div><div class="name">PACS C-FIND / C-MOVE</div><div class="meta">pynetdicom scaffold in integrations/dicom.py</div></div>
+          <span class="badge scaffold">requires hospital PACS endpoint</span>
+        </div>
+      </section>
+    </section>
+
+    <!-- ================= CARE CONTINUUM ================= -->
+    <section class="page" data-page="continuum">
+      <section class="panel">
+        <h2>Care Continuum Pipeline <span class="tag">longitudinal, not per-record</span></h2>
+        <p class="sub">Every other agent reasons about one record in isolation. This tracks where each <em>patient</em> actually stands: Screening → Diagnostic Review → Care Decision → Treatment → Monitoring → Resolved. Stages only move forward.</p>
+        <div class="toolbar" style="display:flex; gap:10px; margin-bottom:12px;">
+          <button class="btn ghost" id="refreshContinuumBtn">Refresh</button>
+          <span id="continuumSource" style="font-size:0.72rem; color:var(--ink-soft); align-self:center;"></span>
+        </div>
+        <div class="funnel-row" id="continuumFunnel"></div>
+      </section>
+      <section class="panel">
+        <h2>Patients in the continuum</h2>
+        <p class="sub">Most recently updated first. Click a stage-advance button to simulate a clinician action.</p>
+        <div class="table-wrap"><table class="clinician-table" id="continuumTable"></table></div>
+      </section>
+    </section>
+
+    <!-- ================= AUTOMATION TIERS ================= -->
+    <section class="page" data-page="automation">
+      <section class="panel">
+        <h2>Automation Tier Engine <span class="tag">escalation policy, not diagnosis</span></h2>
+        <p class="sub">Decides how much autonomy the engine exercises for a finding: <strong>auto-escalate</strong> (URGENT), <strong>recommend</strong> to a clinician awaiting sign-off, or <strong>log only</strong> (INFORMATIVE). URGENT requires <em>both</em> a confirmed urgent ICD-10 code (STEMI: I21.19 / I21.09) <em>and</em> ≥95% cross-modal confidence — either alone is not enough. The live ECG-only pipeline always passes an empty ICD-10 list, so it can only ever reach RECOMMENDATION or INFORMATIVE; URGENT is only reachable once a real, coded diagnosis exists.</p>
+        <div class="toolbar" style="display:flex; gap:10px; margin-bottom:12px;">
+          <button class="btn" id="runAutomationSamplesBtn">Run sample scenarios</button>
+          <span id="automationSampleSource" style="font-size:0.72rem; color:var(--ink-soft); align-self:center;"></span>
+        </div>
+        <div id="automationSamplesBody"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Try it yourself</h2>
+        <p class="sub">Evaluate a custom diagnosis / coding / confidence combination against the live engine.</p>
+        <div class="grid-3" style="gap:10px; align-items:end;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Diagnosis</label>
+            <input type="text" id="autoDxInput" value="STEMI" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ICD-10 codes (comma-separated)</label>
+            <input type="text" id="autoCodesInput" value="I21.19" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ECG confidence (0-100)</label>
+            <input type="text" id="autoEcgConfInput" value="97" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Echo confidence (optional)</label>
+            <input type="text" id="autoEchoConfInput" value="96" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Lab confidence (optional)</label>
+            <input type="text" id="autoLabConfInput" value="" style="width:100%;" />
+          </div>
+          <div>
+            <button class="btn" id="evaluateAutomationBtn" style="width:100%;">Evaluate</button>
+          </div>
+        </div>
+        <div id="automationEvalResult" style="margin-top:14px;"></div>
+      </section>
+    </section>
+
+    <!-- ================= BIAS AUDIT ================= -->
+    <section class="page" data-page="bias">
+      <section class="panel">
+        <h2>Algorithmic Bias Audit Protocol <span class="tag">clinical AI equity</span></h2>
+        <p class="sub">Audits the engine's live inference model against a labeled cardiovascular validation cohort stratified by race/ethnicity, gender, and age band, then runs threshold-based remediation to close any gap. Equity target: ≤<span id="biasEquityTarget">2.0</span> percentage-point sensitivity (true-positive-rate) gap across subgroups, per the product's FDA 2024 digital health equity guidance commitment.</p>
+        <div class="toolbar" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <button class="btn" id="runBiasAuditBtn">Run audit</button>
+          <span id="biasOverallBadge"></span>
+        </div>
+        <div id="biasAuditBody">
+          <div style="font-size:0.8rem; color:var(--ink-soft);">No audit run yet this session. Click "Run audit" to score a synthetic validation cohort against the engine's live model.</div>
+        </div>
+        <div class="disclaimer">Validation cohort is synthetic — no real patient data. The per-subgroup representation gap used to seed baseline disparity is a deliberately injected demo effect standing in for the well-documented mechanism where under-representation in training data weakens a model's signal for that subgroup; it is not a clinical finding. Statistical framework (subgroup confusion matrices, equal-opportunity gap, threshold-based remediation) is real and runs unchanged against a trained model once one exists.</div>
+      </section>
+    </section>
+
+    <!-- ================= CLINICIAN WORKLIST ================= -->
+    <section class="page" data-page="clinician">
+      <section class="panel">
+        <h2>Cardiologist Worklist <span class="tag">hospital persona</span></h2>
+        <p class="sub">Mirrors the "Cardiologist reviews high-risk patient list in EHR dashboard" step from the use-case diagram. Populated live from Alert Agent output on the hospital ECG stream — a patient lands here the moment the orchestrator flags them, and stays until reviewed.</p>
+        <div class="worklist-toolbar">
+          <span class="worklist-count" id="worklistCount">0 patients flagged</span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" id="downloadWorklistBtn">Download CSV</button>
+            <button class="btn ghost" id="clearReviewedBtn">Clear reviewed</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="clinician-table" id="clinicianTable">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>MACE risk</th>
+                <th>Tier</th>
+                <th>HR (bpm)</th>
+                <th>QTc (ms)</th>
+                <th>HRV (ms)</th>
+                <th>Window</th>
+                <th>Flagged at</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="clinicianTableBody">
+              <tr class="empty-row"><td colspan="9">No high-risk patients flagged yet — watching the hospital ECG stream…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="disclaimer">Demo scoring only — risk scores come from the placeholder heuristic in <code>inference/models.py</code>, not a trained model. Not for real clinical use.</div>
+      </section>
+    </section>
+
+    <!-- ================= BUSINESS OUTPUTS ================= -->
+    <section class="page" data-page="outputs">
+      <section class="panel">
+        <h2>Monitoring &amp; Control</h2>
+        <p class="sub">Model accuracy, bias gap, inference latency, EHR integration health — one place instead of stitched-together endpoints.</p>
+        <div class="toolbar" style="display:flex; gap:10px; margin-bottom:12px;">
+          <button class="btn ghost sm" id="refreshMonitoringBtn">Refresh</button>
+        </div>
+        <div class="grid-4" id="monitoringKpis"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Payer Population Report</h2>
+        <p class="sub">Aggregated from every claims record the engine has processed — real aggregation, no fabricated dollar figures.</p>
+        <div class="toolbar" style="display:flex; gap:10px; margin-bottom:12px;">
+          <button class="btn ghost sm" id="refreshPopulationBtn">Refresh</button>
+        </div>
+        <div id="populationReportBody"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Consumer Cardiac Score</h2>
+        <p class="sub">Look up a wearable subscriber's score in consumer-facing language — reuses the same patient registry the clinician dashboard reads.</p>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input type="text" id="consumerLookupId" placeholder="e.g. SUB-0042" style="flex:1;" />
+          <button class="btn" id="consumerLookupBtn">Look up</button>
+        </div>
+        <div id="consumerScoreBody"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Audit Compliance Report</h2>
+        <p class="sub">Combines the most recent bias audit with live agent health into one document for internal review.</p>
+        <div class="toolbar" style="display:flex; gap:10px; margin-bottom:12px;">
+          <button class="btn ghost sm" id="refreshComplianceBtn">Refresh</button>
+        </div>
+        <div id="complianceReportBody"></div>
+        <div class="disclaimer">Not a substitute for a formal regulatory audit or legal compliance sign-off.</div>
+      </section>
+    </section>
+
+    <!-- ================= DEPLOYMENT ================= -->
+    <section class="page" data-page="deploy">
+      <section class="panel">
+        <h2>Render Deployment Architecture</h2>
+        <p class="sub">One Docker web service today; the dotted path shows the scale-out topology for production hospital traffic.</p>
+        <div class="arch-svg-wrap">
+          <svg viewBox="0 0 960 300" width="100%" style="min-width:760px;">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7691aa"/></marker>
+            </defs>
+            <rect x="20" y="115" width="140" height="60" rx="8" fill="#eaf6fc" stroke="#4fc3e8"/>
+            <text x="90" y="140" text-anchor="middle" font-size="12" fill="#12294a" font-weight="600">Browser</text>
+            <text x="90" y="156" text-anchor="middle" font-size="10" fill="#4c6079">Dashboard UI</text>
+
+            <line x1="160" y1="145" x2="230" y2="145" stroke="#7691aa" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="230" y="70" width="220" height="150" rx="10" fill="#ffffff" stroke="#12294a" stroke-width="1.5"/>
+            <text x="340" y="92" text-anchor="middle" font-size="12" fill="#12294a" font-weight="700">Render Web Service</text>
+            <text x="340" y="107" text-anchor="middle" font-size="9" fill="#4c6079">Docker · FastAPI</text>
+            <rect x="245" y="118" width="190" height="26" rx="5" fill="#eaf6fc"/>
+            <text x="340" y="135" text-anchor="middle" font-size="9.5" fill="#12294a">Static frontend (/)</text>
+            <rect x="245" y="150" width="190" height="26" rx="5" fill="#eaf6fc"/>
+            <text x="340" y="167" text-anchor="middle" font-size="9.5" fill="#12294a">REST + WebSocket API (/api, /ws)</text>
+            <rect x="245" y="182" width="190" height="26" rx="5" fill="#eaf6fc"/>
+            <text x="340" y="199" text-anchor="middle" font-size="9.5" fill="#12294a">Central Orchestrator (in-process)</text>
+
+            <line x1="450" y1="145" x2="520" y2="145" stroke="#7691aa" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="520" y="20" width="200" height="50" rx="8" fill="#fff8ec" stroke="#ff8a3d"/>
+            <text x="620" y="40" text-anchor="middle" font-size="11" fill="#12294a" font-weight="600">Hospital EHR</text>
+            <text x="620" y="55" text-anchor="middle" font-size="9" fill="#4c6079">Epic / Cerner · FHIR R4 · HL7</text>
+
+            <rect x="520" y="85" width="200" height="50" rx="8" fill="#fff8ec" stroke="#ff8a3d"/>
+            <text x="620" y="105" text-anchor="middle" font-size="11" fill="#12294a" font-weight="600">Hospital PACS</text>
+            <text x="620" y="120" text-anchor="middle" font-size="9" fill="#4c6079">DICOM C-FIND/C-MOVE</text>
+
+            <rect x="520" y="150" width="200" height="50" rx="8" fill="#fff8ec" stroke="#ff8a3d"/>
+            <text x="620" y="170" text-anchor="middle" font-size="11" fill="#12294a" font-weight="600">Payer claims feed</text>
+            <text x="620" y="185" text-anchor="middle" font-size="9" fill="#4c6079">SFTP / FHIR Bulk Data</text>
+
+            <rect x="520" y="215" width="200" height="50" rx="8" fill="#fff8ec" stroke="#ff8a3d"/>
+            <text x="620" y="235" text-anchor="middle" font-size="11" fill="#12294a" font-weight="600">Consumer app</text>
+            <text x="620" y="250" text-anchor="middle" font-size="9" fill="#4c6079">iOS / Android event stream</text>
+
+            <line x1="450" y1="175" x2="620" y2="215" stroke="#7691aa" stroke-width="1.2" stroke-dasharray="3,3"/>
+            <line x1="450" y1="160" x2="520" y2="170" stroke="#7691aa" stroke-width="1.2" stroke-dasharray="3,3"/>
+
+            <rect x="760" y="70" width="180" height="45" rx="8" fill="#f5f9fc" stroke="#c7d6e3" stroke-dasharray="4,3"/>
+            <text x="850" y="88" text-anchor="middle" font-size="10.5" fill="#4c6079" font-weight="600">Ingestion worker</text>
+            <text x="850" y="102" text-anchor="middle" font-size="8.5" fill="#7691aa">Render Background Worker</text>
+
+            <rect x="760" y="140" width="180" height="45" rx="8" fill="#f5f9fc" stroke="#c7d6e3" stroke-dasharray="4,3"/>
+            <text x="850" y="158" text-anchor="middle" font-size="10.5" fill="#4c6079" font-weight="600">Postgres</text>
+            <text x="850" y="172" text-anchor="middle" font-size="8.5" fill="#7691aa">Event log · FHIR store</text>
+
+            <line x1="450" y1="120" x2="760" y2="92" stroke="#c7d6e3" stroke-width="1.2" stroke-dasharray="2,3" marker-end="url(#arrow)"/>
+            <line x1="450" y1="130" x2="760" y2="162" stroke="#c7d6e3" stroke-width="1.2" stroke-dasharray="2,3" marker-end="url(#arrow)"/>
+          </svg>
+        </div>
+        <p style="font-size:0.76rem; color:var(--ink-soft); margin-top:6px;">Deploy: <code>render.yaml</code> at the repo root defines the web service (Docker build from <code>/backend</code>, health check at <code>/healthz</code>). Connect the repo in the Render dashboard or run <code>render blueprint launch</code> — the worker and Postgres lines are pre-written but commented out until traffic needs them.</p>
+      </section>
+    </section>
+
+  </main>
+</div>
+
+<footer class="foot">Cardio AI · invest@cardioailive.com · cardioailive.com · +1 614-967-8728</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

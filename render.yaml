@@ -1,0 +1,38 @@
+# CardioAI Pro — Render deployment blueprint
+#
+# One service today (backend serves the frontend as static files, so the
+# app is fully connected out of the box). The two commented-out services
+# show how to split into hospital-grade production topology later:
+# a dedicated worker for stream ingestion/inference so a slow model call
+# never blocks the API, and a managed Postgres for the event log / FHIR
+# resource store (currently in-memory).
+
+services:
+  - type: web
+    name: cardioai-pro-engine
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: standard          # bump to `pro` for production hospital traffic
+    region: ohio             # co-locate with your primary hospital systems
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+  # --- scale-out path (uncomment when moving beyond a single-process demo) ---
+  # - type: worker
+  #   name: cardioai-pro-ingestion-worker
+  #   env: docker
+  #   dockerfilePath: ./backend/Dockerfile
+  #   dockerContext: ./backend
+  #   dockerCommand: python -m ingestion.worker
+  #   plan: standard
+  #
+  # databases:
+  #   - name: cardioai-pro-db
+  #     plan: standard
+  #     region: ohio
+  #     postgresMajorVersion: 16

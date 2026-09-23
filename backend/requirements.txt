@@ -1,0 +1,19 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+pydicom==2.4.4
+python-multipart==0.0.9
+websockets==13.1
+
+# Only needed to run training/train_model.py — not imported by the live
+# web service, so a minimal API-only deployment can drop these two.
+numpy==2.1.3
+scikit-learn==1.5.2
+
+# Only needed for imaging_models/ (ECG/CT vision transformer architectures
+# and the MobileNetV3 edge-echo path) — also not imported by the live web
+# service. CPU-only build; swap for a CUDA build when actually pretraining
+# on GPU hardware, or omit torchvision entirely if only the ViT paths (not
+# MobileEchoNet) are used.
+torch==2.5.1
+torchvision==0.20.1
