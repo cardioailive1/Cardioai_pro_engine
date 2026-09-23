@@ -41,6 +41,34 @@ SCHEMAS: dict[str, dict[str, tuple[float, float]]] = {
     },
 }
 
+# Expanded bedside vitals (BP, SpO2, resp rate, temp, weight) — real CVD
+# tracking needs more than HR/QTc/HRV. Deliberately NOT added to
+# SCHEMAS["ecg"] above: DataQualityEngine.check() treats every schema
+# field as REQUIRED and penalizes its absence (see the "missing fields"
+# scoring below), so adding these there would score down every ordinary
+# device-stream ECG record — which never carries them — for "missing" six
+# fields it was never meant to have. This is a separate, optional
+# range-check instead: validates whichever of these fields are actually
+# present, ignores the rest, never touches the ECG quality score.
+EXPANDED_VITALS_RANGES: dict[str, tuple[float, float]] = {
+    "bp_systolic": (70, 250),
+    "bp_diastolic": (40, 150),
+    "spo2_pct": (70, 100),
+    "resp_rate_bpm": (8, 40),
+    "temp_f": (95, 106),
+    "weight_lb": (50, 400),
+}
+
+
+def validate_expanded_vitals(record: dict[str, Any]) -> list[str]:
+    """Range-checks whichever expanded vitals are present in `record`. Returns human-readable warnings (empty list if none, or none present)."""
+    warnings: list[str] = []
+    for field, (lo, hi) in EXPANDED_VITALS_RANGES.items():
+        val = record.get(field)
+        if isinstance(val, (int, float)) and not (lo <= val <= hi):
+            warnings.append(f"{field}={val} is outside the plausible range ({lo}-{hi})")
+    return warnings
+
 
 class RunningStats:
     """Tiny incremental mean/variance tracker, used for the drift check."""

@@ -67,12 +67,29 @@ uvicorn main:app --reload --port 8000
 
 ## Deploying to Render
 
-1. Push this repo to GitHub.
+1. Push this **whole repo** — `cardioai-pro/`, as-is — to GitHub. Nothing
+   needs to be picked apart file by file; `render.yaml` already points at
+   the right build context.
 2. In Render: **New → Blueprint**, point at the repo — `render.yaml` at the
    root defines the service (Docker build from `/backend`, health check at
    `/healthz`).
 3. Deploy. Frontend and backend are live together at the same URL — no
    separate frontend host or CORS config needed.
+
+**What actually gets installed**: only `backend/requirements.txt` —
+`fastapi`, `uvicorn`, `pydantic`, `pydicom`, `python-multipart`,
+`websockets`, and `numpy` (a genuine live-service dependency via
+`integrations/dicom.py`'s pixel feature extraction and
+`longitudinal/trend_engine.py`'s slope calculations — verified with a
+static import check across the whole live code path, not assumed).
+`backend/requirements-training.txt` (scikit-learn, torch, torchvision —
+needed only for `training/` and `imaging_models/`) is deliberately
+**not** installed by the Docker build; those packages aren't imported
+anywhere in the live request path, and including them would add several
+minutes and multiple GB to every deploy for zero production benefit.
+Install `requirements-training.txt` separately wherever you actually run
+the training scripts — locally, or in a Mayo Clinic Platform Workspace
+notebook.
 
 The commented-out `worker` and `database` blocks in `render.yaml` show the
 scale-out path: move ingestion off the request/response cycle into a
@@ -116,6 +133,75 @@ the Main Engine console's Live Data Streams page (or POST to `/api/ingest`
 directly) to generate traffic for the clinician dashboard to display. If
 the engine isn't reachable at all, the dashboard falls back to its own
 synthetic 12-patient roster, clearly labeled as such in the banner.
+
+## Real admission, discharge, expanded vitals, and facility sync
+
+Real gaps a clinician using this dashboard would hit immediately, closed:
+
+**Admit/discharge, not just implicit patient creation.** Before this,
+typing any unknown patient ID anywhere in the dashboard silently created
+a patient with RANDOM demo demographics ("Demo Patient P-0099", a random
+age, a random allergy list) via `PatientRegistry._seed_new()` — fine for
+a device stream that will never carry a real identity, clinically wrong
+for a nurse who just admitted a real person and knows their real name.
+`PatientRegistry.admit_patient()` is the real path (`POST /api/patients`
+— Nurses page's "Admit New Patient" form, and Physician page's "Quick
+Admit" for a new consult); `_seed_new()` stays as the honest fallback for
+data arriving with no admission first, now explicitly labeled
+`admission_source: "auto"` to distinguish it. `discharge_patient()` /
+`readmit_patient()` (`POST /api/patients/{id}/discharge` /
+`/readmit`) round out the status lifecycle; `GET /api/patients` defaults
+to `status=active` so a discharged patient doesn't linger on the nursing/
+physician worklists, while staying reachable via `status=all`.
+
+A real bug surfaced and fixed while building this: `to_detail()` didn't
+expose the new `status` field at all, so the `status=active/discharged`
+filter was silently defaulting every patient to "active" regardless of
+real state — found via live testing (discharge a patient, then check
+whether they still show as active), not code review.
+
+**Expanded vitals — real CVD tracking needs more than HR/QTc/HRV.** BP
+(systolic/diastolic), SpO2, respiratory rate, temperature, and weight are
+now charted live (`vitals`/`vitals_history`), replacing the old `bp`/
+`spo2` fields that were static, seeded once at patient creation, and
+never actually updated from real data. Deliberately NOT added to
+`ingestion/quality.py`'s ECG schema: that schema treats every field as
+*required* and penalizes absence — adding these there would have scored
+down every ordinary device-stream ECG record for "missing" six fields it
+was never meant to carry. Built as a separate, optional range-check
+(`validate_expanded_vitals`) instead, verified to catch a bad value
+(temp=999) without false-flagging valid readings. Weight trend
+specifically matters for heart-failure decompensation risk — tracked now,
+not yet fed into the MACE score itself; a real next integration step,
+named honestly rather than implied as already done.
+
+**Facility sync via HL7 ADT import** (`POST /api/patients/import-hl7`,
+Physician page's "Import from Another Facility") — parses a real ADT^A01
+message the way a referring facility's interface engine (Mirth,
+Rhapsody, etc.) would send one, and admits that patient here. This is the
+*receiving* end of interop — parsing a message handed to it — not a live
+connection reaching into another facility's system, which needs real
+network access and credentials this deployment doesn't have. Verified
+with a genuine round trip: generated a test message with the project's
+own `build_adt_a01()` builder, fed it through the new parser-based import
+endpoint, and confirmed it correctly extracted patient ID, name, and
+admit location.
+
+A second real bug, caught by testing the actual UI rather than just the
+API: `fetchWithTimeout()` already parses the response body and throws
+internally on a non-ok HTTP status — the admit/discharge/import handlers
+were incorrectly re-checking `.ok`/`.status` on that already-parsed body
+(which don't exist there), so every one of them reported failure even on
+success. Root-caused by comparing server-side state (confirmed correct)
+against what the UI displayed (wrongly showed an error), not assumed from
+a passing test. Fixed by matching the correct, already-used pattern
+elsewhere in the same file. A related second bug, found the same way:
+discharging a patient from the drawer made them vanish from the
+in-memory patient list entirely (since the default `/api/patients` fetch
+that refreshes the dashboard is active-only), so the drawer couldn't
+re-render their new state — fixed by fetching that one patient directly
+after a discharge/readmit action, without changing what the worklists
+show by default.
 
 ## MACE training labels — making "30-90 days early" a checkable claim
 
@@ -480,7 +566,8 @@ render.yaml
 backend/
   main.py                 # FastAPI app: mounts API + WebSocket + static frontend
   Dockerfile
-  requirements.txt
+  requirements.txt         # Live web service deps only (includes numpy — a real dependency, not training-only)
+  requirements-training.txt # scikit-learn, torch, torchvision — for training/ and imaging_models/, not installed by the Render build
   orchestrator/
     agents.py              # IngestionAgent, QualityAgent, FHIRAgent, DICOMAgent, InferenceAgent, PatientIntakeAgent, LongitudinalAgent, FusionAgent, DiagnosticAgent, AutomationTierAgent, ClinicalReportAgent, AlertAgent, ContinuumAgent, PatientRegistryAgent, ClaimsAggregatorAgent
     orchestrator.py        # CentralOrchestrator — pipeline definitions, event log, pub/sub

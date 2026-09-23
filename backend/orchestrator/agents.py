@@ -14,6 +14,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable
 
+from ingestion.quality import validate_expanded_vitals
+
 
 @dataclass
 class AgentMessage:
@@ -81,6 +83,15 @@ class QualityAgent(BaseAgent):
     async def handle(self, payload: dict[str, Any]) -> dict[str, Any]:
         normalized = payload["normalized"]
         report = self.engine.evaluate(normalized["modality"], normalized["record"])
+
+        # Expanded bedside vitals (BP, SpO2, resp rate, temp, weight) — a
+        # separate, optional range-check (see ingestion/quality.py's
+        # module comment for why these aren't in SCHEMAS itself). Adds a
+        # warning without affecting the modality quality score.
+        expanded_warnings = validate_expanded_vitals(normalized["record"])
+        if expanded_warnings:
+            report["issues"] = [*report["issues"], *expanded_warnings]
+
         out = {"normalized": normalized, "quality": report}
         if not report["passed"]:
             out["_status"] = "flagged"

@@ -238,12 +238,65 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     <!-- ============ NURSES ============ -->
     <section class="page" data-page="nurses">
       <section class="panel">
+        <h2>Admit New Patient <span class="tag">real intake — not auto-generated demo data</span></h2>
+        <p class="sub">Every field here is what you actually know at admission. Before this form existed, a brand-new patient ID typed anywhere in this dashboard would silently get a randomly generated name, age, and allergy list — fine for a device stream that will never carry a real identity, clinically wrong for an actual admission.</p>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID (MRN)</label>
+            <input type="text" id="admitPatientId" placeholder="e.g. P-0142" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Full name</label>
+            <input type="text" id="admitName" placeholder="e.g. Eleanor Vance" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Age</label>
+            <input type="text" id="admitAge" placeholder="e.g. 68" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Sex</label>
+            <select id="admitSex" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+              <option value="F">F</option><option value="M">M</option><option value="U">Unspecified</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Room</label>
+            <input type="text" id="admitRoom" placeholder="e.g. 4B-12" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Cardiologist</label>
+            <select id="admitCardiologist" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+              <option>Dr. Alvarez</option><option>Dr. Chen</option><option>Dr. Okafor</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Admitting nurse</label>
+            <input type="text" id="admitNurse" placeholder="e.g. Nurse Alvarez" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Payer</label>
+            <input type="text" id="admitPayer" placeholder="e.g. Medicare" style="width:100%;" />
+          </div>
+          <div style="grid-column: span 2;">
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Allergies (comma-separated)</label>
+            <input type="text" id="admitAllergies" placeholder="e.g. Penicillin, Sulfa" style="width:100%;" />
+          </div>
+          <div style="grid-column: span 2;">
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Medications (comma-separated)</label>
+            <input type="text" id="admitMedications" placeholder="e.g. Metoprolol, Lisinopril" style="width:100%;" />
+          </div>
+        </div>
+        <button class="btn" id="submitAdmitBtn" style="margin-top:10px;">Admit patient</button>
+        <div id="admitResult" style="margin-top:12px;"></div>
+      </section>
+
+      <section class="panel">
         <h2>Record Manual Vitals <span class="tag">bedside entry — no connected device</span></h2>
-        <p class="sub">The intake path this dashboard was missing: a nurse charting a reading by hand, for a new or existing patient. Submits through the real engine pipeline — quality check, risk scoring, diagnosis, automation tier — exactly like a device-sourced record.</p>
+        <p class="sub">The intake path this dashboard was missing: a nurse charting a reading by hand, for a new or existing patient. HR/QTc/HRV feed the real risk-scoring pipeline exactly like a device-sourced record; the vitals below (BP, SpO2, respiratory rate, temperature, weight) are charted onto the patient's live chart but don't yet feed the MACE score itself — weight trend specifically matters for heart-failure decompensation risk, a real next integration step, not wired in yet.</p>
         <div class="grid-4" style="gap:10px; align-items:end;">
           <div>
             <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID</label>
-            <input type="text" id="manualPatientId" placeholder="existing MRN or new, e.g. P-0099" style="width:100%;" />
+            <input type="text" id="manualPatientId" placeholder="existing MRN" style="width:100%;" />
           </div>
           <div>
             <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Heart rate (bpm)</label>
@@ -256,6 +309,30 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
           <div>
             <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">HRV SDNN (ms)</label>
             <input type="text" id="manualHrv" placeholder="e.g. 45" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">BP systolic</label>
+            <input type="text" id="manualBpSys" placeholder="e.g. 128" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">BP diastolic</label>
+            <input type="text" id="manualBpDia" placeholder="e.g. 82" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">SpO2 (%)</label>
+            <input type="text" id="manualSpo2" placeholder="e.g. 97" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Resp. rate (br/min)</label>
+            <input type="text" id="manualRespRate" placeholder="e.g. 16" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Temp (°F)</label>
+            <input type="text" id="manualTemp" placeholder="e.g. 98.6" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Weight (lb)</label>
+            <input type="text" id="manualWeight" placeholder="e.g. 165" style="width:100%;" />
           </div>
         </div>
         <button class="btn" id="submitManualVitalsBtn" style="margin-top:10px;">Record vitals</button>
@@ -275,6 +352,55 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
 
     <!-- ============ CARDIOLOGIST / PHYSICIAN ============ -->
     <section class="page" data-page="physician">
+      <section class="panel">
+        <h2>Import Patient from Another Facility <span class="tag">HL7 ADT^A01 — real interop, receiving end</span></h2>
+        <p class="sub">Parses an actual HL7 ADT admit message the way a referring facility's interface engine (Mirth, Rhapsody, etc.) would send one, and admits that patient here. This is the receiving side of interop — parsing a message handed to it, not a live connection reaching into another facility's system, which needs real network access and credentials this deployment doesn't have.</p>
+        <textarea id="hl7ImportText" rows="4" placeholder="MSH|^~\&#92;&|SENDING_APP|SENDING_FACILITY|...&#10;PID|1||PATIENT_ID||PATIENT_NAME&#10;PV1|1|I|LOCATION" style="width:100%; font-family:var(--mono); font-size:0.76rem; padding:8px; border-radius:7px; border:1px solid var(--line);"></textarea>
+        <div class="grid-4" style="gap:10px; align-items:end; margin-top:10px;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Assign cardiologist</label>
+            <select id="hl7Cardiologist" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+              <option>Dr. Alvarez</option><option>Dr. Chen</option><option>Dr. Okafor</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Assign nurse</label>
+            <input type="text" id="hl7Nurse" placeholder="e.g. Nurse Kim" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Payer</label>
+            <input type="text" id="hl7Payer" placeholder="e.g. BlueCross" style="width:100%;" />
+          </div>
+          <div>
+            <button class="btn" id="submitHl7ImportBtn" style="width:100%;">Import &amp; admit</button>
+          </div>
+        </div>
+        <div id="hl7ImportResult" style="margin-top:12px;"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Quick Admit <span class="tag">for a new consult, before an order</span></h2>
+        <p class="sub">A cardiologist seeing a patient nursing hasn't admitted yet — a new outpatient referral or consult — can admit here with the same real-intake form as the Nurses page, then place an order below.</p>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID (MRN)</label>
+            <input type="text" id="physAdmitPatientId" placeholder="e.g. P-0143" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Full name</label>
+            <input type="text" id="physAdmitName" placeholder="e.g. James Okoro" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Age</label>
+            <input type="text" id="physAdmitAge" placeholder="e.g. 55" style="width:100%;" />
+          </div>
+          <div>
+            <button class="btn" id="submitPhysAdmitBtn" style="width:100%;">Admit &amp; use below</button>
+          </div>
+        </div>
+        <div id="physAdmitResult" style="margin-top:12px;"></div>
+      </section>
+
       <section class="panel">
         <h2>Request Analysis <span class="tag">the real entry point — a clinician's request, not raw data</span></h2>
         <p class="sub">This is what triggers the 9-agent pipeline on demand: a cardiologist asks for a patient to be analyzed, and that request — not a device feed — is what enters Ingestion. "ECG risk re-analysis" actually re-runs the real pipeline against the patient's latest captured vitals; other order types are honestly recorded as pending, since this engine has no real data pathway for imaging or lab modalities yet.</p>
@@ -323,6 +449,7 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
         <p class="sub">Search across the roster; click a patient to open their chart.</p>
         <div class="toolbar">
           <input type="search" id="patientSearch" placeholder="Search name, MRN, or diagnosis…" style="width:280px;" />
+
           <span class="mono" id="patientCount" style="font-size:0.78rem;color:var(--ink-soft);"></span>
         </div>
         <div class="table-wrap"><table class="dt" id="ehrTable"></table></div>
@@ -773,18 +900,27 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
   function openDrawer(mrn) {
     const p = PATIENTS.find(p => p.mrn === mrn);
     if (!p) return;
+    const status = p.status || "active"; // local-demo fallback patients don't carry a status field — default active
     document.getElementById("drawerContent").innerHTML = `
       <h3>${p.name}</h3>
       <div class="mrn">${p.mrn} · ${p.age}/${p.sex} · Room ${p.room}</div>
-      <div style="margin-top:8px;"><span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()} RISK</span> <span class="mono" style="font-size:0.75rem;color:var(--ink-soft);">MACE ${p.mace_score.toFixed(3)}</span></div>
+      <div style="margin-top:8px;">
+        <span class="pill ${p.risk_tier}">${p.risk_tier.toUpperCase()} RISK</span>
+        <span class="mono" style="font-size:0.75rem;color:var(--ink-soft);">MACE ${p.mace_score.toFixed(3)}</span>
+        <span class="pill ${status === "active" ? "approved" : "pending"}" style="margin-left:6px;">${status.toUpperCase()}</span>
+      </div>
 
       <div class="drawer-section">
         <h4>Vitals</h4>
         <div class="vital-row">
-          <div class="vital-mini"><div class="vv">${p.vitals.hr}</div><div class="vl">HR bpm</div></div>
-          <div class="vital-mini"><div class="vv">${p.vitals.bp}</div><div class="vl">BP mmHg</div></div>
-          <div class="vital-mini"><div class="vv">${p.vitals.spo2}%</div><div class="vl">SpO2</div></div>
-          <div class="vital-mini"><div class="vv">${p.vitals.qtc}</div><div class="vl">QTc ms</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.hr ?? "—"}</div><div class="vl">HR bpm</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.bp || "—"}</div><div class="vl">BP mmHg</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.spo2 ?? "—"}${p.vitals.spo2 != null ? "%" : ""}</div><div class="vl">SpO2</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.qtc ?? "—"}</div><div class="vl">QTc ms</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.hrv ?? "—"}</div><div class="vl">HRV ms</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.resp_rate ?? "—"}</div><div class="vl">Resp /min</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.temp_f ?? "—"}</div><div class="vl">Temp °F</div></div>
+          <div class="vital-mini"><div class="vv">${p.vitals.weight_lb ?? "—"}</div><div class="vl">Weight lb</div></div>
         </div>
       </div>
 
@@ -822,9 +958,43 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
         <div style="font-size:0.8rem;">${p.payer} · <span class="pill ${p.claim_status}">${p.claim_status}</span> · est. $${p.est_reimbursement.toLocaleString()}</div>
         ${p.coded ? `<div style="margin-top:6px;"><span class="chip">${p.icd10.code}<small>${p.icd10.desc}</small></span></div>` : ""}
       </div>
+
+      <div class="drawer-section">
+        <h4>Admission</h4>
+        <button class="btn ${status === "active" ? "ghost" : ""}" id="drawerDischargeBtn" style="width:100%;" ${DATA_SOURCE !== "live" ? "disabled title='Needs the live engine'" : ""}>
+          ${status === "active" ? "Discharge patient" : "Readmit patient"}
+        </button>
+        <div id="drawerDischargeResult" style="margin-top:8px;"></div>
+      </div>
     `;
     document.getElementById("patientDrawer").classList.add("open");
     document.getElementById("drawerBackdrop").classList.add("open");
+
+    const dischargeBtn = document.getElementById("drawerDischargeBtn");
+    if (dischargeBtn) {
+      dischargeBtn.addEventListener("click", async () => {
+        const action = status === "active" ? "discharge" : "readmit";
+        dischargeBtn.disabled = true;
+        try {
+          // fetchWithTimeout already throws (with the backend's error detail
+          // as the message) on a non-ok HTTP status and returns the parsed
+          // body directly on success — no .ok/.status to check here.
+          await fetchWithTimeout(`${API}/patients/${encodeURIComponent(mrn)}/${action}`, { method: "POST" });
+          await loadAllData(); // refreshes the active-only worklists everywhere else in the dashboard
+          // GET /api/patients defaults to active-only, so a just-discharged
+          // patient won't be in the list loadAllData() just fetched — patch
+          // their fresh state in directly so the drawer can still render it,
+          // without making every worklist show discharged patients too.
+          const freshPatient = await fetchWithTimeout(`${API}/patients/${encodeURIComponent(mrn)}`);
+          const idx = PATIENTS.findIndex(p => p.mrn === mrn);
+          if (idx >= 0) { PATIENTS[idx] = freshPatient; } else { PATIENTS.push(freshPatient); }
+          openDrawer(mrn); // re-render the drawer with the new status
+        } catch (e) {
+          document.getElementById("drawerDischargeResult").innerHTML = `<div class="form-result error">Could not ${action} — ${e.message}.</div>`;
+          dischargeBtn.disabled = false;
+        }
+      });
+    }
   }
   function closeDrawer() {
     document.getElementById("patientDrawer").classList.remove("open");
@@ -903,6 +1073,16 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     const hr = parseFloat(document.getElementById("manualHr").value);
     const qtc = parseFloat(document.getElementById("manualQtc").value);
     const hrv = parseFloat(document.getElementById("manualHrv").value);
+    // Expanded vitals are optional — a nurse charting a quick HR/QTc/HRV
+    // reading shouldn't be blocked from submitting just because BP wasn't
+    // taken this round. parseFloat("") is NaN, so each is only included
+    // below when it actually parsed to a real number.
+    const bpSys = parseFloat(document.getElementById("manualBpSys").value);
+    const bpDia = parseFloat(document.getElementById("manualBpDia").value);
+    const spo2 = parseFloat(document.getElementById("manualSpo2").value);
+    const respRate = parseFloat(document.getElementById("manualRespRate").value);
+    const temp = parseFloat(document.getElementById("manualTemp").value);
+    const weight = parseFloat(document.getElementById("manualWeight").value);
 
     if (!patientId) {
       resultEl.innerHTML = `<div class="form-result error">Patient ID is required.</div>`;
@@ -923,19 +1103,24 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     const originalLabel = btn.textContent;
     btn.textContent = "Recording…";
 
+    const record = { patient_id: patientId, heart_rate_bpm: hr, qt_interval_ms: qtc, hrv_sdnn_ms: hrv };
+    if (!Number.isNaN(bpSys)) record.bp_systolic = bpSys;
+    if (!Number.isNaN(bpDia)) record.bp_diastolic = bpDia;
+    if (!Number.isNaN(spo2)) record.spo2_pct = spo2;
+    if (!Number.isNaN(respRate)) record.resp_rate_bpm = respRate;
+    if (!Number.isNaN(temp)) record.temp_f = temp;
+    if (!Number.isNaN(weight)) record.weight_lb = weight;
+
     try {
       const res = await fetchWithTimeout(`${API}/ingest`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modality: "ecg",
-          source: "manual entry — nurse",
-          record: { patient_id: patientId, heart_rate_bpm: hr, qt_interval_ms: qtc, hrv_sdnn_ms: hrv },
-        }),
+        body: JSON.stringify({ modality: "ecg", source: "manual entry — nurse", record }),
       });
       if (!res.ok) throw new Error("engine rejected the record");
       const finding = res.result?.diagnostic_finding;
       const automation = res.result?.automation;
       const prediction = res.result?.prediction;
+      const qualityIssues = res.result?.quality?.issues || [];
       resultEl.innerHTML = `
         <div class="form-result success">
           Recorded for <strong>${patientId}</strong> — MACE score ${prediction ? prediction.score.toFixed(3) : "n/a"},
@@ -943,16 +1128,136 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
           ${finding && finding.specialist_review_required
             ? `Diagnostic finding: "${finding.diagnosis}"${automation ? ` — ${automation.action_label}.` : "."}`
             : "No significant finding — routine, no escalation."}
+          ${qualityIssues.length ? `<div style="margin-top:6px; color:var(--warn);">⚠ ${qualityIssues.join("; ")}</div>` : ""}
         </div>`;
       document.getElementById("manualHr").value = "";
       document.getElementById("manualQtc").value = "";
       document.getElementById("manualHrv").value = "";
+      document.getElementById("manualBpSys").value = "";
+      document.getElementById("manualBpDia").value = "";
+      document.getElementById("manualSpo2").value = "";
+      document.getElementById("manualRespRate").value = "";
+      document.getElementById("manualTemp").value = "";
+      document.getElementById("manualWeight").value = "";
       await loadAllData(); // so the new/updated patient shows up everywhere immediately
     } catch (err) {
       resultEl.innerHTML = `<div class="form-result error">Could not record — ${err.message}.</div>`;
     } finally {
       btn.disabled = false;
       btn.textContent = originalLabel;
+    }
+  });
+
+  // ---- Admit New Patient (Nurses page) ----
+  async function submitAdmit(idPrefix, resultElId, btnEl) {
+    const resultEl = document.getElementById(resultElId);
+    const patientId = document.getElementById(`${idPrefix}PatientId`).value.trim();
+    const name = document.getElementById(`${idPrefix}Name`).value.trim();
+    const age = parseInt(document.getElementById(`${idPrefix}Age`).value, 10);
+
+    if (!patientId || !name) {
+      resultEl.innerHTML = `<div class="form-result error">Patient ID and name are required.</div>`;
+      return null;
+    }
+    if (Number.isNaN(age)) {
+      resultEl.innerHTML = `<div class="form-result error">Age must be a number.</div>`;
+      return null;
+    }
+    if (DATA_SOURCE !== "live") {
+      resultEl.innerHTML = `<div class="form-result info">Admitting needs the live engine — deploy <code>cardioai-pro.zip</code> and open this page from that server.</div>`;
+      return null;
+    }
+
+    const sexEl = document.getElementById("admitSex");
+    const payload = {
+      patient_id: patientId, name, age,
+      sex: sexEl ? sexEl.value : "U",
+      room: (document.getElementById(`${idPrefix}Room`)?.value || "TBD").trim(),
+      cardiologist: document.getElementById(`${idPrefix}Cardiologist`)?.value || "Unassigned",
+      nurse: (document.getElementById(`${idPrefix}Nurse`)?.value || "Unassigned").trim(),
+      allergies: (document.getElementById(`${idPrefix}Allergies`)?.value || "").split(",").map(s => s.trim()).filter(Boolean),
+      medications: (document.getElementById(`${idPrefix}Medications`)?.value || "").split(",").map(s => s.trim()).filter(Boolean),
+      payer: (document.getElementById(`${idPrefix}Payer`)?.value || "Self-pay").trim(),
+    };
+
+    if (btnEl) { btnEl.disabled = true; }
+    try {
+      // fetchWithTimeout already throws (with the backend's 409 "already
+      // active" detail, or any other error detail, as the message) on a
+      // non-ok status and returns the parsed body directly on success.
+      const admitted = await fetchWithTimeout(`${API}/patients`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      resultEl.innerHTML = `<div class="form-result success">Admitted <strong>${admitted.name}</strong> (${admitted.mrn}).</div>`;
+      await loadAllData();
+      return patientId;
+    } catch (err) {
+      resultEl.innerHTML = `<div class="form-result error">Could not admit — ${err.message}.</div>`;
+      return null;
+    } finally {
+      if (btnEl) { btnEl.disabled = false; }
+    }
+  }
+
+  document.getElementById("submitAdmitBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("submitAdmitBtn");
+    const patientId = await submitAdmit("admit", "admitResult", btn);
+    if (patientId) {
+      ["admitPatientId", "admitName", "admitAge", "admitRoom", "admitNurse", "admitPayer", "admitAllergies", "admitMedications"]
+        .forEach(id => { document.getElementById(id).value = ""; });
+    }
+  });
+
+  // ---- Quick Admit (Physician page) — same admit endpoint, minimal fields, then hands the ID to Request Analysis ----
+  document.getElementById("submitPhysAdmitBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("submitPhysAdmitBtn");
+    const patientId = await submitAdmit("physAdmit", "physAdmitResult", btn);
+    if (patientId) {
+      document.getElementById("orderPatientId").value = patientId; // carry straight into the order form below
+      document.getElementById("physAdmitPatientId").value = "";
+      document.getElementById("physAdmitName").value = "";
+      document.getElementById("physAdmitAge").value = "";
+    }
+  });
+
+  // ---- Import from Another Facility (HL7 ADT) ----
+  document.getElementById("submitHl7ImportBtn").addEventListener("click", async () => {
+    const resultEl = document.getElementById("hl7ImportResult");
+    const message = document.getElementById("hl7ImportText").value.trim();
+    if (!message) {
+      resultEl.innerHTML = `<div class="form-result error">Paste an HL7 message first.</div>`;
+      return;
+    }
+    if (DATA_SOURCE !== "live") {
+      resultEl.innerHTML = `<div class="form-result info">Import needs the live engine — deploy <code>cardioai-pro.zip</code> and open this page from that server.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("submitHl7ImportBtn");
+    btn.disabled = true;
+    try {
+      // fetchWithTimeout already throws (with the backend's error detail as
+      // the message) on a non-ok status and returns the parsed body directly.
+      const body = await fetchWithTimeout(`${API}/patients/import-hl7`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hl7_message: message,
+          cardiologist: document.getElementById("hl7Cardiologist").value,
+          nurse: document.getElementById("hl7Nurse").value.trim() || "Unassigned",
+          payer: document.getElementById("hl7Payer").value.trim() || "Unknown",
+        }),
+      });
+      resultEl.innerHTML = `
+        <div class="form-result success">
+          Imported and admitted <strong>${body.admitted.name}</strong> (${body.admitted.mrn}) from a parsed ${body.parsed_message_type || "HL7"} message.
+          <div style="margin-top:6px; color:var(--ink-soft); font-size:0.76rem;">${body.note || ""}</div>
+        </div>`;
+      document.getElementById("hl7ImportText").value = "";
+      await loadAllData();
+    } catch (err) {
+      resultEl.innerHTML = `<div class="form-result error">Could not import — ${err.message}.</div>`;
+    } finally {
+      btn.disabled = false;
     }
   });
 

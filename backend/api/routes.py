@@ -250,8 +250,17 @@ def _enrich_with_continuum(detail: dict) -> dict:
 
 
 @router.get("/patients")
-async def list_patients():
-    patients = [_enrich_with_continuum(p) for p in orchestrator.patient_registry.list_all()]
+async def list_patients(status: str = "active"):
+    """
+    status: "active" (default — the working census), "discharged", or
+    "all". Defaults to active so a discharged patient doesn't linger on
+    the nursing/physician worklists by default, while staying reachable
+    for chart review via status=all or status=discharged.
+    """
+    all_patients = orchestrator.patient_registry.list_all()
+    if status != "all":
+        all_patients = [p for p in all_patients if p.get("status", "active") == status]
+    patients = [_enrich_with_continuum(p) for p in all_patients]
     return {"patients": patients}
 
 
@@ -261,6 +270,109 @@ async def get_patient(patient_id: str):
     if not detail:
         raise HTTPException(status_code=404, detail=f"No patient record for '{patient_id}'")
     return _enrich_with_continuum(detail)
+
+
+class AdmitPatientRequest(BaseModel):
+    patient_id: str
+    name: str
+    age: int
+    sex: str
+    room: str
+    cardiologist: str
+    nurse: str
+    allergies: list[str] = []
+    medications: list[str] = []
+    payer: str
+
+
+@router.post("/patients")
+async def admit_patient(req: AdmitPatientRequest):
+    """
+    The real admission path — a nurse or physician enters what they
+    actually know about a real patient. Distinct from the implicit
+    creation that happens when device data arrives for an unknown
+    patient_id (which seeds random demo demographics — appropriate for a
+    device stream, not for a real admission where the real details are
+    known at intake time).
+    """
+    record, error = orchestrator.patient_registry.admit_patient(
+        req.patient_id, req.name, req.age, req.sex, req.room, req.cardiologist,
+        req.nurse, req.allergies, req.medications, req.payer, source="manual",
+    )
+    if error:
+        raise HTTPException(status_code=409, detail=error)
+    return _enrich_with_continuum(record.to_detail())
+
+
+@router.post("/patients/{patient_id}/discharge")
+async def discharge_patient(patient_id: str):
+    record = orchestrator.patient_registry.discharge_patient(patient_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"No active patient '{patient_id}' to discharge.")
+    return _enrich_with_continuum(record.to_detail())
+
+
+@router.post("/patients/{patient_id}/readmit")
+async def readmit_patient(patient_id: str):
+    record = orchestrator.patient_registry.readmit_patient(patient_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"No discharged patient '{patient_id}' to readmit.")
+    return _enrich_with_continuum(record.to_detail())
+
+
+class ImportHL7Request(BaseModel):
+    hl7_message: str
+    cardiologist: str = "Unassigned"
+    nurse: str = "Unassigned"
+    room: str = "TBD"
+    payer: str = "Unknown"
+
+
+@router.post("/patients/import-hl7")
+async def import_patient_hl7(req: ImportHL7Request):
+    """
+    Real "sync from another facility" — parses an incoming HL7 ADT
+    message (what a referring facility's interface engine, e.g. Mirth or
+    Rhapsody, would actually send) and admits that patient here. This is
+    the RECEIVING end of interop: parsing a message handed to it, not a
+    live connection reaching out to query a remote facility's system —
+    an actual live HIE/interface-engine connection needs real network
+    access and credentials this deployment doesn't have. Uses
+    integrations/hl7.py's existing parser, extended here to pull PID
+    (patient identity) and PV1 (visit/location) fields specifically.
+    """
+    try:
+        parsed = parse_hl7_message(req.hl7_message)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not parse HL7 message: {exc}")
+
+    pid_segment = next((s for s in parsed["segments"] if s["type"] == "PID"), None)
+    if not pid_segment:
+        raise HTTPException(status_code=422, detail="No PID segment found — can't identify the patient from this message.")
+
+    pid_fields = pid_segment["fields"]
+    patient_id = pid_fields[2] if len(pid_fields) > 2 and pid_fields[2] else None
+    patient_name = pid_fields[4] if len(pid_fields) > 4 and pid_fields[4] else "Unknown (from HL7 import)"
+    if not patient_id:
+        raise HTTPException(status_code=422, detail="PID segment has no patient identifier (PID-3) to admit under.")
+
+    pv1_segment = next((s for s in parsed["segments"] if s["type"] == "PV1"), None)
+    admit_location = None
+    if pv1_segment and len(pv1_segment["fields"]) > 2:
+        admit_location = pv1_segment["fields"][2]
+
+    record, error = orchestrator.patient_registry.admit_patient(
+        patient_id, patient_name, age=0, sex="U", room=admit_location or req.room,
+        cardiologist=req.cardiologist, nurse=req.nurse, allergies=[], medications=[],
+        payer=req.payer, source="hl7_import",
+    )
+    if error:
+        raise HTTPException(status_code=409, detail=error)
+    return {
+        "admitted": _enrich_with_continuum(record.to_detail()),
+        "parsed_message_type": parsed.get("message_type"),
+        "note": "Age and sex weren't in the parsed PID fields used here (a real interface engine's PID segment carries them — extend the parsing above to pull PID-7/PID-8 for a production deployment) — update the chart once confirmed.",
+    }
 
 
 @router.post("/patients/{patient_id}/tasks/{task_id}/toggle")

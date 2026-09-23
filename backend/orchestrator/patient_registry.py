@@ -68,14 +68,28 @@ class PatientRecord:
     allergies: list[str]
     medications: list[str]
     payer: str
-    bp: str = ""
-    spo2: int = 0
+    bp: str = ""     # legacy display string, seeded on demo patients only — real admits/live vitals use `vitals` below instead
+    spo2: int = 0     # legacy — see bp note above
     created_at: float = field(default_factory=time.time)
     last_updated: float = field(default_factory=time.time)
 
-    # Clinical state — updated live by PatientRegistryAgent
+    # Admission status — "active" | "discharged". Distinct from care-continuum
+    # stage (screening/treatment/etc, tracked separately by CareContinuumTracker):
+    # this is whether the patient is on the floor at all, not where they are
+    # in a diagnostic/treatment pathway.
+    status: str = "active"
+    admission_source: str = "manual"   # "manual" | "hl7_import" | "auto" (implicit creation via first data point — see get_or_create)
+    admitted_at: float = field(default_factory=time.time)
+    discharged_at: Optional[float] = None
+
+    # Clinical state — updated live by PatientRegistryAgent. `vitals` now
+    # carries more than HR/QTc/HRV: bp_systolic, bp_diastolic, spo2_pct,
+    # resp_rate, temp_f, weight_lb when a nurse charts them — real CVD
+    # tracking needs more than three ECG-derived numbers (weight trend
+    # specifically matters for heart-failure decompensation risk, though
+    # that isn't wired into the MACE score itself yet — see intake_vitals).
     vitals: dict[str, Any] = field(default_factory=dict)
-    vitals_history: list[dict[str, Any]] = field(default_factory=list)  # [{timestamp, hr, qtc, hrv}, ...] — the raw material for longitudinal trending
+    vitals_history: list[dict[str, Any]] = field(default_factory=list)  # [{timestamp, hr, qtc, hrv, bp_systolic, bp_diastolic, spo2_pct, resp_rate, temp_f, weight_lb}, ...]
     quality_score: float = 0.0
     prediction: Optional[dict[str, Any]] = None
     diagnostic_finding: Optional[dict[str, Any]] = None
@@ -103,6 +117,13 @@ class PatientRecord:
     # Nursing tasks
     tasks: list[dict[str, Any]] = field(default_factory=list)
 
+    def _bp_display(self) -> str:
+        """Human-readable 'systolic/diastolic' — from live charted vitals when present, else the legacy seeded demo string (demo patients only)."""
+        sys_bp, dia_bp = self.vitals.get("bp_systolic"), self.vitals.get("bp_diastolic")
+        if sys_bp is not None and dia_bp is not None:
+            return f"{int(sys_bp)}/{int(dia_bp)}"
+        return self.bp
+
     def to_detail(self) -> dict[str, Any]:
         prediction = self.prediction or {}
         finding = self.diagnostic_finding or {}
@@ -116,13 +137,20 @@ class PatientRecord:
             "room": self.room,
             "cardiologist": self.cardiologist,
             "nurse": self.nurse,
+            "status": self.status,
+            "admission_source": self.admission_source,
+            "admitted_at": self.admitted_at,
+            "discharged_at": self.discharged_at,
             "diagnosis": finding.get("diagnosis", "No significant finding"),
             "mace_score": prediction.get("score", 0.0),
             "risk_tier": prediction.get("risk_tier", "low"),
             "last_visit": time.strftime("%Y-%m-%d", time.gmtime(self.last_updated)),
             "vitals": {
-                "hr": self.vitals.get("hr"), "bp": self.bp, "spo2": self.spo2,
+                "hr": self.vitals.get("hr"),
+                "bp": self._bp_display(), "bp_systolic": self.vitals.get("bp_systolic"), "bp_diastolic": self.vitals.get("bp_diastolic"),
+                "spo2": self.vitals.get("spo2_pct", self.spo2 if self.spo2 else None),
                 "qtc": self.vitals.get("qtc"), "hrv": self.vitals.get("hrv"),
+                "resp_rate": self.vitals.get("resp_rate"), "temp_f": self.vitals.get("temp_f"), "weight_lb": self.vitals.get("weight_lb"),
             },
             "allergies": self.allergies,
             "medications": self.medications,
@@ -152,6 +180,18 @@ class PatientRegistry:
         self.patients: dict[str, PatientRecord] = {}
 
     def _seed_new(self, patient_id: str) -> PatientRecord:
+        """
+        Implicit creation — fires whenever an unknown patient_id first
+        appears in an ingested record (device data, an order, etc.) with
+        no prior explicit admission. Random demo demographics ("Demo
+        Patient P-0099") are appropriate for a device stream that's never
+        going to carry a real name, but were previously also what a nurse
+        saw after manually charting vitals for a genuinely new patient —
+        clinically nonsensical, since the nurse KNOWS the real name/age/
+        allergies at that point. admit_patient() below is the real path;
+        this stays as the honest fallback for data that arrives with no
+        admission having happened first.
+        """
         rnd = _seeded(patient_id)
         idx = rnd.randint(0, 999)
         record = PatientRecord(
@@ -167,6 +207,7 @@ class PatientRegistry:
             payer=rnd.choice(PAYERS),
             bp=f"{105 + rnd.randint(0, 35)}/{65 + rnd.randint(0, 20)}",
             spo2=92 + rnd.randint(0, 7),
+            admission_source="auto",
             diagnostic_order_type=rnd.choice(DIAGNOSTIC_ORDER_TYPES),
             diagnostic_order_status=rnd.choice(DIAGNOSTIC_STATUS_ORDER),
             est_reimbursement=180 + rnd.randint(0, 2400),
@@ -182,6 +223,64 @@ class PatientRegistry:
     def get_or_create(self, patient_id: str) -> PatientRecord:
         return self.patients.get(patient_id) or self._seed_new(patient_id)
 
+    def admit_patient(
+        self, patient_id: str, name: str, age: int, sex: str, room: str, cardiologist: str,
+        nurse: str, allergies: list[str], medications: list[str], payer: str,
+        source: str = "manual",
+    ) -> tuple[Optional[PatientRecord], Optional[str]]:
+        """
+        The real admission path — a nurse or physician enters what they
+        actually know about a real patient, instead of the implicit
+        random-demographic creation _seed_new() does for data arriving
+        with no admission first. Returns (record, error): error is set
+        (and record is None) if patient_id is already active, so a nurse
+        can't accidentally overwrite an existing patient's chart by
+        re-admitting the same MRN — they'd need to discharge first, or
+        use a different ID.
+        """
+        existing = self.patients.get(patient_id)
+        if existing is not None and existing.status == "active":
+            return None, f"{patient_id} is already an active patient (admitted {existing.admission_source}). Discharge first, or use a different patient ID."
+
+        record = PatientRecord(
+            patient_id=patient_id, name=name, age=age, sex=sex, room=room,
+            cardiologist=cardiologist, nurse=nurse, allergies=allergies, medications=medications,
+            payer=payer, status="active", admission_source=source,
+        )
+        record.tasks = [
+            {"id": f"{patient_id}-t1", "label": f"Admission vitals check — {name}", "meta": "on admit", "done": False},
+            {"id": f"{patient_id}-t2", "label": f"Medication reconciliation — {name}", "meta": "on admit", "done": False},
+        ]
+        self.patients[patient_id] = record
+        return record, None
+
+    def discharge_patient(self, patient_id: str) -> Optional[PatientRecord]:
+        p = self.patients.get(patient_id)
+        if p is None or p.status != "active":
+            return None
+        p.status = "discharged"
+        p.discharged_at = time.time()
+        p.last_updated = time.time()
+        return p
+
+    def readmit_patient(self, patient_id: str) -> Optional[PatientRecord]:
+        p = self.patients.get(patient_id)
+        if p is None or p.status != "discharged":
+            return None
+        p.status = "active"
+        p.discharged_at = None
+        p.last_updated = time.time()
+        return p
+
+    # Vitals this pipeline can receive beyond the three ECG-derived ones —
+    # real CVD tracking needs more than HR/QTc/HRV. raw_record key -> the
+    # short key stored in record.vitals / vitals_history.
+    EXPANDED_VITALS_MAP = {
+        "bp_systolic": "bp_systolic", "bp_diastolic": "bp_diastolic",
+        "spo2_pct": "spo2_pct", "resp_rate_bpm": "resp_rate",
+        "temp_f": "temp_f", "weight_lb": "weight_lb",
+    }
+
     def intake_vitals(self, patient_id: str, raw_record: dict[str, Any]) -> PatientRecord:
         """
         Early hop: resolves/creates the patient and appends this record's
@@ -193,6 +292,14 @@ class PatientRegistry:
         now split into this + finalize_clinical below), which meant the
         fused score was computed too late to ever influence the diagnosis
         that had already been made from the raw ECG score alone.
+
+        Also stores the expanded vitals set (BP, SpO2, resp rate, temp,
+        weight) when present — charted here, on the patient's live vitals,
+        but NOT yet fed into the MACE risk score itself (that's still
+        HR/QTc/HRV only, per inference/models.py). Weight trend
+        specifically is a real, meaningful future signal for heart-
+        failure decompensation risk; tracking it here is what makes that
+        a buildable next step rather than starting from nothing.
         """
         record = self.get_or_create(patient_id)
         if "heart_rate_bpm" in raw_record:
@@ -201,17 +308,25 @@ class PatientRegistry:
             record.vitals["qtc"] = raw_record["qt_interval_ms"]
         if "hrv_sdnn_ms" in raw_record:
             record.vitals["hrv"] = raw_record["hrv_sdnn_ms"]
+        for raw_key, vitals_key in self.EXPANDED_VITALS_MAP.items():
+            if raw_key in raw_record:
+                record.vitals[vitals_key] = raw_record[raw_key]
 
-        # Append to history whenever this record actually carries ECG-style
-        # vitals — this is the raw material LongitudinalTrendEngine needs.
-        # A claims or bare imaging record (no hr/qtc/hrv) shouldn't add a
-        # noisy null-filled entry to the trend history.
-        if any(k in raw_record for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms")):
+        # Append to history whenever this record carries ANY trackable
+        # vital — ECG-derived or the expanded set — not just HR/QTc/HRV.
+        history_keys = ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms", *self.EXPANDED_VITALS_MAP.keys())
+        if any(k in raw_record for k in history_keys):
             record.vitals_history.append({
                 "timestamp": time.time(),
                 "hr": raw_record.get("heart_rate_bpm"),
                 "qtc": raw_record.get("qt_interval_ms"),
                 "hrv": raw_record.get("hrv_sdnn_ms"),
+                "bp_systolic": raw_record.get("bp_systolic"),
+                "bp_diastolic": raw_record.get("bp_diastolic"),
+                "spo2_pct": raw_record.get("spo2_pct"),
+                "resp_rate": raw_record.get("resp_rate_bpm"),
+                "temp_f": raw_record.get("temp_f"),
+                "weight_lb": raw_record.get("weight_lb"),
             })
             if len(record.vitals_history) > 200:  # cap memory growth
                 record.vitals_history = record.vitals_history[-200:]

@@ -1,0 +1,18 @@
+# Dependencies for training/ and imaging_models/ beyond what's already in
+# requirements.txt (which now includes numpy — a real live-service
+# dependency via integrations/dicom.py and longitudinal/trend_engine.py,
+# not training-only). NOT installed as part of the Render deployment.
+# Install this separately wherever you actually run the training scripts:
+# locally, in a Mayo Clinic Platform Workspace notebook, or any other ML
+# environment (also install requirements.txt there first, for numpy).
+#
+#   pip install -r requirements.txt -r requirements-training.txt
+#
+scikit-learn==1.5.2
+
+# CPU-only build. Swap for a CUDA build when actually pretraining on GPU
+# hardware (see imaging_models/'s docstrings — real DINO/MAE pretraining
+# needs GPU-scale compute this CPU build isn't for).
+torch==2.5.1
+torchvision==0.20.1
+
