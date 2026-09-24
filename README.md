@@ -160,6 +160,48 @@ filter was silently defaulting every patient to "active" regardless of
 real state — found via live testing (discharge a patient, then check
 whether they still show as active), not code review.
 
+**The "Admit New Patient" form is a real 6-step EHR intake wizard**, not
+a single flat form — Personal → Demographics → Location → Insurance →
+Clinical → Vitals & Submit, with a stepper indicator, per-step
+validation (can't advance past Personal without a patient ID and name,
+past Demographics without a valid age, etc.), a live summary on the
+final step, and a combined submit that admits the patient *and* chains a
+real vitals-ingest call through the pipeline if any reading was entered
+on step 6 — one continuous flow instead of two disconnected actions.
+Demographics' race/ethnicity field deliberately uses the exact same
+category strings as `fairness/bias_audit.py`'s and
+`training/label_schema.py`'s `SUBGROUP_DIMENSIONS`, so a real admission
+captured here doesn't need translating to feed that machinery later.
+
+A second real bug, caught while extending the shared admit logic for the
+wizard: the sex field was hardcoded to read from `"admitSex"` regardless
+of which form called it, so the Physician page's "Quick Admit" — a
+separate, minimal form with no sex field of its own — would have
+silently submitted whatever the Nurse wizard's sex dropdown happened to
+contain. Fixed to read `${idPrefix}Sex` like every other shared field.
+Verified with a full jsdom run through all 6 steps (empty-step
+validation blocking advancement, each step correctly marked "done",
+final combined submit producing a real MACE score) and a direct
+server-side check confirming every new field — phone, race/ethnicity,
+unit, insurance member ID, reason for admission — actually persisted,
+not just that the UI looked right.
+
+**A third real gap, reported directly by a user rather than found in
+testing**: the step indicators in the wizard's top bar looked clickable
+but did nothing — `renderAdmitWizardStep()` toggled their active/done
+CSS classes, but no click handler was ever attached to them. Fixed
+properly rather than just cosmetically: clicking a completed step now
+jumps straight there, with a separate `admitWizardFurthestStep` tracked
+alongside the current step specifically so that reviewing an earlier
+step doesn't lock you back out of later steps you'd already filled in —
+the first version of the fix conflated "current step" with "furthest
+reached," which would have made jumping back from step 3 to review step
+1 visually un-complete steps 2-3 even though their data was still there.
+Verified with a dedicated test: skipping ahead before validating is
+still blocked, jumping back to a done step preserves that step's data,
+and jumping forward again to an already-reached step works even after
+navigating back past it.
+
 **Expanded vitals — real CVD tracking needs more than HR/QTc/HRV.** BP
 (systolic/diastolic), SpO2, respiratory rate, temperature, and weight are
 now charted live (`vitals`/`vitals_history`), replacing the old `bp`/

@@ -73,6 +73,35 @@ class PatientRecord:
     created_at: float = field(default_factory=time.time)
     last_updated: float = field(default_factory=time.time)
 
+    # Personal (contact) — captured at admission, not used elsewhere in the pipeline
+    phone: str = ""
+
+    # Demographics — race_ethnicity intentionally uses the SAME category
+    # strings as fairness/bias_audit.py's SUBGROUP_DIMENSIONS and
+    # training/label_schema.py's SUBGROUP_DIMENSIONS, so a real admission
+    # captured here could, in principle, feed the same bias-audit/training
+    # machinery those modules already use — not wired together yet, but
+    # deliberately not using a different vocabulary that would need
+    # translating later.
+    race_ethnicity: str = ""
+    language: str = "English"
+
+    # Location — `room` above is the bed; `unit` is the nursing unit/floor,
+    # a distinct real field (acuity level, staffing assignment) rooms alone
+    # don't capture.
+    unit: str = ""
+
+    # Insurance — `payer` above is the payer name; these are the actual
+    # claim-identifying fields a real admission needs beyond just knowing
+    # who the payer is.
+    insurance_member_id: str = ""
+    insurance_group_number: str = ""
+
+    # Clinical — chief complaint / reason for admission is a distinct real
+    # field from `diagnostic_finding` below: this is what the PATIENT (or
+    # nurse) reports at intake, before any pipeline analysis has run.
+    reason_for_admission: str = ""
+
     # Admission status — "active" | "discharged". Distinct from care-continuum
     # stage (screening/treatment/etc, tracked separately by CareContinuumTracker):
     # this is whether the patient is on the floor at all, not where they are
@@ -141,6 +170,13 @@ class PatientRecord:
             "admission_source": self.admission_source,
             "admitted_at": self.admitted_at,
             "discharged_at": self.discharged_at,
+            "phone": self.phone,
+            "race_ethnicity": self.race_ethnicity,
+            "language": self.language,
+            "unit": self.unit,
+            "insurance_member_id": self.insurance_member_id,
+            "insurance_group_number": self.insurance_group_number,
+            "reason_for_admission": self.reason_for_admission,
             "diagnosis": finding.get("diagnosis", "No significant finding"),
             "mace_score": prediction.get("score", 0.0),
             "risk_tier": prediction.get("risk_tier", "low"),
@@ -226,7 +262,9 @@ class PatientRegistry:
     def admit_patient(
         self, patient_id: str, name: str, age: int, sex: str, room: str, cardiologist: str,
         nurse: str, allergies: list[str], medications: list[str], payer: str,
-        source: str = "manual",
+        source: str = "manual", phone: str = "", race_ethnicity: str = "", language: str = "English",
+        unit: str = "", insurance_member_id: str = "", insurance_group_number: str = "",
+        reason_for_admission: str = "",
     ) -> tuple[Optional[PatientRecord], Optional[str]]:
         """
         The real admission path — a nurse or physician enters what they
@@ -246,6 +284,9 @@ class PatientRegistry:
             patient_id=patient_id, name=name, age=age, sex=sex, room=room,
             cardiologist=cardiologist, nurse=nurse, allergies=allergies, medications=medications,
             payer=payer, status="active", admission_source=source,
+            phone=phone, race_ethnicity=race_ethnicity, language=language, unit=unit,
+            insurance_member_id=insurance_member_id, insurance_group_number=insurance_group_number,
+            reason_for_admission=reason_for_admission,
         )
         record.tasks = [
             {"id": f"{patient_id}-t1", "label": f"Admission vitals check — {name}", "meta": "on admit", "done": False},

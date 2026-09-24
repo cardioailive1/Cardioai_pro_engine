@@ -128,6 +128,33 @@ textarea { width:100%; resize:vertical; }
 .form-result.error { background:#fde7e5; color:var(--err); border:1px solid #f5c3c1; }
 .form-result.info { background:var(--sky); color:var(--ink-soft); border:1px solid #cfe8f5; }
 
+/* EHR intake wizard */
+.wizard-steps { display:flex; gap:4px; margin-bottom:18px; flex-wrap:wrap; }
+.wizard-step {
+  flex:1; min-width:90px; display:flex; align-items:center; gap:7px; padding:8px 10px;
+  border-radius:8px; background:var(--sky); color:var(--ink-soft); font-size:0.74rem; font-weight:600;
+  border:1px solid var(--line); transition: background 0.15s ease, color 0.15s ease;
+  cursor: default; /* unreached steps aren't clickable — see .active/.done below */
+}
+.wizard-step .num {
+  width:20px; height:20px; border-radius:50%; background:#fff; border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; font-size:0.68rem; flex:0 0 auto; color:var(--ink-soft);
+}
+.wizard-step.active { background:var(--navy); color:#fff; border-color:var(--navy); cursor: pointer; }
+.wizard-step.active .num { background:var(--cyan); border-color:var(--cyan); color:var(--navy-deep); }
+.wizard-step.done { background:#e5f7ee; color:var(--ok); border-color:#b9e8cf; cursor: pointer; }
+.wizard-step.done:hover { background:#d3f0e0; }
+.wizard-step.done .num { background:var(--ok); border-color:var(--ok); color:#fff; }
+.wizard-panel { display:none; }
+.wizard-panel.active { display:block; }
+.wizard-panel h4 { margin:0 0 4px; font-size:0.86rem; color:var(--navy); }
+.wizard-panel .wp-sub { margin:0 0 14px; font-size:0.76rem; color:var(--ink-soft); }
+.wizard-nav { display:flex; justify-content:space-between; margin-top:16px; }
+.wizard-field-label { font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px; }
+.wizard-summary { border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:14px; background:var(--sky); font-size:0.78rem; }
+.wizard-summary .ws-row { display:flex; justify-content:space-between; padding:2px 0; }
+.wizard-summary .ws-label { color:var(--ink-soft); }
+
 /* Patient detail drawer */
 .drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(7,27,54,0.5); z-index:50; }
 .drawer-backdrop.open { display:block; }
@@ -238,55 +265,156 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     <!-- ============ NURSES ============ -->
     <section class="page" data-page="nurses">
       <section class="panel">
-        <h2>Admit New Patient <span class="tag">real intake — not auto-generated demo data</span></h2>
-        <p class="sub">Every field here is what you actually know at admission. Before this form existed, a brand-new patient ID typed anywhere in this dashboard would silently get a randomly generated name, age, and allergy list — fine for a device stream that will never carry a real identity, clinically wrong for an actual admission.</p>
-        <div class="grid-4" style="gap:10px; align-items:end;">
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID (MRN)</label>
-            <input type="text" id="admitPatientId" placeholder="e.g. P-0142" style="width:100%;" />
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Full name</label>
-            <input type="text" id="admitName" placeholder="e.g. Eleanor Vance" style="width:100%;" />
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Age</label>
-            <input type="text" id="admitAge" placeholder="e.g. 68" style="width:100%;" />
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Sex</label>
-            <select id="admitSex" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
-              <option value="F">F</option><option value="M">M</option><option value="U">Unspecified</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Room</label>
-            <input type="text" id="admitRoom" placeholder="e.g. 4B-12" style="width:100%;" />
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Cardiologist</label>
-            <select id="admitCardiologist" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
-              <option>Dr. Alvarez</option><option>Dr. Chen</option><option>Dr. Okafor</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Admitting nurse</label>
-            <input type="text" id="admitNurse" placeholder="e.g. Nurse Alvarez" style="width:100%;" />
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Payer</label>
-            <input type="text" id="admitPayer" placeholder="e.g. Medicare" style="width:100%;" />
-          </div>
-          <div style="grid-column: span 2;">
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Allergies (comma-separated)</label>
-            <input type="text" id="admitAllergies" placeholder="e.g. Penicillin, Sulfa" style="width:100%;" />
-          </div>
-          <div style="grid-column: span 2;">
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Medications (comma-separated)</label>
-            <input type="text" id="admitMedications" placeholder="e.g. Metoprolol, Lisinopril" style="width:100%;" />
+        <h2>Admit New Patient <span class="tag">EHR intake — real data, not auto-generated demo data</span></h2>
+        <p class="sub">Every field here is what you actually know at admission. Before this existed, a brand-new patient ID typed anywhere in this dashboard would silently get a randomly generated name, age, and allergy list — fine for a device stream that will never carry a real identity, clinically wrong for an actual admission.</p>
+
+        <div class="wizard-steps" id="admitWizardSteps">
+          <div class="wizard-step active" data-step="1"><span class="num">1</span><span>Personal</span></div>
+          <div class="wizard-step" data-step="2"><span class="num">2</span><span>Demographics</span></div>
+          <div class="wizard-step" data-step="3"><span class="num">3</span><span>Location</span></div>
+          <div class="wizard-step" data-step="4"><span class="num">4</span><span>Insurance</span></div>
+          <div class="wizard-step" data-step="5"><span class="num">5</span><span>Clinical</span></div>
+          <div class="wizard-step" data-step="6"><span class="num">6</span><span>Vitals &amp; Submit</span></div>
+        </div>
+
+        <!-- Step 1: Personal -->
+        <div class="wizard-panel active" data-wizard-panel="1">
+          <h4>Personal</h4>
+          <p class="wp-sub">Who this patient is, and how to identify their chart.</p>
+          <div class="grid-4" style="gap:10px;">
+            <div>
+              <label class="wizard-field-label">Patient ID (MRN) *</label>
+              <input type="text" id="admitPatientId" placeholder="e.g. P-0142" style="width:100%;" />
+            </div>
+            <div>
+              <label class="wizard-field-label">Full name *</label>
+              <input type="text" id="admitName" placeholder="e.g. Eleanor Vance" style="width:100%;" />
+            </div>
+            <div>
+              <label class="wizard-field-label">Phone</label>
+              <input type="text" id="admitPhone" placeholder="e.g. 555-0142" style="width:100%;" />
+            </div>
           </div>
         </div>
-        <button class="btn" id="submitAdmitBtn" style="margin-top:10px;">Admit patient</button>
+
+        <!-- Step 2: Demographics -->
+        <div class="wizard-panel" data-wizard-panel="2">
+          <h4>Demographics</h4>
+          <p class="wp-sub">Race/ethnicity uses the same categories the bias audit and training pipeline already track, so a real admission's data stays usable by that machinery without translation.</p>
+          <div class="grid-4" style="gap:10px;">
+            <div>
+              <label class="wizard-field-label">Age *</label>
+              <input type="text" id="admitAge" placeholder="e.g. 68" style="width:100%;" />
+            </div>
+            <div>
+              <label class="wizard-field-label">Sex</label>
+              <select id="admitSex" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+                <option value="F">F</option><option value="M">M</option><option value="U">Unspecified</option>
+              </select>
+            </div>
+            <div>
+              <label class="wizard-field-label">Race / ethnicity</label>
+              <select id="admitRaceEthnicity" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+                <option value="">Not specified</option>
+                <option>White</option><option>Black</option><option>Hispanic</option><option>Asian</option><option>Other/Unspecified</option>
+              </select>
+            </div>
+            <div>
+              <label class="wizard-field-label">Preferred language</label>
+              <input type="text" id="admitLanguage" placeholder="e.g. English" value="English" style="width:100%;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Location -->
+        <div class="wizard-panel" data-wizard-panel="3">
+          <h4>Location</h4>
+          <p class="wp-sub">Where this patient is on the floor.</p>
+          <div class="grid-4" style="gap:10px;">
+            <div>
+              <label class="wizard-field-label">Room / bed *</label>
+              <input type="text" id="admitRoom" placeholder="e.g. 4B-12" style="width:100%;" />
+            </div>
+            <div>
+              <label class="wizard-field-label">Nursing unit</label>
+              <input type="text" id="admitUnit" placeholder="e.g. Cardiac Telemetry" style="width:100%;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Insurance -->
+        <div class="wizard-panel" data-wizard-panel="4">
+          <h4>Insurance</h4>
+          <p class="wp-sub">Payer and claim-identifying details for billing.</p>
+          <div class="grid-4" style="gap:10px;">
+            <div>
+              <label class="wizard-field-label">Payer *</label>
+              <input type="text" id="admitPayer" placeholder="e.g. Medicare" style="width:100%;" />
+            </div>
+            <div>
+              <label class="wizard-field-label">Member / policy ID</label>
+              <input type="text" id="admitInsuranceMemberId" placeholder="e.g. M-88213" style="width:100%;" />
+            </div>
+            <div>
+              <label class="wizard-field-label">Group number</label>
+              <input type="text" id="admitInsuranceGroupNumber" placeholder="e.g. GRP-4471" style="width:100%;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5: Clinical -->
+        <div class="wizard-panel" data-wizard-panel="5">
+          <h4>Clinical</h4>
+          <p class="wp-sub">Care team and what the patient reports at intake — distinct from any diagnostic finding the engine computes later.</p>
+          <div class="grid-4" style="gap:10px;">
+            <div>
+              <label class="wizard-field-label">Cardiologist</label>
+              <select id="admitCardiologist" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+                <option>Dr. Alvarez</option><option>Dr. Chen</option><option>Dr. Okafor</option>
+              </select>
+            </div>
+            <div>
+              <label class="wizard-field-label">Admitting nurse</label>
+              <input type="text" id="admitNurse" placeholder="e.g. Nurse Alvarez" style="width:100%;" />
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="wizard-field-label">Reason for admission / chief complaint</label>
+              <input type="text" id="admitReason" placeholder="e.g. Chest pain, rule out ACS" style="width:100%;" />
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="wizard-field-label">Allergies (comma-separated)</label>
+              <input type="text" id="admitAllergies" placeholder="e.g. Penicillin, Sulfa" style="width:100%;" />
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="wizard-field-label">Medications (comma-separated)</label>
+              <input type="text" id="admitMedications" placeholder="e.g. Metoprolol, Lisinopril" style="width:100%;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6: Vitals & Submit -->
+        <div class="wizard-panel" data-wizard-panel="6">
+          <h4>Vitals &amp; Submit</h4>
+          <p class="wp-sub">Optional — an admission reading, if one's been taken. HR/QTc/HRV feed the real risk-scoring pipeline immediately; BP/SpO2/resp rate/temp/weight are charted onto the patient's live chart. Leave blank to admit without an initial reading and chart vitals separately later.</p>
+          <div class="grid-4" style="gap:10px;">
+            <div><label class="wizard-field-label">Heart rate (bpm)</label><input type="text" id="admitVitalsHr" placeholder="e.g. 92" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">QTc (ms)</label><input type="text" id="admitVitalsQtc" placeholder="e.g. 420" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">HRV SDNN (ms)</label><input type="text" id="admitVitalsHrv" placeholder="e.g. 45" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">BP systolic</label><input type="text" id="admitVitalsBpSys" placeholder="e.g. 128" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">BP diastolic</label><input type="text" id="admitVitalsBpDia" placeholder="e.g. 82" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">SpO2 (%)</label><input type="text" id="admitVitalsSpo2" placeholder="e.g. 97" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">Resp. rate (br/min)</label><input type="text" id="admitVitalsRespRate" placeholder="e.g. 16" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">Temp (°F)</label><input type="text" id="admitVitalsTemp" placeholder="e.g. 98.6" style="width:100%;" /></div>
+            <div><label class="wizard-field-label">Weight (lb)</label><input type="text" id="admitVitalsWeight" placeholder="e.g. 165" style="width:100%;" /></div>
+          </div>
+          <div class="wizard-summary" id="admitSummary" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="wizard-nav">
+          <button class="btn ghost" id="wizardBackBtn" disabled>Back</button>
+          <button class="btn" id="wizardNextBtn">Next</button>
+          <button class="btn" id="wizardSubmitBtn" style="display:none;">Admit patient</button>
+        </div>
         <div id="admitResult" style="margin-top:12px;"></div>
       </section>
 
@@ -1168,7 +1296,7 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
       return null;
     }
 
-    const sexEl = document.getElementById("admitSex");
+    const sexEl = document.getElementById(`${idPrefix}Sex`);
     const payload = {
       patient_id: patientId, name, age,
       sex: sexEl ? sexEl.value : "U",
@@ -1178,6 +1306,16 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
       allergies: (document.getElementById(`${idPrefix}Allergies`)?.value || "").split(",").map(s => s.trim()).filter(Boolean),
       medications: (document.getElementById(`${idPrefix}Medications`)?.value || "").split(",").map(s => s.trim()).filter(Boolean),
       payer: (document.getElementById(`${idPrefix}Payer`)?.value || "Self-pay").trim(),
+      // Optional fields the wizard collects that Quick Admit's minimal form
+      // doesn't — safely default to "" when the field doesn't exist, same
+      // pattern as room/cardiologist/nurse above.
+      phone: (document.getElementById(`${idPrefix}Phone`)?.value || "").trim(),
+      race_ethnicity: document.getElementById(`${idPrefix}RaceEthnicity`)?.value || "",
+      language: (document.getElementById(`${idPrefix}Language`)?.value || "English").trim(),
+      unit: (document.getElementById(`${idPrefix}Unit`)?.value || "").trim(),
+      insurance_member_id: (document.getElementById(`${idPrefix}InsuranceMemberId`)?.value || "").trim(),
+      insurance_group_number: (document.getElementById(`${idPrefix}InsuranceGroupNumber`)?.value || "").trim(),
+      reason_for_admission: (document.getElementById(`${idPrefix}Reason`)?.value || "").trim(),
     };
 
     if (btnEl) { btnEl.disabled = true; }
@@ -1199,14 +1337,152 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     }
   }
 
-  document.getElementById("submitAdmitBtn").addEventListener("click", async () => {
-    const btn = document.getElementById("submitAdmitBtn");
-    const patientId = await submitAdmit("admit", "admitResult", btn);
-    if (patientId) {
-      ["admitPatientId", "admitName", "admitAge", "admitRoom", "admitNurse", "admitPayer", "admitAllergies", "admitMedications"]
-        .forEach(id => { document.getElementById(id).value = ""; });
-    }
+  // ---- Admit New Patient wizard (Nurses page) ----
+  const ADMIT_WIZARD_STEPS = 6;
+  let admitWizardStep = 1;
+  let admitWizardFurthestStep = 1; // tracks the furthest step reached, independent of where you've navigated back to — so jumping back to review step 1 doesn't lock you out of step 3 you'd already filled in
+  const ADMIT_WIZARD_FIELD_IDS = [
+    "admitPatientId", "admitName", "admitPhone", "admitAge", "admitSex", "admitRaceEthnicity", "admitLanguage",
+    "admitRoom", "admitUnit", "admitPayer", "admitInsuranceMemberId", "admitInsuranceGroupNumber",
+    "admitCardiologist", "admitNurse", "admitReason", "admitAllergies", "admitMedications",
+    "admitVitalsHr", "admitVitalsQtc", "admitVitalsHrv", "admitVitalsBpSys", "admitVitalsBpDia",
+    "admitVitalsSpo2", "admitVitalsRespRate", "admitVitalsTemp", "admitVitalsWeight",
+  ];
+
+  function renderAdmitWizardStep() {
+    document.querySelectorAll("#admitWizardSteps .wizard-step").forEach(el => {
+      const n = parseInt(el.dataset.step, 10);
+      el.classList.toggle("active", n === admitWizardStep);
+      el.classList.toggle("done", n < admitWizardFurthestStep);
+    });
+    document.querySelectorAll("[data-wizard-panel]").forEach(el => {
+      el.classList.toggle("active", parseInt(el.dataset.wizardPanel, 10) === admitWizardStep);
+    });
+    document.getElementById("wizardBackBtn").disabled = admitWizardStep === 1;
+    document.getElementById("wizardNextBtn").style.display = admitWizardStep === ADMIT_WIZARD_STEPS ? "none" : "";
+    document.getElementById("wizardSubmitBtn").style.display = admitWizardStep === ADMIT_WIZARD_STEPS ? "" : "none";
+    if (admitWizardStep === ADMIT_WIZARD_STEPS) { renderAdmitSummary(); }
+  }
+
+  // The step indicators in the top bar were previously pure visual
+  // progress markers — renderAdmitWizardStep() toggled their active/done
+  // classes, but nothing was ever wired to respond to a click on them,
+  // so they looked interactive but did nothing. Clicking a step you've
+  // already completed (or the current one) now jumps straight there;
+  // clicking ahead to a step not yet reached is a no-op, since skipping
+  // there would bypass that step's own validation on the way through.
+  document.querySelectorAll("#admitWizardSteps .wizard-step").forEach(el => {
+    el.addEventListener("click", () => {
+      const target = parseInt(el.dataset.step, 10);
+      if (target <= admitWizardFurthestStep) {
+        admitWizardStep = target;
+        renderAdmitWizardStep();
+      }
+    });
   });
+
+  function renderAdmitSummary() {
+    const name = document.getElementById("admitName").value.trim() || "(no name yet)";
+    const patientId = document.getElementById("admitPatientId").value.trim() || "(no ID yet)";
+    const room = document.getElementById("admitRoom").value.trim() || "(no room yet)";
+    const payer = document.getElementById("admitPayer").value.trim() || "(no payer yet)";
+    document.getElementById("admitSummary").innerHTML = `
+      <div class="ws-row"><span class="ws-label">Admitting</span><strong>${name}</strong></div>
+      <div class="ws-row"><span class="ws-label">MRN</span><span class="mono">${patientId}</span></div>
+      <div class="ws-row"><span class="ws-label">Room</span><span>${room}</span></div>
+      <div class="ws-row"><span class="ws-label">Payer</span><span>${payer}</span></div>`;
+  }
+
+  function validateAdmitStep(step) {
+    if (step === 1) {
+      if (!document.getElementById("admitPatientId").value.trim()) return "Patient ID is required.";
+      if (!document.getElementById("admitName").value.trim()) return "Full name is required.";
+    }
+    if (step === 2) {
+      if (Number.isNaN(parseInt(document.getElementById("admitAge").value, 10))) return "Age must be a number.";
+    }
+    if (step === 3) {
+      if (!document.getElementById("admitRoom").value.trim()) return "Room / bed is required.";
+    }
+    if (step === 4) {
+      if (!document.getElementById("admitPayer").value.trim()) return "Payer is required.";
+    }
+    return null;
+  }
+
+  document.getElementById("wizardNextBtn").addEventListener("click", () => {
+    const error = validateAdmitStep(admitWizardStep);
+    const resultEl = document.getElementById("admitResult");
+    if (error) {
+      resultEl.innerHTML = `<div class="form-result error">${error}</div>`;
+      return;
+    }
+    resultEl.innerHTML = "";
+    admitWizardStep = Math.min(admitWizardStep + 1, ADMIT_WIZARD_STEPS);
+    admitWizardFurthestStep = Math.max(admitWizardFurthestStep, admitWizardStep);
+    renderAdmitWizardStep();
+  });
+  document.getElementById("wizardBackBtn").addEventListener("click", () => {
+    admitWizardStep = Math.max(admitWizardStep - 1, 1);
+    renderAdmitWizardStep();
+  });
+
+  document.getElementById("wizardSubmitBtn").addEventListener("click", async () => {
+    for (let s = 1; s <= 5; s++) {
+      const error = validateAdmitStep(s);
+      if (error) {
+        admitWizardStep = s;
+        renderAdmitWizardStep();
+        document.getElementById("admitResult").innerHTML = `<div class="form-result error">${error}</div>`;
+        return;
+      }
+    }
+
+    const btn = document.getElementById("wizardSubmitBtn");
+    const resultEl = document.getElementById("admitResult");
+    const patientId = await submitAdmit("admit", "admitResult", btn);
+    if (!patientId) return; // submitAdmit already rendered the error
+
+    // Vitals are optional — only submit if at least one was entered.
+    const vitalsFieldMap = {
+      admitVitalsHr: "heart_rate_bpm", admitVitalsQtc: "qt_interval_ms", admitVitalsHrv: "hrv_sdnn_ms",
+      admitVitalsBpSys: "bp_systolic", admitVitalsBpDia: "bp_diastolic", admitVitalsSpo2: "spo2_pct",
+      admitVitalsRespRate: "resp_rate_bpm", admitVitalsTemp: "temp_f", admitVitalsWeight: "weight_lb",
+    };
+    const record = { patient_id: patientId };
+    for (const [fieldId, apiKey] of Object.entries(vitalsFieldMap)) {
+      const raw = document.getElementById(fieldId).value.trim();
+      if (raw !== "") { const num = parseFloat(raw); if (!Number.isNaN(num)) { record[apiKey] = num; } }
+    }
+    const hasVitals = Object.keys(record).length > 1; // more than just patient_id
+
+    if (hasVitals) {
+      // HR/QTc/HRV feed the real risk pipeline; the backend already
+      // tolerates a partial record (see intake_vitals) if only some of
+      // the expanded vitals were entered.
+      try {
+        const ingestRes = await fetchWithTimeout(`${API}/ingest`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modality: "ecg", source: "manual entry — nurse (admission)", record }),
+        });
+        const prediction = ingestRes.result?.prediction;
+        resultEl.innerHTML = `<div class="form-result success">Admitted and recorded initial vitals for <strong>${patientId}</strong>${prediction ? ` — MACE score ${prediction.score.toFixed(3)}, tier ${prediction.risk_tier.toUpperCase()}` : ""}.</div>`;
+      } catch (err) {
+        resultEl.innerHTML = `<div class="form-result success">Admitted <strong>${patientId}</strong>, but recording initial vitals failed — ${err.message}. Use Record Manual Vitals below to chart them separately.</div>`;
+      }
+    } else {
+      resultEl.innerHTML = `<div class="form-result success">Admitted <strong>${patientId}</strong>. No initial vitals recorded — use Record Manual Vitals below when a reading is taken.</div>`;
+    }
+
+    ADMIT_WIZARD_FIELD_IDS.forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("admitLanguage").value = "English";
+    admitWizardStep = 1;
+    admitWizardFurthestStep = 1; // reset so a fresh admission doesn't show old steps as falsely "done"
+    renderAdmitWizardStep();
+    await loadAllData();
+  });
+
+  renderAdmitWizardStep();
 
   // ---- Quick Admit (Physician page) — same admit endpoint, minimal fields, then hands the ID to Request Analysis ----
   document.getElementById("submitPhysAdmitBtn").addEventListener("click", async () => {

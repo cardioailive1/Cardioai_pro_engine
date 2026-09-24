@@ -283,6 +283,13 @@ class AdmitPatientRequest(BaseModel):
     allergies: list[str] = []
     medications: list[str] = []
     payer: str
+    phone: str = ""
+    race_ethnicity: str = ""
+    language: str = "English"
+    unit: str = ""
+    insurance_member_id: str = ""
+    insurance_group_number: str = ""
+    reason_for_admission: str = ""
 
 
 @router.post("/patients")
@@ -298,6 +305,9 @@ async def admit_patient(req: AdmitPatientRequest):
     record, error = orchestrator.patient_registry.admit_patient(
         req.patient_id, req.name, req.age, req.sex, req.room, req.cardiologist,
         req.nurse, req.allergies, req.medications, req.payer, source="manual",
+        phone=req.phone, race_ethnicity=req.race_ethnicity, language=req.language, unit=req.unit,
+        insurance_member_id=req.insurance_member_id, insurance_group_number=req.insurance_group_number,
+        reason_for_admission=req.reason_for_admission,
     )
     if error:
         raise HTTPException(status_code=409, detail=error)
