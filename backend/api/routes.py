@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import date
+from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from pydantic import BaseModel
@@ -18,8 +20,10 @@ from orchestrator.orchestrator import orchestrator
 from ingestion.streaming import STREAMS
 from integrations.hl7 import build_adt_a01, build_oru_r01, parse_hl7_message
 from integrations.dicom import DICOMService
+from integrations.x12_837 import parse_837_claims, claim_to_cardioai_record
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
+from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
 from training.label_schema import MACELabelRecord, MACEEventType, LabelValidator
 from inference.automation_tiers import AutomationTier
 
@@ -538,6 +542,164 @@ async def ws_stream(ws: WebSocket):
 @router.get("/payer/population-report")
 async def payer_population_report(top_n: int = 20):
     return orchestrator.population_aggregator.report(top_n=max(1, min(top_n, 100)))
+
+
+@router.get("/payer/members/{member_id}")
+async def payer_member_detail(member_id: str):
+    """
+    Full detail for one member — including their complete claim_history —
+    not just the truncated slice the top_n-limited population report's
+    high_risk_cohort carries. This is what the Population Risk page's
+    member-drawer click actually opens.
+    """
+    detail = orchestrator.population_aggregator.get_member(member_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail=f"No member record for '{member_id}'")
+
+    # Fold in the same per-member cost trend cost_avoidance.py computes,
+    # so the drawer doesn't need a second round trip to the Cost
+    # Avoidance page's data to show it.
+    if detail["claim_history"]:
+        trend = compute_member_cost_trend(member_id, detail["claim_history"], detail["recorded_at"])
+        detail["cost_trend"] = trend.to_dict()
+    else:
+        detail["cost_trend"] = None
+
+    return detail
+
+
+class Upload837Request(BaseModel):
+    raw_837: str
+
+
+@router.post("/payer/claims/upload-837")
+async def upload_837_claims(req: Upload837Request):
+    """
+    Real X12 837 EDI parsing (integrations/x12_837.py) — the actual format
+    payers/clearinghouses exchange, not the simplified {member_age,
+    risk_flags_count} shape /api/ingest's claims modality accepted before
+    this existed. Parses every claim in the file and runs each through
+    the exact same claims pipeline, carrying real charge amounts and
+    diagnosis codes through to PopulationAggregator for cost_avoidance.py
+    to use.
+    """
+    try:
+        claims = parse_837_claims(req.raw_837)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Could not parse X12 837 file: {exc}")
+
+    if not claims:
+        raise HTTPException(status_code=400, detail="No CLM (claim) segments found in the file.")
+
+    results = []
+    for claim in claims:
+        record = claim_to_cardioai_record(claim)
+        if record.get("member_age") is None:
+            record["member_age"] = 0  # SCHEMAS["claims"] requires a number; missing DOB parses honestly rather than guessing
+        try:
+            dispatch_result = await orchestrator.dispatch("claims", record, source="x12-837-upload")
+            results.append({"claim_id": claim.claim_id, "member_id": claim.subscriber_member_id, "ok": True, "result": dispatch_result})
+        except ValueError as exc:
+            results.append({"claim_id": claim.claim_id, "member_id": claim.subscriber_member_id, "ok": False, "error": str(exc)})
+
+    return {"claims_parsed": len(claims), "results": results}
+
+
+@router.get("/payer/cost-avoidance-report")
+async def payer_cost_avoidance_report():
+    """
+    Real cost-avoidance methodology (reports/cost_avoidance.py), built on
+    whatever real claim charge history has actually flowed in via
+    /payer/claims/upload-837. Data-gated: returns
+    population_estimate_available=false with an honest explanation rather
+    than a number, until enough members individually have sufficient
+    pre/post-flag claims history.
+    """
+    members_with_history = {}
+    for member_id, m in orchestrator.population_aggregator.members.items():
+        if m.claim_history:
+            members_with_history[member_id] = (m.claim_history, m.recorded_at)
+    return population_cost_avoidance_report(members_with_history)
+
+
+# ---------------------------------------------------------------------------
+# PMPM contract & billing administration (billing/contracts.py) — a
+# distinct concern from risk stratification: a commercial/legal contract
+# record and invoice ledger, not a clinical or population-risk construct.
+# ---------------------------------------------------------------------------
+class CreateContractRequest(BaseModel):
+    payer_name: str
+    pmpm_rate: float
+    contracted_member_count: int
+    start_date: str  # ISO date
+    end_date: Optional[str] = None
+
+
+@router.post("/payer/contracts")
+async def create_contract(req: CreateContractRequest):
+    contract = orchestrator.contract_registry.create_contract(
+        payer_name=req.payer_name, pmpm_rate=req.pmpm_rate, contracted_member_count=req.contracted_member_count,
+        start_date=date.fromisoformat(req.start_date), end_date=date.fromisoformat(req.end_date) if req.end_date else None,
+    )
+    return contract.to_dict()
+
+
+@router.get("/payer/contracts")
+async def list_contracts():
+    return {"contracts": [c.to_dict() for c in orchestrator.contract_registry.contracts.values()]}
+
+
+@router.post("/payer/contracts/{contract_id}/terminate")
+async def terminate_contract(contract_id: str):
+    contract = orchestrator.contract_registry.terminate_contract(contract_id)
+    if not contract:
+        raise HTTPException(status_code=404, detail=f"No contract {contract_id}")
+    return contract.to_dict()
+
+
+class ReconcileRequest(BaseModel):
+    period_label: str
+    actual_member_ids: Optional[list[str]] = None  # if omitted, reconciles against every member PopulationAggregator has actually seen
+
+
+@router.post("/payer/contracts/{contract_id}/reconcile")
+async def reconcile_contract(contract_id: str, req: ReconcileRequest):
+    if contract_id not in orchestrator.contract_registry.contracts:
+        raise HTTPException(status_code=404, detail=f"No contract {contract_id}")
+    member_ids = set(req.actual_member_ids) if req.actual_member_ids else set(orchestrator.population_aggregator.members.keys())
+    try:
+        result = orchestrator.contract_registry.reconcile_membership(contract_id, req.period_label, member_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return result.to_dict()
+
+
+class GenerateInvoiceRequest(BaseModel):
+    period_label: str
+    billing_basis: str = "contracted"
+    reconciled_count: Optional[int] = None
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
+
+
+@router.post("/payer/contracts/{contract_id}/invoice")
+async def generate_invoice(contract_id: str, req: GenerateInvoiceRequest):
+    try:
+        invoice = orchestrator.contract_registry.generate_invoice(
+            contract_id, req.period_label, billing_basis=req.billing_basis, reconciled_count=req.reconciled_count,
+            period_start=date.fromisoformat(req.period_start) if req.period_start else None,
+            period_end=date.fromisoformat(req.period_end) if req.period_end else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return invoice.to_dict()
+
+
+@router.get("/payer/contracts/{contract_id}/invoices")
+async def list_invoices(contract_id: str):
+    if contract_id not in orchestrator.contract_registry.contracts:
+        raise HTTPException(status_code=404, detail=f"No contract {contract_id}")
+    return {"invoices": [i.to_dict() for i in orchestrator.contract_registry.invoices_for_contract(contract_id)]}
 
 
 # ---------------------------------------------------------------------------

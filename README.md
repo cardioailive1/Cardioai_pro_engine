@@ -585,6 +585,212 @@ safety gate holds regardless of fusion, exactly as it should. Full
 regression (all pipelines, both dashboards, 15 agents) passed with zero
 errors after the reorder.
 
+## IoMT backend bridge — connecting the live consumer-facing system
+
+`integrations/iomt_bridge.py` (`POST /api/iomt-bridge/ingest`) connects
+this engine to a separate, real, independently-deployed system — the
+"IoMT CardioAI Backend" live at a production URL, with its own auth,
+BLE device registry, implant registration, and vendor-gateway ingestion.
+That system is the consumer/device-facing front door; this engine is the
+clinical intelligence behind it — quality scoring, inference, diagnosis,
+automation tier, longitudinal trend, fusion.
+
+**What's verified**: real end-to-end tests against the live orchestrator
+— a high-risk reading (HR 172, QTc 535, HRV 9) correctly ran the full
+13-agent pipeline and produced a real MACE score, diagnostic finding,
+and automation-tier decision, with the URGENT safety gate correctly
+staying closed (generic ICD-10 code, so it landed at "recommendation,"
+not auto-escalated). Unrecognized reading types surface a warning in the
+response instead of silently dropping. A shared-secret `X-Bridge-Api-Key`
+header (`IOMT_BRIDGE_API_KEY` env var) gates this specific endpoint —
+deliberately, since this is a new connection point reachable from a live
+internet-facing system, unlike the rest of this project's still-open
+endpoints.
+
+**What's assumed, not confirmed**: the inbound payload shape
+(`IoMTIngestRequest`) is inferred from the live system's endpoint name
+and general BLE/vendor-gateway conventions — its actual OpenAPI spec
+wasn't available to design against directly. A real mismatch would fail
+loudly (422 from Pydantic validation), not silently, but confirm the
+real schema before connecting live traffic.
+
+**What's an open question, not built**: the live system's documented
+endpoints show only `GET /alerts` and `GET /reports` — no `POST`. There's
+no documented way for this engine to push a computed risk score or
+diagnosis back into that system for its consumer app to display. Either
+it has an undocumented write endpoint, or it's designed to pull instead
+of receiving pushes, or that direction doesn't exist yet — worth
+resolving with whoever maintains that deployment rather than guessing at
+an endpoint that may not exist.
+
+**A real, honest gap this surfaced**: the bridge only carries device
+readings, not patient identity — a device-only patient_id that was never
+admitted through the EHR wizard first gets the same auto-seeded "Demo
+Patient" fallback (`admission_source: "auto"`) as any other unknown
+device stream. If the live consumer app has real patient/user identity
+at signup, extending the bridge payload to carry it through to a real
+`admit_patient()` call (rather than the auto-seed fallback) is the
+natural next step, not something this bridge does today.
+
+**For whoever maintains the live IoMT backend** — the other side of this
+bridge, added there (not built here, since this project has no access to
+that deployment):
+
+```python
+import httpx
+
+async def forward_to_cardioai_pro(device_id, patient_id, vendor, readings):
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://<cardioai-pro-deployment>/api/iomt-bridge/ingest",
+            headers={"X-Bridge-Api-Key": "<the shared secret>"},
+            json={"device_id": device_id, "patient_id": patient_id, "vendor": vendor, "readings": readings},
+        )
+        return resp.json()
+```
+
+Called from wherever `POST /vendor-gateway/ingest` currently lands, once
+its actual payload shape is confirmed against `IoMTIngestRequest` above.
+
+### The outbound direction — now built on this side, and what config the IoMT backend needs
+
+`integrations/iomt_client.py` (`IoMTBackendClient`) is CardioAI Pro's
+outbound half — it can `GET /devices`, `GET /alerts`, `GET /reports`
+(pull), and `POST` a computed result back (push). `iomt_bridge.py`'s
+ingest handler now calls the push automatically after every reading it
+processes — best-effort: if the push fails, the response says so under
+`push_back_status` without failing the request that already succeeded.
+
+**Verified two ways, not just written and assumed**: against a local
+mock standing in for the IoMT backend (all four client methods —
+`get_devices`, `get_alerts`, `push_clinical_result`, and the 401 case for
+a wrong key — round-tripped correctly, including a full
+receive-reading → run-pipeline → push-result cycle in one request), and
+separately against the **real live URL**, where the push correctly failed
+gracefully rather than breaking the inbound response. That real test
+surfaced something worth knowing plainly: the failure came back as
+**403 Forbidden, not 404 Not Found** — meaning something in front of that
+path (auth middleware, a WAF, a proxy) is rejecting the request before
+it ever reaches route-matching, not simply "the route doesn't exist yet."
+Worth knowing before assuming the fix is just "add the route."
+
+**Config needed on the IoMT backend side** — none of this can be done
+from here, since this project has no access to that deployment:
+
+1. **Build the results-ingest endpoint** — `POST /clinical/cardioai-pro/results`
+   (or whatever path fits that codebase's existing `/clinical/` naming
+   convention better), accepting exactly the payload
+   `push_clinical_result()` sends:
+   ```json
+   {
+     "patient_id": "...", "source_system": "cardioai-pro",
+     "risk_score": 0.0, "risk_tier": "low|moderate|high",
+     "diagnosis": "...", "icd10_codes": ["..."],
+     "automation_tier": "informative|recommendation|urgent",
+     "requires_signoff": true
+   }
+   ```
+   Wire whatever it stores into the existing `GET /alerts` / `GET /reports`
+   so the consumer app and clinical dashboard on that system actually
+   surface it — receiving the POST alone doesn't make it visible anywhere.
+2. **Whatever is returning 403 today** needs to allow this path through —
+   confirm whether that's the same auth layer protecting the admin
+   endpoints, a separate WAF/proxy rule, or something else before
+   assuming adding the route alone will fix it.
+3. **Issue CardioAI Pro a credential** for both directions — the vendor-key
+   mechanism (`POST /admin/vendor-keys`) is the most natural fit if it's
+   scoped broadly enough to also cover `GET /devices`/`/alerts`/`/reports`
+   and the new results endpoint, not just `/vendor-gateway/ingest`
+   specifically; if it's narrowly scoped, a separate service-account
+   credential is cleaner than routing a service-to-service integration
+   through the email/password `/auth/login` + refresh-token cycle built
+   for human users.
+4. **Confirm the real GET response shapes** — `get_devices()`/`get_alerts()`/
+   `get_reports()`'s field names on this side are inferred from the
+   endpoint names alone, the same honest caveat as the inbound payload
+   shape above.
+5. **Point CardioAI Pro at the right URL and key** — set `IOMT_BACKEND_URL`
+   (defaults to the real production URL already) and `IOMT_BACKEND_API_KEY`
+   as real deployment environment variables once the credential from step 3
+   exists.
+
+## PMPM payer relationship — the four gaps closed
+
+Four genuinely different pieces, all real, tested, and wired together —
+closing every gap flagged when the payer use cases were first designed.
+
+**Real X12 837 claims parsing** (`integrations/x12_837.py`) — the actual
+EDI format payers/clearinghouses exchange, not the simplified
+`{member_age, risk_flags_count}` shape the claims pipeline only accepted
+before. Reads the ISA envelope itself to detect the real element
+separator and segment terminator a file uses, rather than assuming `*`
+and `~` — a parser that assumed defaults would silently misparse any
+real file using different delimiters. Sequential context tracking (not
+full formal HL-loop hierarchy resolution — stated honestly in the
+module) correctly handles the realistic case. Verified against a
+byte-precise, realistic two-claim test file: correctly extracted member
+identity, DOB-derived age, real dollar charge amounts ($4,500 and $820),
+and correctly classified 2 of 3 diagnosis codes as cardiovascular-relevant
+(unstable angina, systolic heart failure — diabetes correctly excluded)
+using real ICD-10 chapter ranges, not an arbitrary count.
+
+**Cost/outcomes linkage** (`reports/cost_avoidance.py`) — real
+methodology for turning claim cost history into an honest cost-avoidance
+estimate: fits a linear trend on each member's claims before and after
+they were first flagged high-risk, compares the two slopes. Explicitly
+NOT a controlled estimate (no control group — stated in the module,
+not glossed over) and explicitly data-gated: needs at least 3 claims
+before AND after the flag date per member, and at least 10 members with
+sufficient data before reporting anything population-level. A real bug
+was found and fixed while testing this: the initial slope calculation
+used raw Unix timestamps (seconds) as the time axis but labeled and
+displayed the result as dollars-per-*day* — a genuine ~$12.50/day trend
+was rounding to $0.00 at display precision. Caught by constructing a
+deliberately rising-cost test case and noticing the reported slope was
+implausibly zero, not by inspection.
+
+**PMPM contract & billing administration** (`billing/contracts.py`) —
+real contract records, membership reconciliation, and invoice generation
+— a commercial/legal construct deliberately kept separate from the
+risk-stratification population report. Reconciliation compares the
+*contracted* member count (negotiated) against the *reconciled* count
+(actual claims activity), flagging when they diverge by more than 10%
+rather than silently accepting either number. Invoicing supports both the
+PMPM industry norm (bill per contracted covered life) and a
+usage-reconciled alternative, with automatic proration when a contract's
+own start/end date only partially covers the billing period — verified
+against hand-computed expected values (14/29 days = 0.4828 proration
+factor, matching exactly).
+
+**A payer-facing portal** (`frontend/payer_portal.html`) — a real,
+separate dashboard (population risk, claims upload, cost avoidance,
+contracts & billing), served automatically alongside the other two
+dashboards from the same backend, no additional wiring needed. Verified
+with a full jsdom run through all four pages against the live backend:
+uploading the real test 837 file, watching the population report update
+from it, confirming cost avoidance correctly reports insufficient data,
+creating a contract, reconciling (correctly flagging a 2-vs-3,000-member
+gap), generating an invoice ($15,750 = 3,000 × $5.25, computed live, not
+hand-checked after the fact), and loading invoice history — zero errors.
+
+**A real gap in that first version, reported directly and fixed**: the
+Population Risk page had no interactive elements at all — no manual
+refresh, and critically, the high-risk cohort table wasn't clickable,
+unlike the established pattern everywhere else in this project (the
+clinician dashboard's patient drawer). Fixed with a real member-detail
+endpoint (`GET /api/payer/members/{member_id}`, returning full claim
+history plus that member's individual cost trend — not just the
+truncated slice the top_n-limited population report carries) and a
+drawer UI matching the clinician dashboard's pattern. Caught a real test
+artifact while verifying the fix, not a bug: an initial test run showed
+"0 clickable rows found," which traced back to the test data genuinely
+having no high-risk members that session (the cohort table correctly
+only lists high-tier members) — not a broken click handler. Re-verified
+with a genuinely high-risk member (score 0.94) submitted specifically to
+test the path: row click, drawer open/close via both the X button and
+backdrop click, and a 404 case for an unknown member ID — all confirmed
+against the live backend, zero errors.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire
@@ -622,6 +828,9 @@ backend/
     fhir.py                  # FHIR R4 resource builder
     hl7.py                    # HL7 v2 ADT/ORU builder + parser
     dicom.py                  # DICOM metadata extraction + PACS scaffold
+    iomt_bridge.py             # Bridge to the live IoMT CardioAI Backend — receives readings, runs the real pipeline, best-effort pushes the result back
+    iomt_client.py             # Outbound client (GET devices/alerts/reports, POST computed results) — POST endpoint proposed, not yet built on their side
+    x12_837.py                 # Real X12 837 EDI claims parser — reads ISA to detect real delimiters, extracts member/diagnosis/charge data
   inference/
     models.py                 # Model registry + inference interface + placeholder heuristics
     automation_tiers.py      # Automation Tier Engine — URGENT / RECOMMENDATION / INFORMATIVE escalation policy
@@ -633,6 +842,7 @@ backend/
   reports/
     clinical_report.py        # Clinical report formatting — the transformation step that was missing
     population_report.py      # Payer population report — claims aggregation, no fabricated cost/Star-Rating figures
+    cost_avoidance.py          # Real pre/post cost-trend methodology, data-gated — no control group, stated honestly
     compliance_report.py      # Audit compliance report — bias audit + agent health combined
   imaging_models/
     vit_backbone.py            # Real, tested ViT-Base backbone (85.4M params) — shared by both modality-specific models below
@@ -650,9 +860,12 @@ backend/
     train_mobile_echo.py      # Real supervised training loop for MobileEchoNet — documents a genuine BatchNorm train/eval bug, found and partially fixed
   fairness/
     bias_audit.py            # Algorithmic Bias Audit Protocol — subgroup validation cohort, disparity metrics, threshold-based remediation
+  billing/
+    contracts.py               # PMPM contract records, membership reconciliation, invoice generation with automatic proration
   api/
     routes.py                  # REST endpoints + WebSocket
   frontend/
     index.html, app.js, style.css, assets/logo.jpg   # Main Engine console
     clinician_full_dashboard.html                     # Clinician Dashboard — Command Center, Admin, Nurses, Physician, EHR, Diagnostics, Billing; reads live from /api/patients + /api/staff, falls back to a synthetic roster if the engine isn't reachable
+    payer_portal.html                                 # Payer Portal — Population Risk, Claims Upload (X12 837), Cost Avoidance, Contracts & Billing
 ```

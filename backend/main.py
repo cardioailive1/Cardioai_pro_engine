@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from api.routes import router as api_router, ws_router
+from integrations.iomt_bridge import router as iomt_bridge_router
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
+app.include_router(iomt_bridge_router, prefix="/api")  # /api/iomt-bridge/ingest — the seam with the external cardioailiverpm.com system
 app.include_router(ws_router)  # /ws/stream — kept off the /api prefix so it isn't shadowed by the static mount
 
 

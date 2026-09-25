@@ -455,6 +455,8 @@ class ClaimsAggregatorAgent(BaseAgent):
             member_id=member_id, age=record.get("member_age", 0),
             risk_flags_count=record.get("risk_flags_count", 0),
             score=prediction.get("score", 0.0), risk_tier=prediction.get("risk_tier", "low"),
+            claim_id=record.get("claim_id"), total_charge_amount=record.get("total_charge_amount"),
+            diagnosis_codes=record.get("diagnosis_codes"),
         )
         return {**payload, "population_member_id": member_id}
 

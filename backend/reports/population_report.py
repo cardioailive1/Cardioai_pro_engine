@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass
@@ -30,6 +30,11 @@ class MemberRiskRecord:
     score: float
     risk_tier: str
     recorded_at: float
+    claim_history: list[dict[str, Any]] = None  # [{claim_id, charge_amount, diagnosis_codes, recorded_at}] — real cost data, when available (via the X12 837 parser)
+
+    def __post_init__(self):
+        if self.claim_history is None:
+            self.claim_history = []
 
 
 class PopulationAggregator:
@@ -37,11 +42,33 @@ class PopulationAggregator:
         self.members: dict[str, MemberRiskRecord] = {}
         self.max_members = max_members
 
-    def record(self, member_id: str, age: int, risk_flags_count: int, score: float, risk_tier: str) -> None:
-        self.members[member_id] = MemberRiskRecord(member_id, age, risk_flags_count, score, risk_tier, time.time())
+    def record(
+        self, member_id: str, age: int, risk_flags_count: int, score: float, risk_tier: str,
+        claim_id: str | None = None, total_charge_amount: float | None = None, diagnosis_codes: list[str] | None = None,
+    ) -> None:
+        existing = self.members.get(member_id)
+        claim_history = existing.claim_history if existing else []
+        if total_charge_amount is not None:
+            claim_history = claim_history + [{
+                "claim_id": claim_id, "charge_amount": total_charge_amount,
+                "diagnosis_codes": diagnosis_codes or [], "recorded_at": time.time(),
+            }]
+        self.members[member_id] = MemberRiskRecord(
+            member_id, age, risk_flags_count, score, risk_tier, time.time(), claim_history,
+        )
         if len(self.members) > self.max_members:
             oldest = min(self.members.values(), key=lambda m: m.recorded_at)
             del self.members[oldest.member_id]
+
+    def get_member(self, member_id: str) -> Optional[dict[str, Any]]:
+        m = self.members.get(member_id)
+        if not m:
+            return None
+        return {
+            "member_id": m.member_id, "age": m.age, "risk_flags_count": m.risk_flags_count,
+            "score": m.score, "risk_tier": m.risk_tier, "recorded_at": m.recorded_at,
+            "claim_history": m.claim_history,
+        }
 
     def report(self, top_n: int = 20) -> dict[str, Any]:
         members = list(self.members.values())

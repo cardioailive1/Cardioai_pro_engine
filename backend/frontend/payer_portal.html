@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CardioAI Pro — Payer Portal</title>
+<style>
+:root {
+  --navy-deep: #071B36; --navy: #0E2E5C; --ocean: #0B6E99; --blue: #1C7EC4; --cyan: #5DC3E8;
+  --sky: #EAF5FC; --bg: #DCEBF8; --panel: #ffffff; --ink: #0E2440; --ink-soft: #4C6683;
+  --line: #D8E7F3; --ok: #16915F; --warn: #C9820A; --err: #C0392B; --indigo: #5B6FD6;
+  --radius: 12px; --shadow-sm: 0 1px 2px rgba(14,46,92,0.06), 0 1px 1px rgba(14,46,92,0.04);
+  --shadow-md: 0 4px 14px rgba(14,46,92,0.08), 0 1px 3px rgba(14,46,92,0.06);
+  --mono: "IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; line-height:1.5; }
+
+.sidebar-brand { display:flex; align-items:center; gap:10px; padding:6px 4px 16px; }
+.brand-mark { width:34px; height:34px; border-radius:9px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:1.15rem; box-shadow:var(--shadow-sm); flex:0 0 auto; }
+.sidebar-brand-text h1 { margin:0; font-size:0.86rem; font-weight:700; color:#fff; }
+.sidebar-brand-text p { margin:0; font-size:0.68rem; color:#a9d4ec; }
+.demo-banner { font-size:0.68rem; line-height:1.4; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:#cfe8f5; padding:7px 10px; border-radius:10px; margin:0 0 12px; }
+.nav-scroll { display:flex; flex-direction:column; gap:3px; flex:1; overflow-y:auto; }
+
+.app-shell { display:flex; align-items:flex-start; max-width:1440px; margin:0 auto; }
+.sidebar { position:sticky; top:0; flex:0 0 220px; display:flex; flex-direction:column; gap:3px; padding:18px 12px; height:100vh; background:linear-gradient(180deg, var(--navy-deep) 0%, #0A4B6E 100%); border-right:1px solid rgba(255,255,255,0.08); }
+.nav-item { display:flex; align-items:center; gap:9px; text-align:left; background:transparent; border:none; border-left:3px solid transparent; padding:10px 11px; border-radius:8px; font-size:0.8rem; font-weight:600; color:#bfdcee; cursor:pointer; transition:background 0.12s ease, color 0.12s ease, border-color 0.12s ease; }
+.nav-item .ic { width:18px; text-align:center; color:var(--cyan); }
+.nav-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
+.nav-item.active { background:rgba(255,255,255,0.14); color:#fff; border-left-color:var(--cyan); }
+.nav-item.active .ic { color:var(--cyan); }
+
+main { flex:1; min-width:0; padding:24px 26px 60px; display:grid; gap:18px; }
+.page { display:none; } .page.active { display:grid; gap:18px; }
+
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; box-shadow:var(--shadow-sm); }
+.panel h2 { margin:0 0 4px; font-size:0.98rem; color:var(--navy); font-weight:700; }
+.panel .sub { margin:0 0 12px; font-size:0.78rem; color:var(--ink-soft); line-height:1.55; }
+.tag { display:inline-block; font-size:0.66rem; padding:2px 9px; border-radius:20px; background:var(--sky); color:var(--blue); border:1px solid #cfe8f5; margin-left:6px; font-weight:600; }
+
+.grid-2 { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+@media (max-width:980px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } }
+
+.kpi { border:1px solid var(--line); border-radius:var(--radius); padding:14px; background:var(--panel); }
+.kpi .kpi-label { font-size:0.7rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
+.kpi .kpi-value { font-size:1.7rem; font-weight:800; color:var(--navy); font-family:var(--mono); margin-top:4px; }
+.kpi .kpi-sub { font-size:0.7rem; color:var(--ink-soft); margin-top:2px; }
+.kpi.warn .kpi-value { color:var(--warn); }
+.kpi.err .kpi-value { color:var(--err); }
+.kpi.ok .kpi-value { color:var(--ok); }
+
+.table-wrap { overflow-x:auto; }
+table.dt { width:100%; border-collapse:collapse; font-size:0.79rem; }
+.dt th { text-align:left; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--ink-soft); border-bottom:1px solid var(--line); padding:8px 9px; white-space:nowrap; }
+.dt td { padding:8px 9px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.dt tr:hover { background:var(--sky); }
+.mono { font-family:var(--mono); }
+
+.pill { font-size:0.66rem; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+.pill.low { background:#e5f7ee; color:var(--ok); }
+.pill.moderate { background:#fff5e0; color:var(--warn); }
+.pill.high { background:#fde7e5; color:var(--err); }
+.pill.pending { background:#fff5e0; color:var(--warn); }
+.pill.paid { background:#e5f7ee; color:var(--ok); }
+.pill.active { background:#e5f7ee; color:var(--ok); }
+.pill.terminated { background:#fde7e5; color:var(--err); }
+
+button.btn { background:var(--blue); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-size:0.76rem; cursor:pointer; font-weight:600; transition:background 0.12s ease, box-shadow 0.12s ease; }
+button.btn:hover { background:var(--navy); box-shadow:var(--shadow-sm); }
+button.btn.ghost { background:transparent; color:var(--blue); border:1px solid var(--blue); }
+button.btn.ghost:hover { background:var(--sky); }
+button.btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+input[type=text], input[type=number], select, textarea {
+  font-size:0.79rem; padding:7px 10px; border-radius:7px; border:1px solid var(--line); font-family:inherit; background:var(--panel); color:var(--ink); width:100%;
+}
+input:focus, select:focus, textarea:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(28,126,196,0.15); }
+textarea { resize:vertical; font-family:var(--mono); font-size:0.76rem; }
+label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px; }
+
+.form-result { font-size:0.8rem; border-radius:9px; padding:10px 12px; margin-top:10px; }
+.form-result.success { background:#e5f7ee; color:var(--ok); border:1px solid #b9e8cf; }
+.form-result.error { background:#fde7e5; color:var(--err); border:1px solid #f5c3c1; }
+.form-result.info { background:var(--sky); color:var(--ink-soft); border:1px solid #cfe8f5; }
+
+.dt tr.clickable { cursor:pointer; }
+.dt tr.clickable:hover { background:var(--sky); }
+
+.drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(7,27,54,0.5); z-index:50; }
+.drawer-backdrop.open { display:block; }
+.drawer { position:fixed; top:0; right:0; height:100vh; width:min(420px,92vw); background:#fff; z-index:51;
+  box-shadow:-6px 0 28px rgba(7,27,54,0.28); padding:20px; overflow-y:auto;
+  transform:translateX(100%); transition:transform 0.2s ease; }
+.drawer.open { transform:translateX(0); }
+.drawer-close { float:right; background:none; border:none; font-size:1.1rem; cursor:pointer; color:var(--ink-soft); }
+.drawer h3 { margin:0 0 2px; color:var(--navy); }
+.drawer .mid { font-family:var(--mono); font-size:0.76rem; color:var(--ink-soft); }
+.drawer-section { margin-top:16px; }
+.drawer-section h4 { margin:0 0 6px; font-size:0.78rem; color:var(--navy); text-transform:uppercase; letter-spacing:0.03em; }
+
+.disclaimer { font-size:0.71rem; color:#b3691a; background:#fff8ec; border:1px solid #ffe0b8; border-radius:8px; padding:8px 10px; margin-top:10px; }
+.narrative-box { border:1px solid var(--line); border-radius:9px; padding:12px 14px; background:var(--sky); font-size:0.82rem; line-height:1.55; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">💳</div>
+      <div class="sidebar-brand-text">
+        <h1>CardioAI Pro</h1>
+        <p>Payer Portal</p>
+      </div>
+    </div>
+    <div class="demo-banner" id="engineBanner">Connecting to engine…</div>
+
+    <div class="nav-scroll">
+      <button class="nav-item active" data-page="population"><span class="ic">&#9673;</span> Population Risk</button>
+      <button class="nav-item" data-page="claims"><span class="ic">&#128196;</span> Claims Upload</button>
+      <button class="nav-item" data-page="cost"><span class="ic">&#128176;</span> Cost Avoidance</button>
+      <button class="nav-item" data-page="billing"><span class="ic">&#9878;</span> Contracts &amp; Billing</button>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ============ POPULATION RISK ============ -->
+    <section class="page active" data-page="population">
+      <section class="panel">
+        <h2>Member Population Risk <span class="tag">real aggregation, no fabricated cost figures</span></h2>
+        <p class="sub">Every claims record actually processed by the engine, rolled up by risk tier. Deliberately does not compute a dollar-figure cost-avoidance estimate here — see the Cost Avoidance page for that real, data-gated methodology instead.</p>
+        <button class="btn ghost" id="refreshPopBtn">Refresh</button>
+        <div class="grid-4" id="popKpis" style="margin-top:14px;"></div>
+      </section>
+      <section class="panel">
+        <h2>High-Risk Member Cohort</h2>
+        <p class="sub">Ranked by risk score — click a member to open their full record. The list a care-management team would actually work from for outreach prioritization.</p>
+        <div class="table-wrap"><table class="dt" id="cohortTable"></table></div>
+      </section>
+      <section class="panel">
+        <h2>Narrative</h2>
+        <div class="narrative-box" id="popNarrative"></div>
+      </section>
+    </section>
+
+    <!-- ============ CLAIMS UPLOAD ============ -->
+    <section class="page" data-page="claims">
+      <section class="panel">
+        <h2>Upload X12 837 Claims <span class="tag">real EDI parsing, not a simplified JSON shape</span></h2>
+        <p class="sub">Paste a real X12 837 (professional or institutional) claims file. The engine reads the actual ISA envelope to detect the real delimiters this file uses (not an assumed default), extracts subscriber identity, diagnosis codes, and real charge amounts per claim, and runs each claim through the full risk pipeline.</p>
+        <textarea id="claims837Text" rows="10" placeholder="ISA*00*          *00*          *ZZ*SENDERID...~"></textarea>
+        <button class="btn" id="upload837Btn" style="margin-top:10px;">Parse &amp; submit claims</button>
+        <div id="upload837Result"></div>
+      </section>
+      <section class="panel">
+        <h2>Last Upload — Per-Claim Results</h2>
+        <div class="table-wrap"><table class="dt" id="claimsResultTable"></table></div>
+      </section>
+    </section>
+
+    <!-- ============ COST AVOIDANCE ============ -->
+    <section class="page" data-page="cost">
+      <section class="panel">
+        <h2>Cost Avoidance <span class="tag">data-gated — a real number only when there's real data for one</span></h2>
+        <p class="sub">A within-member pre/post cost-trend comparison, built from real claim charge history uploaded via X12 837. Requires at least 3 claims before AND after a member was first flagged high-risk before computing anything for them, and at least 10 members with sufficient data before reporting a population-level number — below that, this page says so instead of showing a number computed from too little data.</p>
+        <button class="btn ghost" id="refreshCostBtn">Refresh</button>
+        <div id="costSummary" class="grid-4" style="margin-top:14px;"></div>
+        <div class="narrative-box" id="costNarrative"></div>
+      </section>
+      <section class="panel">
+        <h2>Per-Member Trend Detail</h2>
+        <div class="table-wrap"><table class="dt" id="costMemberTable"></table></div>
+      </section>
+    </section>
+
+    <!-- ============ CONTRACTS & BILLING ============ -->
+    <section class="page" data-page="billing">
+      <section class="panel">
+        <h2>Create Contract</h2>
+        <p class="sub">A commercial/legal record — deliberately distinct from the risk-stratification population above. The contracted member count here is negotiated, not derived from usage.</p>
+        <div class="grid-4">
+          <div><label class="field-label">Payer name</label><input type="text" id="ctrPayerName" placeholder="e.g. Aetna Midwest" /></div>
+          <div><label class="field-label">PMPM rate ($)</label><input type="number" step="0.01" id="ctrPmpmRate" placeholder="e.g. 4.50" /></div>
+          <div><label class="field-label">Contracted member count</label><input type="number" id="ctrMemberCount" placeholder="e.g. 5000" /></div>
+          <div><label class="field-label">Start date</label><input type="text" id="ctrStartDate" placeholder="YYYY-MM-DD" /></div>
+        </div>
+        <button class="btn" id="createContractBtn" style="margin-top:10px;">Create contract</button>
+        <div id="createContractResult"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Contracts</h2>
+        <div class="table-wrap"><table class="dt" id="contractsTable"></table></div>
+      </section>
+
+      <section class="panel">
+        <h2>Reconcile Membership</h2>
+        <p class="sub">Compares the contracted count against how many distinct members actually had claims activity — the two are deliberately different concepts, and a real gap between them is surfaced, not hidden.</p>
+        <div class="grid-4">
+          <div><label class="field-label">Contract ID</label><input type="text" id="reconContractId" placeholder="CTR-..." /></div>
+          <div><label class="field-label">Period label</label><input type="text" id="reconPeriod" placeholder="e.g. 2026-09" /></div>
+          <div style="align-self:end;"><button class="btn ghost" id="reconcileBtn" style="width:100%;">Reconcile</button></div>
+        </div>
+        <div id="reconcileResult"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Generate Invoice</h2>
+        <div class="grid-4">
+          <div><label class="field-label">Contract ID</label><input type="text" id="invContractId" placeholder="CTR-..." /></div>
+          <div><label class="field-label">Period label</label><input type="text" id="invPeriod" placeholder="e.g. 2026-09" /></div>
+          <div>
+            <label class="field-label">Billing basis</label>
+            <select id="invBasis"><option value="contracted">Contracted (PMPM norm)</option><option value="reconciled">Reconciled (usage-based)</option></select>
+          </div>
+          <div style="align-self:end;"><button class="btn" id="generateInvoiceBtn" style="width:100%;">Generate invoice</button></div>
+        </div>
+        <div id="invoiceResult"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Invoice History</h2>
+        <div class="grid-2" style="align-items:end; margin-bottom:10px;">
+          <div><label class="field-label">Contract ID to view</label><input type="text" id="viewInvoicesContractId" placeholder="CTR-..." /></div>
+          <div><button class="btn ghost" id="viewInvoicesBtn">Load invoices</button></div>
+        </div>
+        <div class="table-wrap"><table class="dt" id="invoicesTable"></table></div>
+      </section>
+    </section>
+  </main>
+</div>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="memberDrawer">
+  <button class="drawer-close" id="drawerClose">&times;</button>
+  <div id="drawerContent"></div>
+</div>
+
+<script>
+const API = "/api";
+let ENGINE_LIVE = false;
+
+async function fetchJSON(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const body = await res.json(); if (body.detail) detail = body.detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+// ---- Navigation ----
+document.querySelectorAll(".nav-item").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelector(`.page[data-page="${btn.dataset.page}"]`).classList.add("active");
+  });
+});
+
+// ---- Engine connectivity + population report ----
+async function loadPopulationReport() {
+  try {
+    const report = await fetchJSON(`${API}/payer/population-report`);
+    ENGINE_LIVE = true;
+    const lastUpdated = new Date(report.generated_at * 1000).toLocaleTimeString();
+    document.getElementById("engineBanner").textContent = `● Live engine — ${report.total_members} member(s) tracked · updated ${lastUpdated}`;
+
+    document.getElementById("popKpis").innerHTML = `
+      <div class="kpi"><div class="kpi-label">Total members</div><div class="kpi-value">${report.total_members}</div></div>
+      <div class="kpi ok"><div class="kpi-label">Low risk</div><div class="kpi-value">${report.tier_breakdown.low}</div></div>
+      <div class="kpi warn"><div class="kpi-label">Moderate risk</div><div class="kpi-value">${report.tier_breakdown.moderate}</div></div>
+      <div class="kpi err"><div class="kpi-label">High risk</div><div class="kpi-value">${report.tier_breakdown.high}</div></div>`;
+
+    const rows = report.high_risk_cohort.map(m => `
+      <tr class="clickable" data-member-id="${m.member_id}"><td class="mono">${m.member_id}</td><td>${m.age}</td><td>${m.risk_flags_count}</td><td class="mono">${m.score.toFixed(3)}</td></tr>`).join("");
+    document.getElementById("cohortTable").innerHTML = `
+      <thead><tr><th>Member ID</th><th>Age</th><th>Risk flags</th><th>Score</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">No high-risk members yet.</td></tr>'}</tbody>`;
+    document.querySelectorAll("#cohortTable tbody tr.clickable").forEach(tr => {
+      tr.addEventListener("click", () => openMemberDrawer(tr.dataset.memberId));
+    });
+
+    document.getElementById("popNarrative").innerHTML = `<strong>MLR impact:</strong> ${report.narrative.mlr_impact}<br><br><strong>Star Rating:</strong> ${report.narrative.star_rating_note}`;
+  } catch (e) {
+    document.getElementById("engineBanner").textContent = "⚠ Engine not reachable";
+  }
+}
+document.getElementById("refreshPopBtn").addEventListener("click", loadPopulationReport);
+
+// ---- Member detail drawer ----
+async function openMemberDrawer(memberId) {
+  try {
+    const m = await fetchJSON(`${API}/payer/members/${encodeURIComponent(memberId)}`);
+    const claimRows = (m.claim_history || []).map(c => `
+      <tr><td class="mono">${c.claim_id || "—"}</td><td>${c.charge_amount != null ? "$" + c.charge_amount.toLocaleString() : "—"}</td>
+      <td>${(c.diagnosis_codes || []).join(", ") || "—"}</td><td>${new Date(c.recorded_at * 1000).toLocaleDateString()}</td></tr>`).join("");
+
+    const trendHtml = m.cost_trend
+      ? (m.cost_trend.sufficient_data
+          ? `<div class="narrative-box">${m.cost_trend.narrative}</div>`
+          : `<div class="form-result info">${m.cost_trend.narrative}</div>`)
+      : `<div class="form-result info">No cost trend yet — needs claim history before and after this member was flagged.</div>`;
+
+    document.getElementById("drawerContent").innerHTML = `
+      <h3>Member ${m.member_id}</h3>
+      <div class="mid">Age ${m.age} · <span class="pill ${m.risk_tier}">${m.risk_tier.toUpperCase()}</span> · score ${m.score.toFixed(3)} · ${m.risk_flags_count} cardiovascular risk flag(s)</div>
+
+      <div class="drawer-section">
+        <h4>Cost trend</h4>
+        ${trendHtml}
+      </div>
+
+      <div class="drawer-section">
+        <h4>Claim history (${(m.claim_history || []).length})</h4>
+        <div class="table-wrap"><table class="dt">
+          <thead><tr><th>Claim ID</th><th>Charge</th><th>Diagnosis codes</th><th>Date</th></tr></thead>
+          <tbody>${claimRows || '<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">No claims on record for this member.</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    `;
+    document.getElementById("memberDrawer").classList.add("open");
+    document.getElementById("drawerBackdrop").classList.add("open");
+  } catch (e) {
+    document.getElementById("drawerContent").innerHTML = `<div class="form-result error">Could not load member ${memberId} — ${e.message}.</div>`;
+    document.getElementById("memberDrawer").classList.add("open");
+    document.getElementById("drawerBackdrop").classList.add("open");
+  }
+}
+function closeMemberDrawer() {
+  document.getElementById("memberDrawer").classList.remove("open");
+  document.getElementById("drawerBackdrop").classList.remove("open");
+}
+document.getElementById("drawerClose").addEventListener("click", closeMemberDrawer);
+document.getElementById("drawerBackdrop").addEventListener("click", closeMemberDrawer);
+
+// ---- Claims upload (X12 837) ----
+document.getElementById("upload837Btn").addEventListener("click", async () => {
+  const resultEl = document.getElementById("upload837Result");
+  const raw = document.getElementById("claims837Text").value.trim();
+  if (!raw) { resultEl.innerHTML = `<div class="form-result error">Paste an X12 837 file first.</div>`; return; }
+
+  const btn = document.getElementById("upload837Btn");
+  btn.disabled = true;
+  try {
+    const body = await fetchJSON(`${API}/payer/claims/upload-837`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw_837: raw }),
+    });
+    resultEl.innerHTML = `<div class="form-result success">Parsed and submitted ${body.claims_parsed} claim(s).</div>`;
+
+    const rows = body.results.map(r => {
+      const record = r.result?.result?.normalized?.record || {};
+      const prediction = r.result?.result?.prediction;
+      return `<tr>
+        <td class="mono">${r.claim_id || "—"}</td><td class="mono">${r.member_id || "—"}</td>
+        <td>${record.member_age ?? "—"}</td><td>${record.total_charge_amount != null ? "$" + record.total_charge_amount.toLocaleString() : "—"}</td>
+        <td>${(record.diagnosis_codes || []).join(", ") || "—"}</td>
+        <td>${prediction ? `<span class="pill ${prediction.risk_tier}">${prediction.risk_tier.toUpperCase()}</span>` : "—"}</td>
+        <td>${r.ok ? "✓" : "✗ " + (r.error || "")}</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("claimsResultTable").innerHTML = `
+      <thead><tr><th>Claim ID</th><th>Member</th><th>Age</th><th>Charge</th><th>Diagnosis codes</th><th>Risk tier</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>`;
+
+    await loadPopulationReport();
+  } catch (e) {
+    resultEl.innerHTML = `<div class="form-result error">Could not upload — ${e.message}.</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- Cost avoidance ----
+async function loadCostAvoidance() {
+  try {
+    const report = await fetchJSON(`${API}/payer/cost-avoidance-report`);
+    if (report.population_estimate_available) {
+      document.getElementById("costSummary").innerHTML = `
+        <div class="kpi"><div class="kpi-label">Members evaluated</div><div class="kpi-value">${report.members_evaluated}</div></div>
+        <div class="kpi ok"><div class="kpi-label">Sufficient data</div><div class="kpi-value">${report.members_with_sufficient_data}</div></div>
+        <div class="kpi"><div class="kpi-label">Avg trend change/day</div><div class="kpi-value">$${report.avg_trend_change_per_day}</div></div>
+        <div class="kpi ok"><div class="kpi-label">Decelerating cost</div><div class="kpi-value">${report.members_with_decelerating_cost_pct}%</div></div>`;
+    } else {
+      document.getElementById("costSummary").innerHTML = `
+        <div class="kpi"><div class="kpi-label">Members evaluated</div><div class="kpi-value">${report.members_evaluated}</div></div>
+        <div class="kpi warn"><div class="kpi-label">Sufficient data</div><div class="kpi-value">${report.members_with_sufficient_data}</div></div>`;
+    }
+    document.getElementById("costNarrative").textContent = report.narrative;
+
+    const rows = (report.member_trends || []).map(t => `
+      <tr><td class="mono">${t.member_id}</td><td>${t.n_pre_claims}</td><td>${t.n_post_claims}</td>
+      <td>${t.sufficient_data ? "✓" : "✗"}</td>
+      <td>${t.pre_flag_slope_per_day != null ? "$"+t.pre_flag_slope_per_day+"/day" : "—"}</td>
+      <td>${t.post_flag_slope_per_day != null ? "$"+t.post_flag_slope_per_day+"/day" : "—"}</td></tr>`).join("");
+    document.getElementById("costMemberTable").innerHTML = `
+      <thead><tr><th>Member</th><th>Pre claims</th><th>Post claims</th><th>Sufficient?</th><th>Pre-flag trend</th><th>Post-flag trend</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);">No claim history yet — upload claims first.</td></tr>'}</tbody>`;
+  } catch (e) {
+    document.getElementById("costNarrative").textContent = "Could not load — " + e.message;
+  }
+}
+document.getElementById("refreshCostBtn").addEventListener("click", loadCostAvoidance);
+
+// ---- Contracts & billing ----
+async function loadContracts() {
+  try {
+    const body = await fetchJSON(`${API}/payer/contracts`);
+    const rows = body.contracts.map(c => `
+      <tr><td class="mono">${c.contract_id}</td><td>${c.payer_name}</td><td>$${c.pmpm_rate}</td>
+      <td>${c.contracted_member_count.toLocaleString()}</td><td>${c.start_date}</td>
+      <td><span class="pill ${c.status}">${c.status.toUpperCase()}</span></td></tr>`).join("");
+    document.getElementById("contractsTable").innerHTML = `
+      <thead><tr><th>Contract ID</th><th>Payer</th><th>PMPM rate</th><th>Contracted members</th><th>Start</th><th>Status</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);">No contracts yet.</td></tr>'}</tbody>`;
+  } catch (e) { /* silent — banner already shows connectivity state */ }
+}
+
+document.getElementById("createContractBtn").addEventListener("click", async () => {
+  const resultEl = document.getElementById("createContractResult");
+  const payerName = document.getElementById("ctrPayerName").value.trim();
+  const pmpmRate = parseFloat(document.getElementById("ctrPmpmRate").value);
+  const memberCount = parseInt(document.getElementById("ctrMemberCount").value, 10);
+  const startDate = document.getElementById("ctrStartDate").value.trim();
+  if (!payerName || Number.isNaN(pmpmRate) || Number.isNaN(memberCount) || !startDate) {
+    resultEl.innerHTML = `<div class="form-result error">All fields are required.</div>`; return;
+  }
+  try {
+    const contract = await fetchJSON(`${API}/payer/contracts`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payer_name: payerName, pmpm_rate: pmpmRate, contracted_member_count: memberCount, start_date: startDate }),
+    });
+    resultEl.innerHTML = `<div class="form-result success">Created <strong>${contract.contract_id}</strong> for ${contract.payer_name}.</div>`;
+    await loadContracts();
+  } catch (e) {
+    resultEl.innerHTML = `<div class="form-result error">Could not create — ${e.message}.</div>`;
+  }
+});
+
+document.getElementById("reconcileBtn").addEventListener("click", async () => {
+  const resultEl = document.getElementById("reconcileResult");
+  const contractId = document.getElementById("reconContractId").value.trim();
+  const period = document.getElementById("reconPeriod").value.trim();
+  if (!contractId || !period) { resultEl.innerHTML = `<div class="form-result error">Contract ID and period are required.</div>`; return; }
+  try {
+    const recon = await fetchJSON(`${API}/payer/contracts/${encodeURIComponent(contractId)}/reconcile`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period_label: period }),
+    });
+    resultEl.innerHTML = `<div class="form-result ${recon.alert ? "error" : "success"}">${recon.narrative}</div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div class="form-result error">Could not reconcile — ${e.message}.</div>`;
+  }
+});
+
+document.getElementById("generateInvoiceBtn").addEventListener("click", async () => {
+  const resultEl = document.getElementById("invoiceResult");
+  const contractId = document.getElementById("invContractId").value.trim();
+  const period = document.getElementById("invPeriod").value.trim();
+  const basis = document.getElementById("invBasis").value;
+  if (!contractId || !period) { resultEl.innerHTML = `<div class="form-result error">Contract ID and period are required.</div>`; return; }
+  try {
+    const invoice = await fetchJSON(`${API}/payer/contracts/${encodeURIComponent(contractId)}/invoice`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period_label: period, billing_basis: basis }),
+    });
+    resultEl.innerHTML = `<div class="form-result success"><strong>${invoice.invoice_id}</strong> — ${invoice.billed_member_count.toLocaleString()} members × $${invoice.pmpm_rate} = $${invoice.amount.toLocaleString()}</div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div class="form-result error">Could not generate — ${e.message}.</div>`;
+  }
+});
+
+document.getElementById("viewInvoicesBtn").addEventListener("click", async () => {
+  const contractId = document.getElementById("viewInvoicesContractId").value.trim();
+  if (!contractId) return;
+  try {
+    const body = await fetchJSON(`${API}/payer/contracts/${encodeURIComponent(contractId)}/invoices`);
+    const rows = body.invoices.map(i => `
+      <tr><td class="mono">${i.invoice_id}</td><td>${i.period_label}</td><td>${i.billing_basis}</td>
+      <td>${i.billed_member_count.toLocaleString()}</td><td>$${i.amount.toLocaleString()}</td>
+      <td><span class="pill ${i.status}">${i.status.toUpperCase()}</span></td></tr>`).join("");
+    document.getElementById("invoicesTable").innerHTML = `
+      <thead><tr><th>Invoice ID</th><th>Period</th><th>Basis</th><th>Members</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);">No invoices for this contract yet.</td></tr>'}</tbody>`;
+  } catch (e) {
+    document.getElementById("invoicesTable").innerHTML = `<tr><td colspan="6">Could not load — ${e.message}</td></tr>`;
+  }
+});
+
+// ---- Initial load + light polling ----
+loadPopulationReport();
+loadContracts();
+loadCostAvoidance();
+setInterval(loadPopulationReport, 8000);
+</script>
+</body>
+</html>
