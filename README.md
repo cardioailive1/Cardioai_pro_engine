@@ -791,6 +791,58 @@ test the path: row click, drawer open/close via both the X button and
 backdrop click, and a 404 case for an unknown member ID — all confirmed
 against the live backend, zero errors.
 
+## Care management — what happens after the risk score
+
+A real, named gap: seeing a member's risk score in the Population Risk
+drawer had no tracked next step — no outreach record, no enrollment, no
+referral. A human had to remember to act, and the system had no way to
+know whether they did.
+
+**`care_management/tasks.py`** — real task records (outreach call,
+enrollment, referral, care coordination) with a deliberately linear
+status lifecycle (`pending → contacted → enrolled/declined/referred`,
+with terminal statuses that can't be reopened — a renewed outreach
+attempt creates a new task instead of mutating history). Verified: the
+terminal-status guard correctly rejects reopening a resolved task, and
+`get_intervention_anchor()` correctly returns the earliest terminal-task
+timestamp for a member, or `None` when no task has resolved yet.
+
+**A real methodological improvement to `cost_avoidance.py`, not just a UI
+addition**: that module's pre/post cost-trend comparison used to anchor
+on `flagged_at` — the date a risk score crossed the threshold — as a
+proxy for "when intervention started." A score crossing a threshold and
+a care coordinator actually enrolling a member are different events.
+`compute_member_cost_trend()` now accepts a real
+`intervention_started_at` and prefers it over `flagged_at` when a care
+task has actually resolved. This isn't cosmetic: in a real test case,
+anchoring on the score date alone left only 2 pre-period claims
+(insufficient to compute anything); anchoring on the real, later
+intervention date correctly captured 6 pre-claims and 4 post-claims,
+producing a genuine, well-supported trend the score-date anchor couldn't
+even attempt.
+
+**A care management worklist** (Payer Portal's new "Care Management"
+page) and a "Create task" form built directly into the member drawer —
+so acting on a risk score and tracking that action happen in the same
+place. Status-advance actions in the worklist only offer valid next
+states (a `pending` task can only move to `contacted`; a terminal task
+offers none), matching the backend's lifecycle exactly rather than
+duplicating that logic loosely in the UI.
+
+**A real bug found and fixed while verifying this, not a UI cosmetic
+issue**: creating a task from the member drawer worked correctly, but
+navigating to the Care Management page afterward showed it as empty.
+Traced to a genuine, systemic gap — clicking a sidebar nav item only
+ever toggled which page's CSS was visible; it never reloaded that page's
+data. Any page's content was only ever as fresh as its last manual
+refresh or its own polling interval, regardless of what changed
+elsewhere in the meantime. Fixed by triggering each page's real loader
+function on navigation to it, not just on initial script load or a
+manual refresh click — re-verified with the full task lifecycle (create
+from drawer → appears in worklist → advance twice through real status
+transitions → correctly disappears from a "pending" filter once
+resolved) end to end, zero errors.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire
@@ -862,6 +914,8 @@ backend/
     bias_audit.py            # Algorithmic Bias Audit Protocol — subgroup validation cohort, disparity metrics, threshold-based remediation
   billing/
     contracts.py               # PMPM contract records, membership reconciliation, invoice generation with automatic proration
+  care_management/
+    tasks.py                    # Care task lifecycle (outreach/enrollment/referral) — also feeds cost_avoidance.py a real intervention anchor
   api/
     routes.py                  # REST endpoints + WebSocket
   frontend/

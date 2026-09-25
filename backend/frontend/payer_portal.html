@@ -123,6 +123,7 @@ label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; mar
       <button class="nav-item" data-page="claims"><span class="ic">&#128196;</span> Claims Upload</button>
       <button class="nav-item" data-page="cost"><span class="ic">&#128176;</span> Cost Avoidance</button>
       <button class="nav-item" data-page="billing"><span class="ic">&#9878;</span> Contracts &amp; Billing</button>
+      <button class="nav-item" data-page="care"><span class="ic">&#10010;</span> Care Management</button>
     </div>
   </nav>
 
@@ -230,6 +231,29 @@ label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; mar
         <div class="table-wrap"><table class="dt" id="invoicesTable"></table></div>
       </section>
     </section>
+
+    <!-- ============ CARE MANAGEMENT ============ -->
+    <section class="page" data-page="care">
+      <section class="panel">
+        <h2>Care Management Worklist <span class="tag">closes "what happens next" after a risk score</span></h2>
+        <p class="sub">Every outreach/enrollment/referral task created from a member's record, across the whole population — not just what's visible from one member's drawer. Filter by status to see what still needs action.</p>
+        <div class="grid-4" style="align-items:end; margin-bottom:12px;">
+          <div>
+            <label class="field-label">Filter by status</label>
+            <select id="careStatusFilter">
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="contacted">Contacted</option>
+              <option value="enrolled">Enrolled</option>
+              <option value="declined">Declined</option>
+              <option value="referred">Referred</option>
+            </select>
+          </div>
+          <div><button class="btn ghost" id="refreshCareTasksBtn">Refresh</button></div>
+        </div>
+        <div class="table-wrap"><table class="dt" id="careTasksTable"></table></div>
+      </section>
+    </section>
   </main>
 </div>
 
@@ -254,12 +278,29 @@ async function fetchJSON(url, opts = {}) {
 }
 
 // ---- Navigation ----
+const PAGE_LOADERS = {
+  population: loadPopulationReport,
+  cost: loadCostAvoidance,
+  billing: loadContracts,
+  care: loadCareTasks,
+  // "claims" has no standing data to reload — it's a blank upload form until submitted
+};
+
 document.querySelectorAll(".nav-item").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     document.querySelector(`.page[data-page="${btn.dataset.page}"]`).classList.add("active");
+    // Reload that page's data on navigation — before this fix, switching
+    // tabs only toggled visibility; anything created/changed since the
+    // last load of that specific page (e.g. a care task created from a
+    // member drawer opened on the Population Risk page) wouldn't show
+    // until that page's own manual refresh button was clicked, which
+    // looked exactly like "nothing updates" even though the underlying
+    // data was correct.
+    const loader = PAGE_LOADERS[btn.dataset.page];
+    if (loader) loader();
   });
 });
 
@@ -307,6 +348,11 @@ async function openMemberDrawer(memberId) {
           : `<div class="form-result info">${m.cost_trend.narrative}</div>`)
       : `<div class="form-result info">No cost trend yet — needs claim history before and after this member was flagged.</div>`;
 
+    const taskRows = (m.care_tasks || []).map(t => `
+      <tr><td class="mono">${t.task_id}</td><td>${t.task_type.replace("_"," ")}</td>
+      <td><span class="pill ${t.status}">${t.status.toUpperCase()}</span></td><td>${t.assigned_to}</td></tr>`).join("");
+    const hasOpenTask = (m.care_tasks || []).some(t => !["enrolled","declined","referred"].includes(t.status));
+
     document.getElementById("drawerContent").innerHTML = `
       <h3>Member ${m.member_id}</h3>
       <div class="mid">Age ${m.age} · <span class="pill ${m.risk_tier}">${m.risk_tier.toUpperCase()}</span> · score ${m.score.toFixed(3)} · ${m.risk_flags_count} cardiovascular risk flag(s)</div>
@@ -317,6 +363,28 @@ async function openMemberDrawer(memberId) {
       </div>
 
       <div class="drawer-section">
+        <h4>Care tasks (${(m.care_tasks || []).length})</h4>
+        <div class="table-wrap"><table class="dt">
+          <thead><tr><th>Task ID</th><th>Type</th><th>Status</th><th>Assigned to</th></tr></thead>
+          <tbody>${taskRows || '<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">No care tasks yet — what happens next after this risk score is untracked until one is created.</td></tr>'}</tbody>
+        </table></div>
+        ${hasOpenTask ? '<div class="form-result info" style="margin-top:8px;">An open task already exists for this member — update its status in Care Management rather than creating a duplicate.</div>' : `
+        <div style="margin-top:10px;">
+          <label class="field-label">Create a task</label>
+          <select id="drawerTaskType" style="margin-bottom:6px;">
+            <option value="outreach_call">Outreach call</option>
+            <option value="enrollment">Enrollment</option>
+            <option value="referral">Referral</option>
+            <option value="care_coordination">Care coordination</option>
+          </select>
+          <input type="text" id="drawerTaskAssignee" placeholder="Assigned to (e.g. Coordinator Reyes)" style="margin-bottom:6px;" />
+          <input type="text" id="drawerTaskNotes" placeholder="Notes (optional)" style="margin-bottom:6px;" />
+          <button class="btn" id="drawerCreateTaskBtn" style="width:100%;">Create task</button>
+          <div id="drawerTaskResult"></div>
+        </div>`}
+      </div>
+
+      <div class="drawer-section">
         <h4>Claim history (${(m.claim_history || []).length})</h4>
         <div class="table-wrap"><table class="dt">
           <thead><tr><th>Claim ID</th><th>Charge</th><th>Diagnosis codes</th><th>Date</th></tr></thead>
@@ -324,6 +392,28 @@ async function openMemberDrawer(memberId) {
         </table></div>
       </div>
     `;
+
+    const createBtn = document.getElementById("drawerCreateTaskBtn");
+    if (createBtn) {
+      createBtn.addEventListener("click", async () => {
+        const resultEl = document.getElementById("drawerTaskResult");
+        const assignee = document.getElementById("drawerTaskAssignee").value.trim();
+        if (!assignee) { resultEl.innerHTML = `<div class="form-result error">Assigned to is required.</div>`; return; }
+        try {
+          await fetchJSON(`${API}/payer/members/${encodeURIComponent(memberId)}/tasks`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              task_type: document.getElementById("drawerTaskType").value,
+              assigned_to: assignee,
+              notes: document.getElementById("drawerTaskNotes").value.trim(),
+            }),
+          });
+          await openMemberDrawer(memberId); // re-render the drawer with the new task
+        } catch (e) {
+          resultEl.innerHTML = `<div class="form-result error">Could not create task — ${e.message}.</div>`;
+        }
+      });
+    }
     document.getElementById("memberDrawer").classList.add("open");
     document.getElementById("drawerBackdrop").classList.add("open");
   } catch (e) {
@@ -491,10 +581,59 @@ document.getElementById("viewInvoicesBtn").addEventListener("click", async () =>
   }
 });
 
+// ---- Care Management worklist ----
+const STATUS_ACTIONS = {
+  pending: ["contacted"], contacted: ["enrolled", "declined", "referred"],
+  enrolled: [], declined: [], referred: [],
+};
+
+async function loadCareTasks() {
+  const statusFilter = document.getElementById("careStatusFilter").value;
+  try {
+    const url = statusFilter ? `${API}/payer/care-tasks?status=${encodeURIComponent(statusFilter)}` : `${API}/payer/care-tasks`;
+    const body = await fetchJSON(url);
+    const rows = body.tasks.map(t => {
+      const actions = (STATUS_ACTIONS[t.status] || []).map(next =>
+        `<button class="btn ghost sm task-action-btn" data-task-id="${t.task_id}" data-next-status="${next}" style="margin-right:4px;">${next}</button>`
+      ).join("");
+      return `<tr>
+        <td class="mono">${t.task_id}</td><td class="mono">${t.member_id}</td><td>${t.task_type.replace("_"," ")}</td>
+        <td><span class="pill ${t.status}">${t.status.toUpperCase()}</span></td><td>${t.assigned_to}</td>
+        <td>${new Date(t.updated_at * 1000).toLocaleString()}</td>
+        <td>${actions || "—"}</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("careTasksTable").innerHTML = `
+      <thead><tr><th>Task ID</th><th>Member</th><th>Type</th><th>Status</th><th>Assigned to</th><th>Last updated</th><th>Actions</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:var(--ink-soft);">No care tasks yet.</td></tr>'}</tbody>`;
+
+    document.querySelectorAll(".task-action-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          await fetchJSON(`${API}/payer/care-tasks/${encodeURIComponent(btn.dataset.taskId)}/status`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: btn.dataset.nextStatus }),
+          });
+          await loadCareTasks();
+        } catch (e) {
+          btn.disabled = false;
+          alert(`Could not update — ${e.message}`);
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById("careTasksTable").innerHTML = `<tr><td colspan="7">Could not load — ${e.message}</td></tr>`;
+  }
+}
+document.getElementById("refreshCareTasksBtn").addEventListener("click", loadCareTasks);
+document.getElementById("careStatusFilter").addEventListener("change", loadCareTasks);
+
 // ---- Initial load + light polling ----
 loadPopulationReport();
 loadContracts();
 loadCostAvoidance();
+loadCareTasks();
 setInterval(loadPopulationReport, 8000);
 </script>
 </body>

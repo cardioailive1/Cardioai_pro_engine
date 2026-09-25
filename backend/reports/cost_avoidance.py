@@ -70,12 +70,13 @@ class MemberCostTrend:
     pre_flag_slope_per_day: Optional[float] = None   # dollars/day trend BEFORE the member was first flagged high-risk
     post_flag_slope_per_day: Optional[float] = None  # dollars/day trend AFTER
     trend_change: Optional[float] = None              # post - pre; negative means costs decelerated after flagging
+    anchor_source: str = "flagged_at"  # "flagged_at" (fallback) | "intervention" (a real care task reached a terminal status) — see compute_member_cost_trend's docstring
     narrative: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "member_id": self.member_id, "n_pre_claims": self.n_pre_claims, "n_post_claims": self.n_post_claims,
-            "sufficient_data": self.sufficient_data,
+            "sufficient_data": self.sufficient_data, "anchor_source": self.anchor_source,
             "pre_flag_slope_per_day": round(self.pre_flag_slope_per_day, 2) if self.pre_flag_slope_per_day is not None else None,
             "post_flag_slope_per_day": round(self.post_flag_slope_per_day, 2) if self.post_flag_slope_per_day is not None else None,
             "trend_change": round(self.trend_change, 2) if self.trend_change is not None else None,
@@ -83,20 +84,34 @@ class MemberCostTrend:
         }
 
 
-def compute_member_cost_trend(member_id: str, claim_history: list[dict[str, Any]], flagged_at: float) -> MemberCostTrend:
+def compute_member_cost_trend(
+    member_id: str, claim_history: list[dict[str, Any]], flagged_at: float,
+    intervention_started_at: Optional[float] = None,
+) -> MemberCostTrend:
     """
     claim_history: [{charge_amount, recorded_at}, ...] — the same shape
     reports/population_report.py's MemberRiskRecord.claim_history carries.
-    flagged_at: the timestamp this member was first scored high-risk.
+    flagged_at: the timestamp this member was first scored high-risk —
+    the fallback anchor.
+    intervention_started_at: when available (from
+    care_management.tasks.CareTaskRegistry.get_intervention_anchor() — the
+    earliest terminal-status care task for this member), this is used
+    INSTEAD of flagged_at. A risk score crossing a threshold and a care
+    coordinator actually enrolling/referring/reaching the member are
+    different events; anchoring on the real one, when it exists, is a
+    materially better pre/post split than anchoring on the score alone.
     """
-    pre = [c for c in claim_history if c["recorded_at"] < flagged_at and c.get("charge_amount") is not None]
-    post = [c for c in claim_history if c["recorded_at"] >= flagged_at and c.get("charge_amount") is not None]
+    anchor = intervention_started_at if intervention_started_at is not None else flagged_at
+    anchor_source = "intervention" if intervention_started_at is not None else "flagged_at"
+    pre = [c for c in claim_history if c["recorded_at"] < anchor and c.get("charge_amount") is not None]
+    post = [c for c in claim_history if c["recorded_at"] >= anchor and c.get("charge_amount") is not None]
 
     sufficient = len(pre) >= MIN_CLAIMS_PER_PERIOD and len(post) >= MIN_CLAIMS_PER_PERIOD
     if not sufficient:
         return MemberCostTrend(
             member_id=member_id, n_pre_claims=len(pre), n_post_claims=len(post), sufficient_data=False,
-            narrative=f"Only {len(pre)} pre-flag and {len(post)} post-flag claims — need at least {MIN_CLAIMS_PER_PERIOD} of each to fit a real trend, not noise.",
+            anchor_source=anchor_source,
+            narrative=f"Only {len(pre)} pre-{anchor_source} and {len(post)} post-{anchor_source} claims — need at least {MIN_CLAIMS_PER_PERIOD} of each to fit a real trend, not noise.",
         )
 
     t0 = claim_history[0]["recorded_at"]
@@ -114,30 +129,38 @@ def compute_member_cost_trend(member_id: str, claim_history: list[dict[str, Any]
     if pre_slope is None or post_slope is None:
         return MemberCostTrend(
             member_id=member_id, n_pre_claims=len(pre), n_post_claims=len(post), sufficient_data=False,
+            anchor_source=anchor_source,
             narrative="Enough claims, but not enough time spread within one period to fit a reliable slope.",
         )
 
     change = post_slope - pre_slope
     direction = "decelerated" if change < 0 else "accelerated" if change > 0 else "stayed flat"
+    anchor_desc = "after a real recorded intervention (enrollment/referral)" if anchor_source == "intervention" else "after flagging (no recorded intervention yet — using the risk-score date as a fallback anchor)"
     narrative = (
-        f"Cost trend {direction} after flagging: {pre_slope:+.2f}/day before -> {post_slope:+.2f}/day after. "
+        f"Cost trend {direction} {anchor_desc}: {pre_slope:+.2f}/day before -> {post_slope:+.2f}/day after. "
         "This is a within-member trend comparison, not a controlled estimate — see module docstring."
     )
     return MemberCostTrend(
         member_id=member_id, n_pre_claims=len(pre), n_post_claims=len(post), sufficient_data=True,
-        pre_flag_slope_per_day=pre_slope, post_flag_slope_per_day=post_slope, trend_change=change, narrative=narrative,
+        pre_flag_slope_per_day=pre_slope, post_flag_slope_per_day=post_slope, trend_change=change,
+        anchor_source=anchor_source, narrative=narrative,
     )
 
 
-def population_cost_avoidance_report(members_with_history: dict[str, tuple[list[dict[str, Any]], float]]) -> dict[str, Any]:
+def population_cost_avoidance_report(members_with_history: dict[str, tuple[list[dict[str, Any]], float, Optional[float]]]) -> dict[str, Any]:
     """
-    members_with_history: member_id -> (claim_history, flagged_at). Returns
-    an honest population-level rollup — a real number ONLY when enough
-    members individually have sufficient data; otherwise says so instead
-    of computing one from too few members and presenting it with false
-    confidence.
+    members_with_history: member_id -> (claim_history, flagged_at,
+    intervention_started_at). The third element may be None — passed
+    straight through to compute_member_cost_trend, which falls back to
+    flagged_at when it is. Returns an honest population-level rollup — a
+    real number ONLY when enough members individually have sufficient
+    data; otherwise says so instead of computing one from too few members
+    and presenting it with false confidence.
     """
-    trends = [compute_member_cost_trend(mid, hist, flagged_at) for mid, (hist, flagged_at) in members_with_history.items()]
+    trends = [
+        compute_member_cost_trend(mid, hist, flagged_at, intervention_started_at=intervention_at)
+        for mid, (hist, flagged_at, intervention_at) in members_with_history.items()
+    ]
     valid = [t for t in trends if t.sufficient_data]
 
     if len(valid) < MIN_MEMBERS_FOR_POPULATION_ESTIMATE:

@@ -558,14 +558,58 @@ async def payer_member_detail(member_id: str):
 
     # Fold in the same per-member cost trend cost_avoidance.py computes,
     # so the drawer doesn't need a second round trip to the Cost
-    # Avoidance page's data to show it.
+    # Avoidance page's data to show it. Now anchored on a real recorded
+    # intervention when one exists (care_management/tasks.py), not just
+    # the risk-score date.
+    anchor = orchestrator.care_task_registry.get_intervention_anchor(member_id)
     if detail["claim_history"]:
-        trend = compute_member_cost_trend(member_id, detail["claim_history"], detail["recorded_at"])
+        trend = compute_member_cost_trend(member_id, detail["claim_history"], detail["recorded_at"], intervention_started_at=anchor)
         detail["cost_trend"] = trend.to_dict()
     else:
         detail["cost_trend"] = None
 
+    detail["care_tasks"] = [t.to_dict() for t in orchestrator.care_task_registry.tasks_for_member(member_id)]
     return detail
+
+
+class CreateCareTaskRequest(BaseModel):
+    task_type: str
+    assigned_to: str
+    notes: str = ""
+
+
+@router.post("/payer/members/{member_id}/tasks")
+async def create_care_task(member_id: str, req: CreateCareTaskRequest):
+    """
+    Closes the "what happens next" gap directly: before this endpoint
+    existed, seeing a member's risk score in the drawer had no next step
+    tracked anywhere — no outreach record, no enrollment, nothing. This is
+    that record. See care_management/tasks.py for the status lifecycle
+    and why it's deliberately linear (no reopening a resolved task).
+    """
+    task, error = orchestrator.care_task_registry.create_task(member_id, req.task_type, req.assigned_to, req.notes)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return task.to_dict()
+
+
+class UpdateCareTaskStatusRequest(BaseModel):
+    status: str
+
+
+@router.post("/payer/care-tasks/{task_id}/status")
+async def update_care_task_status(task_id: str, req: UpdateCareTaskStatusRequest):
+    task, error = orchestrator.care_task_registry.update_status(task_id, req.status)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return task.to_dict()
+
+
+@router.get("/payer/care-tasks")
+async def list_care_tasks(status: Optional[str] = None):
+    """The care management worklist — every task across every member, optionally filtered by status."""
+    tasks = orchestrator.care_task_registry.all_tasks(status_filter=status)
+    return {"tasks": [t.to_dict() for t in tasks]}
 
 
 class Upload837Request(BaseModel):
@@ -618,7 +662,8 @@ async def payer_cost_avoidance_report():
     members_with_history = {}
     for member_id, m in orchestrator.population_aggregator.members.items():
         if m.claim_history:
-            members_with_history[member_id] = (m.claim_history, m.recorded_at)
+            anchor = orchestrator.care_task_registry.get_intervention_anchor(member_id)
+            members_with_history[member_id] = (m.claim_history, m.recorded_at, anchor)
     return population_cost_avoidance_report(members_with_history)
 
 
