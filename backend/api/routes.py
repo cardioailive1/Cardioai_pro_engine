@@ -21,6 +21,7 @@ from ingestion.streaming import STREAMS
 from integrations.hl7 import build_adt_a01, build_oru_r01, parse_hl7_message
 from integrations.dicom import DICOMService
 from integrations.x12_837 import parse_837_claims, claim_to_cardioai_record
+from integrations.x12_834 import parse_834_enrollment
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
 from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
@@ -704,19 +705,69 @@ async def terminate_contract(contract_id: str):
 
 class ReconcileRequest(BaseModel):
     period_label: str
-    actual_member_ids: Optional[list[str]] = None  # if omitted, reconciles against every member PopulationAggregator has actually seen
+    actual_member_ids: Optional[list[str]] = None  # explicit override — if provided, used as-is regardless of `source`
+    source: str = "enrollment"  # "enrollment" (real X12 834 active membership — the methodologically correct basis for PMPM) | "claims_activity" (the older usage-proxy fallback)
+
+
+@router.post("/payer/claims/enrollment/upload-834")
+async def upload_834_enrollment(req: Upload837Request):
+    """
+    Real X12 834 parsing (integrations/x12_834.py) — closes the gap
+    between "members with claims activity" (a usage proxy) and actual
+    covered membership. reuses Upload837Request's shape (just a
+    raw_837-named field carrying raw EDI text) since the request shape
+    is identical; the field name is a minor mismatch not worth a
+    duplicate model for.
+    """
+    try:
+        events, unrecognized = parse_834_enrollment(req.raw_837)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Could not parse X12 834 file: {exc}")
+
+    if not events:
+        raise HTTPException(status_code=400, detail="No INS (member-level) segments found in the file.")
+
+    result = orchestrator.enrollment_registry.apply_events(events)
+    response = result.to_dict()
+    if unrecognized:
+        response["warning"] = f"Unrecognized maintenance type code(s): {unrecognized} — see KNOWN_MAINTENANCE_CODES in integrations/x12_834.py to add support."
+    return response
+
+
+@router.get("/payer/enrollment")
+async def list_enrollment(status: Optional[str] = None):
+    members = orchestrator.enrollment_registry.all_members()
+    if status:
+        members = [m for m in members if m["status"] == status]
+    return {"members": members, "active_count": len(orchestrator.enrollment_registry.active_member_ids())}
 
 
 @router.post("/payer/contracts/{contract_id}/reconcile")
 async def reconcile_contract(contract_id: str, req: ReconcileRequest):
     if contract_id not in orchestrator.contract_registry.contracts:
         raise HTTPException(status_code=404, detail=f"No contract {contract_id}")
-    member_ids = set(req.actual_member_ids) if req.actual_member_ids else set(orchestrator.population_aggregator.members.keys())
+
+    if req.actual_member_ids:
+        member_ids = set(req.actual_member_ids)
+        source_used = "explicit"
+    elif req.source == "enrollment" and orchestrator.enrollment_registry.members:
+        member_ids = orchestrator.enrollment_registry.active_member_ids()
+        source_used = "enrollment"
+    else:
+        # Falls back to the claims-activity usage proxy when no real
+        # enrollment data has been uploaded yet, or when explicitly
+        # requested — never silently returns an empty reconciliation
+        # just because the preferred source isn't populated.
+        member_ids = set(orchestrator.population_aggregator.members.keys())
+        source_used = "claims_activity"
+
     try:
         result = orchestrator.contract_registry.reconcile_membership(contract_id, req.period_label, member_ids)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return result.to_dict()
+    result_dict = result.to_dict()
+    result_dict["source_used"] = source_used
+    return result_dict
 
 
 class GenerateInvoiceRequest(BaseModel):

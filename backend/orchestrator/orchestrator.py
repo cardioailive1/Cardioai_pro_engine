@@ -38,6 +38,7 @@ from reports.clinical_report import ClinicalReportGenerator
 from reports.population_report import PopulationAggregator
 from billing.contracts import ContractRegistry
 from care_management.tasks import CareTaskRegistry
+from billing.enrollment import EnrollmentRegistry
 from longitudinal.trend_engine import LongitudinalTrendEngine
 
 
@@ -56,6 +57,7 @@ class CentralOrchestrator:
         self.population_aggregator = PopulationAggregator()
         self.contract_registry = ContractRegistry()
         self.care_task_registry = CareTaskRegistry()
+        self.enrollment_registry = EnrollmentRegistry()
         self.longitudinal_trend_engine = LongitudinalTrendEngine()
         self.fusion_engine = MultiModalFusionEngine()
         self.last_bias_audit: dict | None = None  # cached by /api/bias-audit/run, read by the compliance report

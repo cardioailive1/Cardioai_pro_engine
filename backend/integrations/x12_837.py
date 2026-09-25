@@ -30,6 +30,11 @@ X12 837 implementation guide requires) without the added complexity of
 resolving arbitrary HL parent/child nesting. A file with genuinely
 irregular loop ordering could be misparsed by this simplification; a
 production clearinghouse-grade parser would resolve HL loops formally.
+
+Envelope/segment parsing (ISA delimiter detection, generic segment
+splitting) lives in integrations/x12_common.py, shared with
+integrations/x12_834.py (enrollment) — this module only handles the
+837-specific segment interpretation (CLM/HI/SV1/SV2).
 """
 from __future__ import annotations
 
@@ -37,47 +42,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Optional
 
-
-@dataclass
-class X12Segment:
-    tag: str
-    elements: list[str]  # elements[0] is the tag itself's data position is NOT included — elements are everything after the tag
-
-
-def parse_x12_envelope(raw: str) -> tuple[str, str, str]:
-    """
-    Reads the ISA segment to determine the REAL element separator and
-    segment terminator this file actually uses, rather than assuming
-    `*` and `~`. Returns (element_sep, segment_term, component_sep).
-    ISA is fixed-width: position 3 (0-indexed) is the element separator;
-    the component separator is the second-to-last character of the ISA
-    line (ISA16); the segment terminator is whatever character
-    immediately follows the ISA line's 105 data characters.
-    """
-    if not raw.startswith("ISA"):
-        raise ValueError("Not a valid X12 file — must start with an ISA segment.")
-    element_sep = raw[3]
-    isa_line = raw[:106]  # ISA is exactly 106 characters including its terminator
-    component_sep = isa_line[104]  # ISA16, the component element separator
-    segment_term = raw[105] if len(raw) > 105 else "~"
-    return element_sep, segment_term, component_sep
-
-
-def parse_segments(raw: str) -> list[X12Segment]:
-    """Splits the whole file into segments using the real delimiters detected from ISA, tolerating stray whitespace/newlines some real-world files include around segment terminators."""
-    element_sep, segment_term, _ = parse_x12_envelope(raw)
-    raw_segments = raw.split(segment_term)
-    segments: list[X12Segment] = []
-    for raw_seg in raw_segments:
-        raw_seg = raw_seg.strip().strip("\n").strip("\r")
-        if not raw_seg:
-            continue
-        parts = raw_seg.split(element_sep)
-        tag = parts[0].strip()
-        if not tag:
-            continue
-        segments.append(X12Segment(tag=tag, elements=[p.strip() for p in parts[1:]]))
-    return segments
+from integrations.x12_common import X12Segment, parse_x12_envelope, parse_segments
 
 
 @dataclass

@@ -791,6 +791,41 @@ test the path: row click, drawer open/close via both the X button and
 backdrop click, and a 404 case for an unknown member ID — all confirmed
 against the live backend, zero errors.
 
+## Real enrollment data — closing the claims-vs-coverage gap
+
+A real, named gap: claims (X12 837) tell you who USED services; nothing
+told this system who is actually COVERED. `contracted_member_count`
+reconciliation could only ever check against members with claims
+activity — a usage proxy — when PMPM billing is specifically NOT
+usage-based (you pay per covered life whether or not they submit a claim
+that month).
+
+**`integrations/x12_834.py`** — real X12 834 (Benefit Enrollment and
+Maintenance) parsing: additions (021), terminations (024), changes
+(001), reinstatements (025), with unrecognized maintenance codes
+surfaced in the response rather than silently dropped. Shares its
+envelope/delimiter-detection logic with the 837 parser via a new
+`integrations/x12_common.py` — extracted during this build rather than
+duplicated, and re-verified the 837 parser produces byte-identical
+output after the refactor before building on top of it.
+
+**`billing/enrollment.py`** — a real `EnrollmentRegistry` tracking active
+vs. terminated membership from those events, with the edge cases handled
+deliberately, not glossed over: a termination for a member with no prior
+recorded addition still gets recorded rather than dropped (real files
+can arrive mid-history); a "change" event with no existing member is
+treated as an implicit addition rather than discarding real member data.
+
+**Reconciliation now defaults to real enrollment data** when it exists,
+falling back to the claims-activity proxy only when no enrollment data
+has been uploaded yet — verified with a live before/after test: before
+any 834 upload, `source_used: "claims_activity"`; after uploading real
+enrollment events, the same reconciliation call automatically switched
+to `source_used: "enrollment"` and the reconciled count changed to
+reflect only truly active members, not everyone who'd ever shown claims
+activity. The Payer Portal surfaces which basis was used directly in the
+reconciliation result, not just the number.
+
 ## Care management — what happens after the risk score
 
 A real, named gap: seeing a member's risk score in the Population Risk
@@ -883,6 +918,8 @@ backend/
     iomt_bridge.py             # Bridge to the live IoMT CardioAI Backend — receives readings, runs the real pipeline, best-effort pushes the result back
     iomt_client.py             # Outbound client (GET devices/alerts/reports, POST computed results) — POST endpoint proposed, not yet built on their side
     x12_837.py                 # Real X12 837 EDI claims parser — reads ISA to detect real delimiters, extracts member/diagnosis/charge data
+    x12_834.py                 # Real X12 834 enrollment parser — additions/terminations/changes/reinstatements, real coverage not a usage proxy
+    x12_common.py              # Shared envelope/delimiter-detection logic between the 837 and 834 parsers
   inference/
     models.py                 # Model registry + inference interface + placeholder heuristics
     automation_tiers.py      # Automation Tier Engine — URGENT / RECOMMENDATION / INFORMATIVE escalation policy
@@ -914,6 +951,7 @@ backend/
     bias_audit.py            # Algorithmic Bias Audit Protocol — subgroup validation cohort, disparity metrics, threshold-based remediation
   billing/
     contracts.py               # PMPM contract records, membership reconciliation, invoice generation with automatic proration
+    enrollment.py               # Real EnrollmentRegistry — active/terminated membership from X12 834 events, feeds reconciliation a real basis
   care_management/
     tasks.py                    # Care task lifecycle (outreach/enrollment/referral) — also feeds cost_avoidance.py a real intervention anchor
   api/

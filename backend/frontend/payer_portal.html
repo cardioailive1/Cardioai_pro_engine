@@ -120,7 +120,7 @@ label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; mar
 
     <div class="nav-scroll">
       <button class="nav-item active" data-page="population"><span class="ic">&#9673;</span> Population Risk</button>
-      <button class="nav-item" data-page="claims"><span class="ic">&#128196;</span> Claims Upload</button>
+      <button class="nav-item" data-page="claims"><span class="ic">&#128196;</span> Claims &amp; Enrollment</button>
       <button class="nav-item" data-page="cost"><span class="ic">&#128176;</span> Cost Avoidance</button>
       <button class="nav-item" data-page="billing"><span class="ic">&#9878;</span> Contracts &amp; Billing</button>
       <button class="nav-item" data-page="care"><span class="ic">&#10010;</span> Care Management</button>
@@ -159,6 +159,19 @@ label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; mar
       <section class="panel">
         <h2>Last Upload — Per-Claim Results</h2>
         <div class="table-wrap"><table class="dt" id="claimsResultTable"></table></div>
+      </section>
+
+      <section class="panel">
+        <h2>Upload X12 834 Enrollment <span class="tag">real coverage data — not a usage proxy</span></h2>
+        <p class="sub">Claims tell you who USED services; this tells you who is actually COVERED — a materially different, more correct basis for PMPM reconciliation than claims activity, since PMPM bills per covered life whether or not they submitted a claim. Handles additions (021), terminations (024), changes (001), and reinstatements (025).</p>
+        <textarea id="enrollment834Text" rows="10" placeholder="ISA*00*          *00*          *ZZ*SENDERID...~"></textarea>
+        <button class="btn" id="upload834Btn" style="margin-top:10px;">Parse &amp; apply enrollment events</button>
+        <div id="upload834Result"></div>
+      </section>
+      <section class="panel">
+        <h2>Enrolled Members <span id="activeEnrollmentCount" class="tag"></span></h2>
+        <button class="btn ghost" id="refreshEnrollmentBtn">Refresh</button>
+        <div class="table-wrap" style="margin-top:10px;"><table class="dt" id="enrollmentTable"></table></div>
       </section>
     </section>
 
@@ -280,10 +293,10 @@ async function fetchJSON(url, opts = {}) {
 // ---- Navigation ----
 const PAGE_LOADERS = {
   population: loadPopulationReport,
+  claims: loadEnrollment,  // the claims page now also shows standing enrollment data, not just an upload form
   cost: loadCostAvoidance,
   billing: loadContracts,
   care: loadCareTasks,
-  // "claims" has no standing data to reload — it's a blank upload form until submitted
 };
 
 document.querySelectorAll(".nav-item").forEach(btn => {
@@ -466,6 +479,45 @@ document.getElementById("upload837Btn").addEventListener("click", async () => {
   }
 });
 
+// ---- Enrollment upload (X12 834) ----
+document.getElementById("upload834Btn").addEventListener("click", async () => {
+  const resultEl = document.getElementById("upload834Result");
+  const raw = document.getElementById("enrollment834Text").value.trim();
+  if (!raw) { resultEl.innerHTML = `<div class="form-result error">Paste an X12 834 file first.</div>`; return; }
+
+  const btn = document.getElementById("upload834Btn");
+  btn.disabled = true;
+  try {
+    const body = await fetchJSON(`${API}/payer/claims/enrollment/upload-834`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw_837: raw }),
+    });
+    resultEl.innerHTML = `<div class="form-result success">Added ${body.added.length}, terminated ${body.terminated.length}, changed ${body.changed.length}, reinstated ${body.reinstated.length}.
+      ${body.skipped_no_member_id ? `${body.skipped_no_member_id} event(s) skipped (no member ID).` : ""}
+      ${body.warning ? `<br><span style="color:var(--warn);">${body.warning}</span>` : ""}</div>`;
+    await loadEnrollment();
+  } catch (e) {
+    resultEl.innerHTML = `<div class="form-result error">Could not upload — ${e.message}.</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function loadEnrollment() {
+  try {
+    const body = await fetchJSON(`${API}/payer/enrollment`);
+    document.getElementById("activeEnrollmentCount").textContent = `${body.active_count} active`;
+    const rows = body.members.map(m => `
+      <tr><td class="mono">${m.member_id}</td><td>${m.first_name || "—"} ${m.last_name || ""}</td>
+      <td><span class="pill ${m.status}">${m.status.toUpperCase()}</span></td><td>${m.effective_date || "—"}</td></tr>`).join("");
+    document.getElementById("enrollmentTable").innerHTML = `
+      <thead><tr><th>Member ID</th><th>Name</th><th>Status</th><th>Effective date</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">No enrollment data uploaded yet — reconciliation falls back to claims activity until it is.</td></tr>'}</tbody>`;
+  } catch (e) {
+    document.getElementById("enrollmentTable").innerHTML = `<tr><td colspan="4">Could not load — ${e.message}</td></tr>`;
+  }
+}
+document.getElementById("refreshEnrollmentBtn").addEventListener("click", loadEnrollment);
+
 // ---- Cost avoidance ----
 async function loadCostAvoidance() {
   try {
@@ -541,7 +593,7 @@ document.getElementById("reconcileBtn").addEventListener("click", async () => {
     const recon = await fetchJSON(`${API}/payer/contracts/${encodeURIComponent(contractId)}/reconcile`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period_label: period }),
     });
-    resultEl.innerHTML = `<div class="form-result ${recon.alert ? "error" : "success"}">${recon.narrative}</div>`;
+    resultEl.innerHTML = `<div class="form-result ${recon.alert ? "error" : "success"}">${recon.narrative}<div style="margin-top:6px; font-size:0.72rem; opacity:0.75;">Basis: <strong>${recon.source_used}</strong>${recon.source_used === "claims_activity" ? " — no enrollment data uploaded yet; upload an X12 834 for a more accurate reconciliation." : ""}</div></div>`;
   } catch (e) {
     resultEl.innerHTML = `<div class="form-result error">Could not reconcile — ${e.message}.</div>`;
   }
@@ -634,6 +686,7 @@ loadPopulationReport();
 loadContracts();
 loadCostAvoidance();
 loadCareTasks();
+loadEnrollment();
 setInterval(loadPopulationReport, 8000);
 </script>
 </body>
