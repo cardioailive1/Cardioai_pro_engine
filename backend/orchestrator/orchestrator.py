@@ -39,6 +39,7 @@ from reports.population_report import PopulationAggregator
 from billing.contracts import ContractRegistry
 from care_management.tasks import CareTaskRegistry
 from billing.enrollment import EnrollmentRegistry
+from data_room.documents import DocumentRegistry
 from longitudinal.trend_engine import LongitudinalTrendEngine
 
 
@@ -58,6 +59,7 @@ class CentralOrchestrator:
         self.contract_registry = ContractRegistry()
         self.care_task_registry = CareTaskRegistry()
         self.enrollment_registry = EnrollmentRegistry()
+        self.document_registry = DocumentRegistry()
         self.longitudinal_trend_engine = LongitudinalTrendEngine()
         self.fusion_engine = MultiModalFusionEngine()
         self.last_bias_audit: dict | None = None  # cached by /api/bias-audit/run, read by the compliance report

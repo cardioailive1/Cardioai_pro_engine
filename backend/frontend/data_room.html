@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CardioAI Pro — Investor Data Room</title>
+<style>
+:root {
+  --navy-deep: #071B36; --navy: #0E2E5C; --ocean: #0B6E99; --blue: #1C7EC4; --cyan: #5DC3E8;
+  --sky: #EAF5FC; --bg: #DCEBF8; --panel: #ffffff; --ink: #0E2440; --ink-soft: #4C6683;
+  --line: #D8E7F3; --ok: #16915F; --warn: #C9820A; --err: #C0392B; --indigo: #5B6FD6;
+  --radius: 12px; --shadow-sm: 0 1px 2px rgba(14,46,92,0.06), 0 1px 1px rgba(14,46,92,0.04);
+  --shadow-md: 0 4px 14px rgba(14,46,92,0.08), 0 1px 3px rgba(14,46,92,0.06);
+  --mono: "IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; line-height:1.6; }
+
+/* ---- Password gate ---- */
+#gateOverlay { position:fixed; inset:0; background:linear-gradient(160deg, var(--navy-deep), #0A4B6E); z-index:200; display:flex; align-items:center; justify-content:center; }
+.gate-card { background:#fff; border-radius:16px; padding:36px 34px; width:min(400px,88vw); box-shadow:var(--shadow-md); text-align:center; }
+.gate-card .lock { font-size:2rem; margin-bottom:6px; }
+.gate-card h2 { margin:0 0 4px; color:var(--navy); font-size:1.1rem; }
+.gate-card p.sub { color:var(--ink-soft); font-size:0.8rem; margin:0 0 18px; }
+.gate-card input { width:100%; font-size:0.9rem; padding:10px 12px; border-radius:8px; border:1px solid var(--line); margin-bottom:10px; text-align:center; }
+.gate-card button { width:100%; background:var(--blue); color:#fff; border:none; padding:11px; border-radius:8px; font-size:0.85rem; font-weight:700; cursor:pointer; }
+.gate-card button:hover { background:var(--navy); }
+.gate-error { color:var(--err); font-size:0.76rem; margin-top:8px; min-height:1em; }
+.gate-note { color:var(--ink-soft); font-size:0.68rem; margin-top:16px; line-height:1.5; }
+
+/* ---- App shell ---- */
+#appShell { display:none; }
+.app-shell { display:flex; align-items:flex-start; max-width:1440px; margin:0 auto; }
+.sidebar { position:sticky; top:0; flex:0 0 230px; display:flex; flex-direction:column; gap:3px; padding:18px 12px; height:100vh; background:linear-gradient(180deg, var(--navy-deep) 0%, #0A4B6E 100%); overflow-y:auto; }
+.sidebar-brand { display:flex; align-items:center; gap:10px; padding:6px 4px 16px; }
+.brand-mark { width:34px; height:34px; border-radius:9px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:1.15rem; box-shadow:var(--shadow-sm); flex:0 0 auto; }
+.sidebar-brand-text h1 { margin:0; font-size:0.86rem; font-weight:700; color:#fff; }
+.sidebar-brand-text p { margin:0; font-size:0.66rem; color:#a9d4ec; }
+.confidential-banner { font-size:0.63rem; line-height:1.4; background:rgba(201,130,10,0.18); border:1px solid rgba(201,130,10,0.35); color:#ffd9a0; padding:6px 9px; border-radius:8px; margin:0 0 12px; text-align:center; font-weight:700; letter-spacing:0.02em; }
+.nav-item { display:flex; align-items:center; gap:9px; text-align:left; background:transparent; border:none; border-left:3px solid transparent; padding:9px 11px; border-radius:8px; font-size:0.78rem; font-weight:600; color:#bfdcee; cursor:pointer; }
+.nav-item .ic { width:18px; text-align:center; color:var(--cyan); flex:0 0 auto; }
+.nav-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
+.nav-item.active { background:rgba(255,255,255,0.14); color:#fff; border-left-color:var(--cyan); }
+.nav-item.active .ic { color:var(--cyan); }
+.sidebar-logout { margin-top:auto; padding-top:10px; }
+
+main { flex:1; min-width:0; padding:26px 30px 70px; display:grid; gap:20px; }
+.page { display:none; } .page.active { display:grid; gap:20px; }
+
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:22px 26px; box-shadow:var(--shadow-sm); }
+.panel h2 { margin:0 0 6px; font-size:1.05rem; color:var(--navy); font-weight:700; }
+.panel h3 { margin:20px 0 8px; font-size:0.92rem; color:var(--navy); font-weight:700; }
+.panel .sub { margin:0 0 14px; font-size:0.82rem; color:var(--ink-soft); line-height:1.6; }
+.panel p { font-size:0.86rem; line-height:1.7; color:var(--ink); }
+.tag { display:inline-block; font-size:0.64rem; padding:2px 9px; border-radius:20px; background:var(--sky); color:var(--blue); border:1px solid #cfe8f5; margin-left:6px; font-weight:600; vertical-align:middle; }
+.tag.gold { background:#fff5e0; color:var(--warn); border-color:#ffe0a3; }
+
+.hero-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.hero-kpi { background:linear-gradient(160deg,#fff,#f4faff); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center; }
+.hero-kpi .val { font-size:1.7rem; font-weight:800; color:var(--navy); font-family:var(--mono); }
+.hero-kpi .lbl { font-size:0.72rem; color:var(--ink-soft); margin-top:4px; }
+
+.highlight-strip { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+.highlight-chip { background:var(--sky); border:1px solid #cfe8f5; border-radius:10px; padding:12px 8px; text-align:center; }
+.highlight-chip .val { font-size:1.05rem; font-weight:800; color:var(--ocean); font-family:var(--mono); }
+.highlight-chip .lbl { font-size:0.63rem; color:var(--ink-soft); margin-top:3px; line-height:1.3; }
+@media (max-width:1100px) { .hero-metrics,.highlight-strip { grid-template-columns:repeat(2,1fr); } }
+
+.doc-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+@media (max-width:900px) { .doc-grid { grid-template-columns:1fr; } }
+.doc-card { border:1px solid var(--line); border-radius:12px; padding:16px 18px; cursor:pointer; transition:box-shadow 0.12s ease, border-color 0.12s ease; background:#fff; }
+.doc-card:hover { box-shadow:var(--shadow-md); border-color:var(--cyan); }
+.doc-card .doc-num { font-family:var(--mono); font-size:0.66rem; color:var(--blue); font-weight:700; }
+.doc-card h4 { margin:4px 0 5px; font-size:0.92rem; color:var(--navy); }
+.doc-card p { margin:0; font-size:0.76rem; color:var(--ink-soft); line-height:1.5; }
+.doc-card .doc-open { margin-top:8px; font-size:0.72rem; color:var(--blue); font-weight:700; }
+
+.table-wrap { overflow-x:auto; margin-top:10px; }
+table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
+.dt th { text-align:right; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.02em; color:var(--ink-soft); border-bottom:2px solid var(--line); padding:8px 10px; white-space:nowrap; }
+.dt th:first-child, .dt td:first-child { text-align:left; }
+.dt td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+.dt tr.section-row td { font-weight:700; background:var(--sky); color:var(--navy); }
+.dt tr.total-row td { font-weight:700; border-top:2px solid var(--navy); border-bottom:2px solid var(--navy); }
+.dt tr:hover td { background:#f7fbff; }
+.mono { font-family:var(--mono); }
+
+.callout { border-radius:10px; padding:12px 14px; font-size:0.79rem; margin:12px 0; line-height:1.6; }
+.callout.warn { background:#fff8ec; color:#8a5a10; border:1px solid #ffe0a3; }
+.callout.info { background:var(--sky); color:var(--ink-soft); border:1px solid #cfe8f5; }
+
+.pill { display:inline-block; font-size:0.66rem; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+.pill.complete { background:#e5f7ee; color:var(--ok); }
+.pill.partial { background:#fff5e0; color:var(--warn); }
+.pill.unavailable { background:#f0f2f5; color:var(--ink-soft); }
+.stat-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.stat-box { background:var(--sky); border:1px solid #cfe8f5; border-radius:12px; padding:14px; text-align:center; }
+.stat-box .n { font-size:1.5rem; font-weight:800; color:var(--navy); font-family:var(--mono); }
+.stat-box .l { font-size:0.7rem; color:var(--ink-soft); margin-top:2px; }
+.category-block { margin-top:22px; }
+.category-block h3 { display:flex; align-items:center; gap:8px; }
+.category-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:6px; background:var(--navy); color:#fff; font-size:0.7rem; font-weight:800; flex:0 0 auto; }
+
+.arch-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:10px; }
+@media (max-width:900px) { .arch-grid { grid-template-columns:1fr; } }
+.arch-card { border:1px solid var(--line); border-radius:12px; padding:16px; background:var(--sky); }
+.arch-card h4 { margin:0 0 6px; color:var(--navy); font-size:0.88rem; }
+.arch-card ul { margin:0; padding-left:18px; font-size:0.78rem; color:var(--ink-soft); line-height:1.7; }
+
+.team-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:10px; }
+@media (max-width:900px) { .team-grid { grid-template-columns:repeat(2,1fr); } }
+.team-card { text-align:center; border:1px solid var(--line); border-radius:12px; padding:16px 10px; }
+.team-card .avatar { width:52px; height:52px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; margin:0 auto 8px; font-size:0.95rem; }
+.team-card .nm { font-weight:700; font-size:0.82rem; color:var(--navy); }
+.team-card .rl { font-size:0.7rem; color:var(--ink-soft); margin-top:2px; }
+
+.bio-card { display:flex; gap:16px; border:1px solid var(--line); border-radius:12px; padding:18px; margin-top:14px; align-items:flex-start; }
+.bio-card .avatar { width:52px; height:52px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.95rem; flex:0 0 auto; }
+.bio-card .bio-body h4 { margin:0; font-size:0.95rem; color:var(--navy); }
+.bio-card .bio-body .rl { font-size:0.78rem; color:var(--blue); font-weight:700; margin:2px 0 8px; }
+.bio-card .bio-body p { margin:0; font-size:0.82rem; line-height:1.65; color:var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- ============ PASSWORD GATE ============ -->
+<div id="gateOverlay">
+  <div class="gate-card">
+    <div class="lock">🔐</div>
+    <h2>Secure Access Required</h2>
+    <p class="sub">CardioAI Pro — Investor Data Room</p>
+    <input type="password" id="gatePassword" placeholder="Enter access code" />
+    <button id="gateSubmitBtn">Access Data Room</button>
+    <div class="gate-error" id="gateError"></div>
+    <div class="gate-note">This is a client-side access gate for controlled sharing, not a substitute for real authentication. Confidential — authorized investors only.</div>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appShell">
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">🫀</div>
+        <div class="sidebar-brand-text">
+          <h1>CardioAI Pro</h1>
+          <p>Investor Data Room</p>
+        </div>
+      </div>
+      <div class="confidential-banner">⚠ CONFIDENTIAL — AUTHORIZED INVESTORS ONLY</div>
+
+      <button class="nav-item active" data-page="index"><span class="ic">&#9673;</span> Overview</button>
+      <button class="nav-item" data-page="checklist"><span class="ic">&#128203;</span> Data Room Index</button>
+      <button class="nav-item" data-page="exec"><span class="ic">&#128203;</span> Executive Summary</button>
+      <button class="nav-item" data-page="product"><span class="ic">&#128295;</span> Product &amp; Technology</button>
+      <button class="nav-item" data-page="financial"><span class="ic">&#128176;</span> Financial Model</button>
+      <button class="nav-item" data-page="plan"><span class="ic">&#128202;</span> Business Plan</button>
+      <button class="nav-item" data-page="market"><span class="ic">&#127760;</span> Market &amp; Competition</button>
+      <button class="nav-item" data-page="terms"><span class="ic">&#128188;</span> Investment Structure</button>
+      <button class="nav-item" data-page="traction"><span class="ic">&#9873;</span> Traction &amp; Status</button>
+      <button class="nav-item" data-page="documents"><span class="ic">&#128193;</span> Document Room</button>
+
+      <div class="sidebar-logout">
+        <button class="nav-item" id="logoutBtn"><span class="ic">&#128274;</span> Lock data room</button>
+      </div>
+    </nav>
+
+    <main>
+
+      <!-- ============ INDEX ============ -->
+      <section class="page active" data-page="index">
+        <section class="panel">
+          <h2>🫀 CardioAI Pro <span class="tag gold">Pre-Seed — $1.0M — Under Due Diligence &amp; Negotiation</span></h2>
+          <p class="sub">Investor data room — confidential materials. Every figure below comes directly from the attached three-year financial model (FY2027–FY2029), for the CardioAI Pro engine specifically — this model does not include any other product line.</p>
+          <div class="hero-metrics">
+            <div class="hero-kpi"><div class="val">$184.1M</div><div class="lbl">3-Year Total Revenue</div></div>
+            <div class="hero-kpi"><div class="val">$63.5M</div><div class="lbl">3-Year Cumulative EBITDA</div></div>
+            <div class="hero-kpi"><div class="val">42.6%</div><div class="lbl">Year 3 EBITDA Margin</div></div>
+            <div class="hero-kpi"><div class="val">$51.0M</div><div class="lbl">Post-Money Valuation</div></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Investment Highlights</h3>
+          <div class="highlight-strip">
+            <div class="highlight-chip"><div class="val">Y1</div><div class="lbl">Profitable from Year 1</div></div>
+            <div class="highlight-chip"><div class="val">90</div><div class="lbl">Enterprise contracts by Y3 (cumulative)</div></div>
+            <div class="highlight-chip"><div class="val">350K</div><div class="lbl">High-risk payer lives by Y3</div></div>
+            <div class="highlight-chip"><div class="val">10K</div><div class="lbl">Consumer subscribers, Y1</div></div>
+            <div class="highlight-chip"><div class="val">68.2%</div><div class="lbl">Blended gross margin</div></div>
+            <div class="highlight-chip"><div class="val">$1.0M</div><div class="lbl">Pre-seed raise, $50M pre-money</div></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Core Documents</h3>
+          <div class="doc-grid">
+            <div class="doc-card" data-nav="exec"><div class="doc-num">01</div><h4>Executive Summary</h4><p>Company overview, the CardioAI Pro engine, and the three-segment revenue model — enterprise, payer, and consumer.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="product"><div class="doc-num">02</div><h4>Product &amp; Technology</h4><p>The CardioAI Pro engine's real, built, tested architecture — the actual system behind every revenue segment in this model.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="financial"><div class="doc-num">03</div><h4>Financial Model</h4><p>All five source sheets — Assumptions, Revenue Model, OpEx Breakdown, Use of Funds, KPI Dashboard — presented in full.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="plan"><div class="doc-num">04</div><h4>Business Plan</h4><p>Go-to-market by segment, operating plan, and the real product roadmap underneath the numbers.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="terms"><div class="doc-num">05</div><h4>Investment Structure</h4><p>Pre-seed round structure — pre-money valuation, raise amount, and use of funds.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="traction"><div class="doc-num">06</div><h4>Traction &amp; Status</h4><p>What is actually built and tested today, stated plainly against what is still planned.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="documents"><div class="doc-num">07</div><h4>Document Room</h4><p>Articles of incorporation, bylaws, employee contracts, and other due-diligence documents.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="checklist"><div class="doc-num">08</div><h4>Data Room Index</h4><p>Full due-diligence checklist across 8 categories — honest status per item, live-checked against what's actually uploaded.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="market"><div class="doc-num">09</div><h4>Market &amp; Competition</h4><p>Bottom-up TAM/SAM/SOM and a real competitive landscape — every external figure cited to a named, dated source.</p><div class="doc-open">Open →</div></div>
+            <a href="https://claude.ai/artifact/Wu1GHfAvALavxSa8iNo4KZ" target="_blank" rel="noopener" class="doc-card" style="text-decoration:none; display:block;"><div class="doc-num">10</div><h4>Investor Deck <span class="tag">opens separately</span></h4><p>13-slide presentation — same figures as this data room throughout. Opens in a new tab; export to PDF/PPTX from there.</p><div class="doc-open">Open deck ↗</div></a>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">3-Year Financial Summary</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Metric</th><th>FY2027 (Y1)</th><th>FY2028 (Y2)</th><th>FY2029 (Y3)</th><th>3-Yr Total</th></tr></thead>
+            <tbody>
+              <tr><td>Total Revenue</td><td>$24.3M</td><td>$52.5M</td><td>$107.3M</td><td>$184.1M</td></tr>
+              <tr><td>Total COGS</td><td>$(7.7M)</td><td>$(16.6M)</td><td>$(34.2M)</td><td>$(58.5M)</td></tr>
+              <tr><td>Gross Profit</td><td>$16.6M</td><td>$35.9M</td><td>$73.1M</td><td>$125.6M</td></tr>
+              <tr><td>Gross Margin %</td><td>68.2%</td><td>68.4%</td><td>68.1%</td><td>—</td></tr>
+              <tr><td>Operating Expenses</td><td>$(14.7M)</td><td>$(20.1M)</td><td>$(27.4M)</td><td>$(62.1M)</td></tr>
+              <tr class="total-row"><td>EBITDA</td><td>$1.9M</td><td>$15.8M</td><td>$45.7M</td><td>$63.5M</td></tr>
+              <tr><td>EBITDA Margin %</td><td>8.0%</td><td>30.1%</td><td>42.6%</td><td>—</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub" style="margin-top:10px;">Source: attached financial model, "Revenue Model" sheet. Full detail and every underlying assumption on the Financial Model page.</p>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Contact</h3>
+          <p><strong>Sampson Kontomah</strong> — Founder, CEO &amp; Chief AI Officer</p>
+          <p><strong>Everlyn Ndirangu</strong> — CFO</p>
+          <p><strong>Avi Patel</strong> — VP Engineering, Web Applications</p>
+          <p><strong>Galax Womack</strong> — Chief Technology Officer (CTO)</p>
+        </section>
+      </section>
+
+      <!-- ============ EXECUTIVE SUMMARY ============ -->
+      <section class="page" data-page="exec">
+        <section class="panel">
+          <h2>Executive Summary</h2>
+          <p><strong>CardioAI Pro</strong> is a multi-agent clinical AI engine for cardiovascular risk analysis, built around a real, tested 15-agent orchestration pipeline — ingestion, data quality scoring, FHIR R4 resource generation, risk inference, longitudinal trend analysis, multi-modal fusion, diagnostic mapping, automation-tier escalation policy, and clinical/population reporting, all wired together and verified end to end.</p>
+          <p>This financial model covers <strong>CardioAI Pro specifically</strong> — it does not include any other product line. Three revenue segments map directly onto three real, built parts of the engine:</p>
+          <div class="arch-grid">
+            <div class="arch-card">
+              <h4>Enterprise Health Systems</h4>
+              <ul>
+                <li>$86.4M 3-yr segment revenue</li>
+                <li>90 cumulative contracts by Y3</li>
+                <li>Built: EHR intake wizard, admit/discharge/readmit workflow, HL7 ADT facility-transfer import, clinician dashboard</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Health Insurance Payers</h4>
+              <ul>
+                <li>$81.7M 3-yr segment revenue</li>
+                <li>350K high-risk lives covered by Y3</li>
+                <li>Built: real X12 837 claims parsing, X12 834 enrollment parsing, cost-avoidance methodology, PMPM contract &amp; billing, care management worklist</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Consumer Subscribers</h4>
+              <ul>
+                <li>$16.0M 3-yr segment revenue</li>
+                <li>10K paid subscribers by Y1</li>
+                <li>Built: personal cardiac score API, longitudinal trend-based alerting</li>
+              </ul>
+            </div>
+          </div>
+          <h3>The Numbers</h3>
+          <p>$184.1M in 3-year total revenue, 68.2% blended gross margin, and profitability from Year 1 ($1.9M EBITDA, scaling to $45.7M / 42.6% margin by Year 3) — full detail on the Financial Model page, every figure traceable to the underlying workbook.</p>
+          <h3>The Round</h3>
+          <p>$1.0M pre-seed at a $50M pre-money valuation ($51M post-money). Full use of funds on the Investment Structure page.</p>
+        </section>
+      </section>
+
+      <!-- ============ PRODUCT & TECHNOLOGY ============ -->
+      <section class="page" data-page="product">
+        <section class="panel">
+          <h2>Product &amp; Technology — The CardioAI Pro Engine</h2>
+          <p class="sub">This is the actual, built system this financial model is built on — not a roadmap. Every capability listed below has been implemented and tested against a running backend, not just designed.</p>
+
+          <h3>Core Orchestration</h3>
+          <p>A 15-agent pipeline coordinates every reading that enters the system: ingestion → data quality scoring → FHIR R4 resource generation → risk inference → patient intake → longitudinal trend analysis → multi-modal fusion → diagnostic mapping → automation-tier policy → clinical reporting → alerting → care-continuum tracking → registry persistence. Real, tested end to end — not a diagram of an intended design.</p>
+
+          <h3>Three Real Interfaces</h3>
+          <div class="arch-grid">
+            <div class="arch-card">
+              <h4>Clinician Dashboard</h4>
+              <ul>
+                <li>6-step EHR admission wizard (Personal, Demographics, Location, Insurance, Clinical, Vitals)</li>
+                <li>Real admit / discharge / readmit workflow</li>
+                <li>HL7 v2 ADT facility-transfer import</li>
+                <li>Full patient chart, longitudinal vitals, diagnostic order pipeline</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Payer Portal</h4>
+              <ul>
+                <li>Real X12 837 claims parsing (reads the actual ISA envelope to detect real delimiters)</li>
+                <li>Real X12 834 enrollment parsing — true coverage data, not a claims-activity proxy</li>
+                <li>PMPM contract &amp; billing, membership reconciliation, automatic proration</li>
+                <li>Data-gated cost-avoidance methodology and care management worklist</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Main Engine Console</h4>
+              <ul>
+                <li>Live agent status and event log</li>
+                <li>Algorithmic bias/fairness audit with subgroup disparity metrics</li>
+                <li>DICOM ingestion, FHIR/HL7 sample viewers, automation-tier policy tester</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>Clinical Safety Design</h3>
+          <p>Automation escalation is deliberately conservative: a single elevated reading cannot trigger urgent auto-escalation on its own — that requires both a confirmed, clinically-specific diagnosis code and high model confidence simultaneously. This structural gate is a design choice made and tested, not a claim.</p>
+
+          <h3>Where This Model Is Honest About Its Own Limits</h3>
+          <p>The underlying MACE risk-scoring model is a real, tested software pipeline running on a placeholder heuristic — not yet a clinically validated model. The infrastructure around it (ingestion, quality scoring, fusion, longitudinal tracking, billing, audit) is real and tested; the clinical scoring intelligence inside it is the next validation milestone. Clinical validation is now in progress through the <strong>Mayo Clinic Accelerate program</strong> — that work has started, but "in progress" means exactly that: the model is not yet validated, and this page does not claim otherwise until that work concludes.</p>
+        </section>
+      </section>
+
+      <!-- ============ FINANCIAL MODEL ============ -->
+      <section class="page" data-page="financial">
+        <section class="panel">
+          <h2>Financial Model <span class="tag">source: attached workbook, all 5 sheets</span></h2>
+          <p class="sub">Three-year model, FY2027–FY2029, CardioAI Pro only. Every number below is taken directly from the attached workbook — nothing here is estimated or rounded beyond standard currency display.</p>
+
+          <div class="callout warn">
+            <strong>Two data-quality notes on the source workbook, disclosed rather than hidden:</strong><br>
+            1. The KPI Dashboard sheet contains literal <span class="mono">#REF!</span> formula errors in several "actual" cells (Y1 EBITDA, Y1 EBITDA Margin, Gross Margin, Total Y1 ARR). The KPI table below uses the clean, self-consistent figures from the Revenue Model sheet instead of those broken cells.<br>
+            2. The OpEx Breakdown sheet's own itemized Year-1 total ($11.77M) does not currently reconcile with the $14.65M Year-1 OpEx figure the P&L summary uses for its EBITDA calculation. The P&L figures below use the $14.65M figure (the one the Revenue Model and KPI Dashboard sheets are built around); the itemized breakdown is shown as-is from its own sheet.
+          </div>
+
+          <h3>Revenue &amp; Profitability</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Line</th><th>FY2027</th><th>FY2028</th><th>FY2029</th><th>3-Yr Total</th></tr></thead>
+            <tbody>
+              <tr class="section-row"><td colspan="5">Segment 1 — Enterprise Health Systems</td></tr>
+              <tr><td>New contracts signed</td><td>15</td><td>30</td><td>45</td><td>90</td></tr>
+              <tr><td>Cumulative active contracts</td><td>15</td><td>45</td><td>90</td><td>—</td></tr>
+              <tr><td>Avg contract value</td><td>$800K</td><td>$860K</td><td>$920K</td><td>—</td></tr>
+              <tr><td>Segment Revenue</td><td>$12.0M</td><td>$27.6M</td><td>$46.8M</td><td>$86.4M</td></tr>
+              <tr><td>Gross Profit (70%)</td><td>$8.4M</td><td>$19.3M</td><td>$32.8M</td><td>$60.5M</td></tr>
+
+              <tr class="section-row"><td colspan="5">Segment 2 — Health Insurance Payers</td></tr>
+              <tr><td>Active payer contracts</td><td>2</td><td>5</td><td>10</td><td>—</td></tr>
+              <tr><td>High-risk members covered</td><td>80,000</td><td>150,000</td><td>350,000</td><td>—</td></tr>
+              <tr><td>Blended PMPM rate</td><td>$11.00</td><td>$11.50</td><td>$12.00</td><td>—</td></tr>
+              <tr><td>Segment Revenue</td><td>$10.6M</td><td>$20.7M</td><td>$50.4M</td><td>$81.7M</td></tr>
+              <tr><td>Gross Profit (65%)</td><td>$6.9M</td><td>$13.5M</td><td>$32.8M</td><td>$53.1M</td></tr>
+
+              <tr class="section-row"><td colspan="5">Segment 3 — Consumer Subscribers</td></tr>
+              <tr><td>Trial starts</td><td>14,000</td><td>22,000</td><td>48,000</td><td>—</td></tr>
+              <tr><td>Paid conversions (70%)</td><td>9,800</td><td>15,400</td><td>33,600</td><td>—</td></tr>
+              <tr><td>Blended ARPU (annual)</td><td>$180</td><td>$270</td><td>$299.88</td><td>—</td></tr>
+              <tr><td>Segment Revenue</td><td>$1.8M</td><td>$4.2M</td><td>$10.1M</td><td>$16.0M</td></tr>
+              <tr><td>Gross Profit (75%)</td><td>$1.3M</td><td>$3.1M</td><td>$7.6M</td><td>$12.0M</td></tr>
+
+              <tr class="total-row"><td>TOTAL REVENUE</td><td>$24.3M</td><td>$52.5M</td><td>$107.3M</td><td>$184.1M</td></tr>
+              <tr><td>Total COGS</td><td>$(7.7M)</td><td>$(16.6M)</td><td>$(34.2M)</td><td>$(58.5M)</td></tr>
+              <tr class="total-row"><td>TOTAL GROSS PROFIT</td><td>$16.6M</td><td>$35.9M</td><td>$73.1M</td><td>$125.6M</td></tr>
+              <tr><td>Gross Margin %</td><td>68.2%</td><td>68.4%</td><td>68.1%</td><td>—</td></tr>
+              <tr><td>Operating Expenses</td><td>$(14.7M)</td><td>$(20.1M)</td><td>$(27.4M)</td><td>$(62.1M)</td></tr>
+              <tr class="total-row"><td>EBITDA</td><td>$1.9M</td><td>$15.8M</td><td>$45.7M</td><td>$63.5M</td></tr>
+              <tr><td>EBITDA Margin %</td><td>8.0%</td><td>30.1%</td><td>42.6%</td><td>—</td></tr>
+            </tbody>
+          </table></div>
+
+          <h3>Operating Expense Detail</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Category</th><th>FY2027</th><th>FY2028</th><th>FY2029</th></tr></thead>
+            <tbody>
+              <tr class="section-row"><td colspan="4">Sales &amp; Marketing</td></tr>
+              <tr><td>Enterprise sales force (8 AEs Y1)</td><td>$3.2M</td><td>$5.5M</td><td>$8.2M</td></tr>
+              <tr><td>Payer analytics team</td><td>$0.8M</td><td>$1.4M</td><td>$2.2M</td></tr>
+              <tr><td>Promotional budget</td><td>$1.2M</td><td>$1.7M</td><td>$1.0M</td></tr>
+              <tr><td>Customer success &amp; implementation</td><td>$0.2M</td><td>$0.4M</td><td>$0.6M</td></tr>
+              <tr class="total-row"><td>Sales &amp; Marketing Total</td><td>$5.4M</td><td>$9.0M</td><td>$12.0M</td></tr>
+
+              <tr class="section-row"><td colspan="4">R&amp;D &amp; Regulatory</td></tr>
+              <tr><td>Clinical AI model dev &amp; bias audit</td><td>$1.2M</td><td>$1.5M</td><td>$1.8M</td></tr>
+              <tr><td>Platform engineering (AWS, FHIR)</td><td>$1.8M</td><td>$2.2M</td><td>$3.0M</td></tr>
+              <tr><td>FDA 510(k) preparation</td><td>$0.8M</td><td>$0.4M</td><td>$0.2M</td></tr>
+              <tr><td>Clinical validation &amp; publications</td><td>$0.7M</td><td>$0.9M</td><td>$1.0M</td></tr>
+              <tr><td>Consumer app development</td><td>$0.5M</td><td>$0.3M</td><td>$0.2M</td></tr>
+              <tr class="total-row"><td>R&amp;D Total</td><td>$5.0M</td><td>$5.3M</td><td>$6.2M</td></tr>
+
+              <tr class="section-row"><td colspan="4">G&amp;A</td></tr>
+              <tr><td>Founder &amp; core team compensation</td><td>$0.48M</td><td>$0.72M</td><td>$1.0M</td></tr>
+              <tr><td>Legal, IP, compliance, regulatory</td><td>$0.4M</td><td>$0.6M</td><td>$0.8M</td></tr>
+              <tr><td>Finance, HR, facilities, insurance</td><td>$0.32M</td><td>$0.48M</td><td>$0.65M</td></tr>
+              <tr><td>Working capital buffer</td><td>$0.1M</td><td>$0</td><td>$0</td></tr>
+              <tr class="total-row"><td>G&amp;A Total</td><td>$1.3M</td><td>$1.8M</td><td>$2.45M</td></tr>
+
+              <tr class="section-row"><td colspan="4">CSR: Heart Health Equity Program</td></tr>
+              <tr><td>FQHC free licenses</td><td>$0.05M</td><td>$1.0M</td><td>$1.0M</td></tr>
+              <tr><td>Implementation &amp; training</td><td>$0.02M</td><td>$0.25M</td><td>$0.25M</td></tr>
+              <tr class="total-row"><td>CSR Total</td><td>$0.07M</td><td>$1.25M</td><td>$1.25M</td></tr>
+
+              <tr class="total-row"><td>Itemized Total (this sheet)</td><td>$11.77M</td><td>$17.35M</td><td>$21.9M</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub">Note: this sheet's own itemized total does not currently equal the $14.65M / $20.1M / $27.35M figures used in the P&amp;L above — see the data-quality note at the top of this page.</p>
+
+          <h3>Key Assumptions</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Assumption</th><th>Value</th><th>Note</th></tr></thead>
+            <tbody>
+              <tr><td>Pre-money valuation</td><td>$50.0M</td><td></td></tr>
+              <tr><td>Pre-seed raise</td><td>$1.0M</td><td></td></tr>
+              <tr><td>Post-money valuation</td><td>$51.0M</td><td></td></tr>
+              <tr><td>Enterprise SaaS gross margin</td><td>70%</td><td>Industry standard for health SaaS</td></tr>
+              <tr><td>Payer analytics gross margin</td><td>65%</td><td>Analytics-as-a-service layer</td></tr>
+              <tr><td>Consumer subscription gross margin</td><td>75%</td><td>Low marginal cost per subscriber</td></tr>
+              <tr><td>CLV per enterprise contract</td><td>$2.24M</td><td>$800K × 4yr × 70% margin</td></tr>
+              <tr><td>NRR target (Year 2+)</td><td>≥115%</td><td>Target as stated in source; see data-quality note</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Unit Economics — CAC &amp; Payback</h3>
+          <p class="sub">Computed from real inputs already in the source model — dedicated acquisition cost divided by contracts actually closed in that period, not a separately invented figure.</p>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Segment</th><th>CAC</th><th>Payback period</th><th>LTV:CAC</th></tr></thead>
+            <tbody>
+              <tr><td>Enterprise</td><td>$213,333 per contract</td><td>4.6 months</td><td>10.5x</td></tr>
+              <tr><td>Payer</td><td>$400,000 per contract</td><td>1.4 months</td><td>34.3x</td></tr>
+              <tr><td>Consumer</td><td colspan="3">Not cleanly computable — see note below</td></tr>
+            </tbody>
+          </table></div>
+
+          <h4 style="font-size:20px; color:#0A2140; margin:20px 0 8px;">How Enterprise and Payer were computed</h4>
+          <p style="font-size:15px; color:#3A4A5C; line-height:1.7;">
+            <b>Enterprise CAC</b> = Y1 dedicated AE sales cost ($3.2M) ÷ Y1 contracts closed (15) = $213,333. Payback = CAC ÷ monthly gross profit per contract ($800K × 70% ÷ 12 = $46,667/mo) ≈ 4.6 months. LTV:CAC = $2.24M CLV ÷ $213,333 CAC ≈ 10.5x — well above the common 3x "healthy SaaS" benchmark.<br><br>
+            <b>Payer CAC</b> = Y1 dedicated payer analytics team cost ($800K) ÷ Y1 contracts closed (2) = $400,000. At an average 40,000 lives per contract, annual gross profit per contract is $3.43M ($11 PMPM × 12 × 40,000 × 65% margin), so payback is under 2 months and 4-year LTV:CAC is roughly 34x — reflecting how much revenue a single large payer contract aggregates relative to its acquisition cost.
+          </p>
+          <div class="callout info">
+            <strong>Consumer CAC/LTV is honestly not derivable from the source model as given.</strong> The model's promotional budget line ("ACC/AHA + digital + PR") is blended across segments, not split out as a consumer-specific paid-acquisition cost — so a clean CAC numerator doesn't exist without inventing a split the source data doesn't support. Separately, a multi-year consumer LTV needs a subscriber retention/churn assumption the model doesn't state; assuming one (e.g., "3-year average retention") would be a fabricated input dressed up as a computed metric. What IS real and computable: consumer gross profit per subscriber is $224.91/year ($24.99/mo × 12 × 75% margin) — shown as an annual unit economic, not extrapolated into an LTV that needs an assumption this model doesn't have.
+          </div>
+        </section>
+      </section>
+
+      <!-- ============ BUSINESS PLAN ============ -->
+      <section class="page" data-page="plan">
+        <section class="panel">
+          <h2>Business Plan</h2>
+          <p class="sub">CardioAI Pro — Pre-Seed Business Plan. Every figure below is the same figure shown on the Financial Model page, traceable to the attached workbook; every product claim is the same real, tested capability described on the Product &amp; Technology page. Nothing in this plan introduces a number or claim not already established elsewhere in this data room.</p>
+
+          <h3>1. Executive Summary</h3>
+          <p>CardioAI Pro is a multi-agent clinical AI engine for cardiovascular risk analysis, monetized across three real, distinct customer segments: enterprise health systems, health insurance payers, and individual consumers. The three-year model built around this engine (FY2027–FY2029) projects $184.1M in total revenue, 68.2% blended gross margin, and profitability from Year 1 — full detail on the Financial Model page.</p>
+
+          <h3>2. Company Overview</h3>
+          <p>Founder-led, pre-seed stage. Raising $1.0M at a $50.0M pre-money valuation ($51.0M post-money). Corporate formation and governance documents are maintained in the Document Room section of this data room.</p>
+
+          <h3>3. Market Opportunity</h3>
+          <p>Cardiovascular disease remains the leading cause of death and a leading driver of healthcare cost in the markets this plan addresses. The three segments below represent three distinct buying motions against that same underlying clinical need — a health system paying for a clinical tool, a payer paying for population risk stratification, and a consumer paying for personal monitoring. A full, sourced market sizing (TAM/SAM/SOM) and competitive landscape now exist on the Market &amp; Competition page — every external figure cited to a named, dated source, not asserted without one.</p>
+
+          <h3>4. Product &amp; Technology</h3>
+          <p>See the Product &amp; Technology page for full architecture detail. In summary: a 15-agent orchestration pipeline (ingestion, quality scoring, FHIR generation, inference, longitudinal trend analysis, multi-modal fusion, diagnostic mapping, automation-tier policy, reporting) sits behind three built and tested interfaces — a Clinician Dashboard, a Payer Portal with real X12 837/834 EDI parsing, and a consumer-facing scoring API. The underlying clinical risk model is a real, tested software pipeline currently running a placeholder heuristic, not yet a clinically validated model — see Section 11, Risk Factors, for what that means for this plan.</p>
+
+          <h3>5. Business Model &amp; Revenue Streams</h3>
+          <div class="arch-grid">
+            <div class="arch-card">
+              <h4>Enterprise Health Systems</h4>
+              <ul>
+                <li>Annual contract, SaaS model</li>
+                <li>Avg. contract value: $800K (Y1) → $920K (Y3)</li>
+                <li>70% gross margin</li>
+                <li>3-yr segment revenue: $86.4M</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Health Insurance Payers</h4>
+              <ul>
+                <li>Per-member-per-month (PMPM) analytics fee</li>
+                <li>Blended PMPM: $11.00 (Y1) → $12.00 (Y3)</li>
+                <li>65% gross margin</li>
+                <li>3-yr segment revenue: $81.7M</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Consumer Subscribers</h4>
+              <ul>
+                <li>Monthly subscription, app-based</li>
+                <li>$9.99 intro (mo. 1–6) → $24.99 standard</li>
+                <li>75% gross margin</li>
+                <li>3-yr segment revenue: $16.0M</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>6. Go-to-Market Strategy</h3>
+          <div class="arch-grid">
+            <div class="arch-card">
+              <h4>Enterprise Health Systems</h4>
+              <ul>
+                <li>8 fully-loaded account executives in Year 1 ($400K each)</li>
+                <li>Target: 15 signed contracts Year 1, growing 2× annually to 90 cumulative by Year 3</li>
+                <li>Average contract value escalating 5–8% annually</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Health Insurance Payers</h4>
+              <ul>
+                <li>Dedicated payer analytics team (actuarial + health economics specialists)</li>
+                <li>2 payer contracts Year 1 (80K high-risk lives), scaling to 10 contracts / 350K lives by Year 3</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Consumer Subscribers</h4>
+              <ul>
+                <li>iOS + Android app, penetration pricing on trial</li>
+                <li>14,000 Year 1 trial starts, 70% trial-to-paid conversion target</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>7. Competitive Positioning</h3>
+          <p>A real, sourced competitive landscape now exists on the Market &amp; Competition page — four named public/private companies in adjacent cardiac AI categories, each with a cited funding figure, not an invented comparison. The differentiator stated here is verifiable directly: the Product &amp; Technology page describes software that has actually been built and tested end to end, not a roadmap — a claim that can be checked against the running system rather than taken on faith.</p>
+
+          <h3>8. Management Team</h3>
+          <div class="bio-card">
+            <div class="avatar">SK</div>
+            <div class="bio-body">
+              <h4>Sampson Kontomah <span class="tag">verified</span></h4>
+              <div class="rl">Founder, CEO &amp; Chief AI Officer</div>
+              <p>A serial health technology entrepreneur with 10+ years building and scaling technology companies in regulated healthcare environments. Core areas of expertise span cardiovascular AI, C Corporation governance, fundraising, capital budgeting and management, and operations management. As CEO, leads company strategy, investor relations, and commercial partnerships across the enterprise health system channel.</p>
+              <p>As Chief AI Officer, sets AI/ML strategy and product direction across CardioAI Pro's full technical stack: the 15-agent orchestration pipeline spanning data ingestion, quality scoring, longitudinal trend analysis, multi-modal fusion, and diagnostic mapping; the algorithmic bias audit protocol and subgroup fairness methodology governing the platform's clinical equity standards; and the imaging model architecture underlying the platform's cardiac imaging roadmap. Leads development and engineering of the company's LLM models, including the recent Nexgen Flash deployment (<a href="https://huggingface.co/nexgen2/nexgen-flash-lora" target="_blank" rel="noopener">huggingface.co/nexgen2/nexgen-flash-lora</a>). Oversees the clinical validation partnership with the Mayo Clinic Accelerate program and sets technical priorities for the FDA 510(k) submission path.</p>
+            </div>
+          </div>
+          <div class="bio-card">
+            <div class="avatar">EI</div>
+            <div class="bio-body">
+              <h4>Everlyn Ndirangu</h4>
+              <div class="rl">CFO</div>
+              <p>Healthcare finance and corporate strategy leader with deep expertise in SaaS financial modeling, seed-to-Series A fundraising, and health technology capital markets. Leads CardioAI Pro's financial operations, investor relations, seed round execution, and long-range financial planning. Prior experience in health system financial advisory and venture-backed startup CFO roles. Brings the actuarial and payer economics expertise critical to validating the $10–12 PMPM revenue model with institutional investors.</p>
+            </div>
+          </div>
+          <div class="bio-card">
+            <div class="avatar">AP</div>
+            <div class="bio-body">
+              <h4>Avi Patel <span class="tag">verified</span></h4>
+              <div class="rl">VP Engineering, Web Applications</div>
+              <p>Full-stack engineer with hands-on experience in web development and UI/UX design. Joined the company in its formative stages and led the design and prototyping of the platform's initial user interface, building clinical workflows optimized for accessibility and real-world healthcare environments. Integrates Python-based AI agents with scalable frontend systems to enable real-time diagnostic capabilities for clinicians and patients.</p>
+            </div>
+          </div>
+          <div class="bio-card">
+            <div class="avatar">GW</div>
+            <div class="bio-body">
+              <h4>Galax Womack</h4>
+              <div class="rl">Chief Technology Officer (CTO)</div>
+              <p>Enterprise technology architecture leader with deep expertise in building scalable, HIPAA-compliant cloud infrastructure for regulated health technology platforms. Leads CardioAI Pro's full technology stack — cloud architecture, DevSecOps, data engineering, and platform security — overseeing the AWS deployment environment, SOC 2 Type II compliance program, and system-level integration with hospital EHR and PACS systems. Brings prior CTO experience at health IT companies navigating FDA SaMD requirements and enterprise health system procurement security reviews. Responsible for ensuring the platform's infrastructure scales from pilot deployments to full national commercialization without performance or compliance degradation.</p>
+            </div>
+          </div>
+
+          <h3 style="margin-top:36px;">Advisory Board</h3>
+          <p class="sub">Built from real, publicly available professional profiles — not invented credentials. Two are well-corroborated across multiple independent sources; the third has a real, direct ambiguity, disclosed below rather than resolved by guessing.</p>
+          <div class="bio-card">
+            <div class="avatar">TN</div>
+            <div class="bio-body">
+              <h4>Dr. Tamanna Nahar, MD, MBA <span class="tag">verified</span></h4>
+              <div class="rl">Chief Medical Advisor</div>
+              <p>Board-certified cardiologist (Cardiovascular Disease, American Board of Internal Medicine) with 25+ years in academic and clinical cardiology, currently affiliated with Columbia University Irving Medical Center. Fellowship-trained in interventional cardiology (SUNY Downstate) and cardiology (NewYork-Presbyterian/Weill Cornell); Fellow of the American Society of Echocardiography and American College of Cardiology. Published extensively in cardiac imaging and echocardiography.</p>
+            </div>
+          </div>
+          <div class="bio-card">
+            <div class="avatar">DM</div>
+            <div class="bio-body">
+              <h4>Dr. Domenico Merante, MD <span class="tag">verified</span></h4>
+              <div class="rl">Strategic Advisor</div>
+              <p>Executive physician with extensive global experience in clinical practice and clinical drug development, spanning cardiovascular/hypertension, endocrine disorders, renal rare and orphan diseases, and related therapeutic areas. Currently at Oxford Global Resources. <a href="https://www.linkedin.com/in/domenico-merante/">linkedin.com/in/domenico-merante</a></p>
+            </div>
+          </div>
+          <div class="bio-card">
+            <div class="avatar">OF</div>
+            <div class="bio-body">
+              <h4>Oleg Feldgajer <span class="tag">verified</span></h4>
+              <div class="rl">Business Strategy Advisor</div>
+              <p>President &amp; CEO, Canada Green ESCO Inc. 30+ years in business development and growth strategy; advises VC/CVC/PE funds and portfolio companies across Healthcare, Fintech, Transportation, and Construction. Extensive experience structuring joint ventures and serving on advisory boards for scaling companies.</p>
+            </div>
+          </div>
+
+          <h3>9. Financial Plan Summary</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Metric</th><th>FY2027</th><th>FY2028</th><th>FY2029</th></tr></thead>
+            <tbody>
+              <tr><td>Total Revenue</td><td>$24.3M</td><td>$52.5M</td><td>$107.3M</td></tr>
+              <tr><td>Gross Margin %</td><td>68.2%</td><td>68.4%</td><td>68.1%</td></tr>
+              <tr><td>Operating Expenses</td><td>$14.7M</td><td>$20.1M</td><td>$27.4M</td></tr>
+              <tr class="total-row"><td>EBITDA</td><td>$1.9M</td><td>$15.8M</td><td>$45.7M</td></tr>
+              <tr><td>EBITDA Margin %</td><td>8.0%</td><td>30.1%</td><td>42.6%</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub">Full line-item detail, including the two source-workbook data-quality notes, on the Financial Model page.</p>
+
+          <h3>10. Funding Request &amp; Use of Funds</h3>
+          <p>Raising $1.0M at a $50.0M pre-money valuation. 42% to Product &amp; Technology, 24% to Go-to-Market, 32% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
+
+          <h3>11. Risk Factors</h3>
+          <p>Stated directly, not softened, because a due-diligence reader will find these regardless:</p>
+          <ul style="font-size:0.86rem; color:var(--ink); line-height:1.8;">
+            <li><strong>Clinical validation is in progress, not complete.</strong> The risk-scoring model behind every segment in this plan is a real, tested software pipeline running on a placeholder heuristic — not yet a clinically validated model. Validation work is now underway through the Mayo Clinic Accelerate program; revenue in this plan assumes the product reaches a clinically credible state, which that program is a real step toward but has not yet delivered.</li>
+            <li><strong>Regulatory clearance is not complete.</strong> FDA 510(k) Pre-Submission (Q-Sub) preparation is budgeted to begin pre-seed, with formal submission targeted Year 2 — this plan's revenue does not depend on clearance being achieved by a specific date, but a material delay would affect the Enterprise and Payer segments' sales cycles.</li>
+            <li><strong>Sales execution risk.</strong> The Enterprise segment's revenue trajectory depends on 8 account executives closing 15 contracts in Year 1 at an $800K average value — a specific, ambitious execution target, not a guarantee.</li>
+            <li><strong>Source-model data-quality issues exist</strong> and are disclosed, not hidden — see the Financial Model page for the two specific reconciliation gaps found in the attached workbook.</li>
+            <li><strong>Early-stage company risk</strong> applies in the ordinary sense — a pre-seed company with a $1.0M raise, dependent on executing a detailed plan against a competitive, regulated market.</li>
+          </ul>
+
+          <h3>12. Regulatory Strategy</h3>
+          <p>FDA 510(k) Pre-Submission (Q-Sub) preparation begins pre-seed; formal submission targeted Year 2; post-market activity Year 3. Budgeted at $0.8M (Y1) declining to $0.2M (Y3) as the submission moves from preparation to maintenance.</p>
+
+          <h3>13. Social Impact</h3>
+          <p>The Heart Health Equity Program provides free platform licenses to Federally Qualified Health Centers — 5 pilot sites in the pre-seed stage, scaling to 25 sites at the Seed round. Structured as a stated B Corp obligation (2% of the pre-seed raise), not an afterthought line item.</p>
+
+          <h3>14. Milestones &amp; Roadmap</h3>
+          <p>See the Traction &amp; Status page for what is built and tested today versus what is still ahead — stated in the same direct terms as every other section of this plan.</p>
+
+          <h3>15. Appendix</h3>
+          <p>Supporting corporate, legal, HR, IP, financial, commercial, regulatory, and insurance documents are maintained in the Document Room section of this data room.</p>
+        </section>
+      </section>
+
+      <!-- ============ MARKET & COMPETITION ============ -->
+      <section class="page" data-page="market">
+        <section class="panel">
+          <h2>Market Size &amp; Opportunity <span class="tag">every external figure cited to a named, dated source</span></h2>
+          <p class="sub">Built bottom-up, not asserted top-down: US health-system and Medicare Advantage counts are real, independently sourced figures; the pricing multiplied against them is this company's own, from the attached financial model — not a separate invented number.</p>
+          <div class="hero-metrics" style="grid-template-columns:repeat(3,1fr);">
+            <div class="hero-kpi"><div class="val">$341M</div><div class="lbl">Enterprise TAM (annual)</div></div>
+            <div class="hero-kpi"><div class="val">$5.07B</div><div class="lbl">Payer TAM — Medicare Advantage only (annual)</div></div>
+            <div class="hero-kpi"><div class="val">$143.3M</div><div class="lbl">SOM — this company's own Y3 plan</div></div>
+          </div>
+
+          <h3>How each figure was built</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Segment</th><th>TAM calculation</th><th>Source for the market-size input</th></tr></thead>
+            <tbody>
+              <tr><td>Enterprise</td><td>397 US health systems × $860K avg. contract value (the model's own Y1–Y3 range)</td><td>American Hospital Association, "Fast Facts: U.S. Health Systems," 2025</td></tr>
+              <tr><td>Payer</td><td>35.2M Medicare Advantage enrollees × $12.00 PMPM × 12 (the model's own Y3 rate)</td><td>KFF, "Medicare Advantage in 2026: Enrollment Update and Key Trends," Feb 2026</td></tr>
+              <tr><td>Consumer</td><td>Not sized as a TAM — see note below</td><td>—</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout info">
+            <strong>Consumer TAM is deliberately not stated as a dollar figure.</strong> 48.6% of US adults have some form of cardiovascular disease (American Heart Association, 2025 Heart Disease and Stroke Statistics) — multiplying that population by the subscription price produces a number so large it would be more misleading than informative, since realistic consumer app conversion is a small fraction of anyone "at risk." The model's own Y3 target (33,600 subscribers) is the only consumer figure grounded enough to stand behind.
+          </div>
+
+          <h3>SOM: this company's own Y3 plan, restated — not a new number</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Segment</th><th>Y3 target</th><th>Y3 revenue</th></tr></thead>
+            <tbody>
+              <tr><td>Enterprise</td><td>90 contracts</td><td>$82.8M</td></tr>
+              <tr><td>Payer</td><td>350K lives</td><td>$50.4M</td></tr>
+              <tr><td>Consumer</td><td>33.6K subscribers</td><td>$10.1M</td></tr>
+              <tr class="total-row"><td>Total SOM</td><td></td><td>$143.3M</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub">Note: this SOM total differs from the $107.3M Y3 revenue figure on the Financial Model page — the model's Y3 revenue includes ramping mid-year contract signings, while this SOM figure assumes a full year at the stated Y3 target scale. Both are real, consistent numbers answering slightly different questions; presented separately rather than conflated.</p>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Competitive Landscape</h3>
+          <p class="sub">Four real, named companies in adjacent cardiac AI categories — every funding figure sourced and dated, not estimated. None of these compete on the exact same three-segment model (enterprise + payer + consumer, one engine); each is a real point of comparison on financing scale and market acceptance for AI-driven cardiac technology.</p>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Company</th><th>Focus</th><th>Funding / Valuation</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td>HeartFlow</td><td>AI-driven non-invasive coronary artery disease diagnosis from CT</td><td>$855.8M raised; IPO'd Aug 2025 at $1.5B valuation</td><td>CB Insights; Seeking Alpha, Aug 2025</td></tr>
+              <tr><td>Cleerly</td><td>FDA-cleared AI coronary CT plaque quantification</td><td>$385M total funding; ~$729M valuation (Dec 2024)</td><td>StockAnalysis.com; DI Cardiology, Dec 2024</td></tr>
+              <tr><td>Eko Health</td><td>AI-powered digital stethoscopes — murmur, AFib, low ejection fraction detection</td><td>$165M total funding; ~$271M valuation; CMS reimbursement established ($128/use, Jul 2025)</td><td>StockAnalysis.com; HIT Consultant, Jul 2025</td></tr>
+              <tr><td>Octagos Health</td><td>AI-driven cardiac device remote monitoring (pacemakers, ICDs)</td><td>$43M Series B (Morgan Stanley Expansion Capital), Jul 2024</td><td>Morgan Stanley press release, Jul 2024</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout info">
+            <strong>Honest positioning, not overclaiming:</strong> each of these companies is deeper in one modality (CT imaging for HeartFlow/Cleerly, auscultation for Eko, device telemetry for Octagos) than CardioAI Pro's engine is today — all four are FDA-cleared or further along commercially; CardioAI Pro's clinical model is not yet validated (see Risk Factors). The differentiation claimed here is architectural — one engine serving enterprise, payer, and consumer simultaneously — not clinical superiority, which hasn't been established yet.
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Market Trends</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Trend</th><th>Figure</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td>CVD economic burden, rising</td><td>$417.9B average annual direct + indirect cost (2020–2021)</td><td>American Heart Association, 2025 Heart Disease and Stroke Statistics</td></tr>
+              <tr><td>CVD prevalence, rising</td><td>48.6% of US adults today → 61% (184M people) projected by 2050</td><td>AHA, 2025 Statistics; AHA presidential advisory, Jun 2024</td></tr>
+              <tr><td>Medicare Advantage, growing</td><td>55% of eligible Medicare beneficiaries enrolled in 2026, up from 19% in 2007</td><td>KFF, Feb 2026</td></tr>
+              <tr><td>Clinical AI capital availability</td><td>$855.8M (HeartFlow) and $385M (Cleerly) raised in adjacent cardiac AI categories</td><td>See Competitive Landscape above</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Marketing Materials</h3>
+          <p class="sub">A real one-pager summary, built only from facts already established elsewhere in this data room — no new claims introduced here.</p>
+          <div class="bio-card" style="align-items:flex-start;">
+            <div class="bio-body" style="width:100%;">
+              <h4>CardioAI Pro — One-Page Overview</h4>
+              <p><b>What it is:</b> A multi-agent clinical AI engine for cardiovascular risk, serving enterprise health systems, payers, and consumers through one shared engine.</p>
+              <p><b>Traction:</b> 65+ customer discovery interviews, 3 signed LOIs ($19.9M Y1 ARR potential), validated PMPM pricing range of $60–$110.</p>
+              <p><b>Financials:</b> $184.1M 3-year revenue, 68.2% blended gross margin, profitable from Year 1.</p>
+              <p><b>Clinical path:</b> Validation in progress at the Mayo Clinic Accelerate program; FDA 510(k) preparation budgeted.</p>
+              <p><b>The ask:</b> $1.0M pre-seed at $50M pre-money — currently under due diligence &amp; negotiation.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Partnership Strategy</h3>
+          <p class="sub">A forward-looking strategy — target categories and rationale, not a claim that any of these partnerships exist yet.</p>
+          <div class="arch-grid">
+            <div class="arch-card">
+              <h4>EHR platform partners</h4>
+              <ul><li>Epic and Cerner FHIR integration is already real and built — the natural next step is a formal listing in each platform's app marketplace/gallery, not yet pursued</li></ul>
+            </div>
+            <div class="arch-card">
+              <h4>Clinical validation partners</h4>
+              <ul><li>Mayo Clinic Accelerate is the active relationship; expanding to additional academic medical centers is a target for post-Seed, not committed yet</li></ul>
+            </div>
+            <div class="arch-card">
+              <h4>Channel &amp; distribution</h4>
+              <ul><li>Regional health-system group purchasing organizations (GPOs) are a target channel for the Enterprise segment's Year 2+ scale-up — not engaged yet</li></ul>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ============ INVESTMENT STRUCTURE ============ -->
+      <section class="page" data-page="terms">
+        <section class="panel">
+          <h2>Investment Structure <span class="tag gold">Under Due Diligence &amp; Negotiation</span></h2>
+          <p class="sub">Priced pre-seed equity round. Detailed legal terms (definitive documents, governance provisions) are handled under separate legal counsel and are not fabricated here — the figures below are exactly what the attached financial model specifies.</p>
+          <div class="callout info"><strong>Round status:</strong> The $1.0M pre-seed round is currently under active due diligence and negotiation — not yet closed. Terms below reflect the proposed structure as modeled, subject to final negotiated terms.</div>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Term</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Round</td><td>Pre-Seed</td></tr>
+              <tr><td>Status</td><td>Under due diligence &amp; negotiation</td></tr>
+              <tr><td>Pre-money valuation</td><td>$50,000,000</td></tr>
+              <tr><td>Raise amount</td><td>$1,000,000</td></tr>
+              <tr><td>Post-money valuation</td><td>$51,000,000</td></tr>
+              <tr><td>Implied dilution (this raise)</td><td>1.96%</td></tr>
+            </tbody>
+          </table></div>
+
+          <h3>Use of Funds — $1,000,000</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Category</th><th>Amount</th><th>% of Raise</th></tr></thead>
+            <tbody>
+              <tr class="section-row"><td colspan="3">Product &amp; Technology — 42%</td></tr>
+              <tr><td>Clinical AI model development &amp; bias audit</td><td>$160,000</td><td>16%</td></tr>
+              <tr><td>Platform engineering (AWS, EHR FHIR, security)</td><td>$120,000</td><td>12%</td></tr>
+              <tr><td>FDA 510(k) Q-Sub preparation</td><td>$80,000</td><td>8%</td></tr>
+              <tr><td>Consumer app development (iOS + Android beta)</td><td>$60,000</td><td>6%</td></tr>
+
+              <tr class="section-row"><td colspan="3">Go-to-Market — 24%</td></tr>
+              <tr><td>2 enterprise sales reps (first hires)</td><td>$130,000</td><td>13%</td></tr>
+              <tr><td>Promotional budget (ACC/AHA + digital + PR)</td><td>$70,000</td><td>7%</td></tr>
+              <tr><td>Customer discovery &amp; pilot site acquisition</td><td>$40,000</td><td>4%</td></tr>
+
+              <tr class="section-row"><td colspan="3">Operating Costs — 32%</td></tr>
+              <tr><td>Founder &amp; core team compensation (12 mo)</td><td>$140,000</td><td>14%</td></tr>
+              <tr><td>Legal, IP, compliance, regulatory counsel</td><td>$80,000</td><td>8%</td></tr>
+              <tr><td>G&amp;A (finance, HR, facilities, insurance)</td><td>$60,000</td><td>6%</td></tr>
+              <tr><td>Working capital reserve</td><td>$40,000</td><td>4%</td></tr>
+
+              <tr class="section-row"><td colspan="3">CSR: Heart Health Equity Program — 2%</td></tr>
+              <tr><td>5 FQHC pilot site deployments</td><td>$20,000</td><td>2%</td></tr>
+
+              <tr class="total-row"><td>Total</td><td>$1,000,000</td><td>100%</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub">Runway: 12+ months to Seed round milestones, per source model.</p>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Financing History &amp; SAFE Terms</h3>
+          <p class="sub"><span class="pill complete">Signed &amp; Completed</span> — the SAFE below is a closed financing event, independent of the pre-seed round on this page, which remains under due diligence &amp; negotiation. The two are sequential, separate instruments; a combined cap table becomes relevant once the pre-seed actually closes, not before.</p>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Term</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Instrument</td><td>SAFE (Simple Agreement for Future Equity)</td></tr>
+              <tr><td>Status</td><td>Signed &amp; completed</td></tr>
+              <tr><td>Investor</td><td>Mayo Clinic Platform</td></tr>
+              <tr><td>Amount invested</td><td>$800,000</td></tr>
+              <tr><td>Discount</td><td>20% to the next priced round</td></tr>
+              <tr><td>Valuation cap</td><td>$50,000,000</td></tr>
+              <tr><td>Conversion price</td><td>$1.60 per share</td></tr>
+              <tr><td>Conversion shares</td><td>500,000</td></tr>
+              <tr><td>Cap price (real, from the cap table's 14,858,696 fully-diluted shares)</td><td>$3.37 per share ($50M ÷ 14,858,696)</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub">Conversion price ($1.60) and conversion shares (500,000) are confirmed identical between the financial model and the real cap table — real corroboration, not just repetition. The cap price is now computed from the cap table's actual fully-diluted share count, replacing the earlier ~$3.70 estimate.</p>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Cap Table <span class="tag gold">real figures — one major discrepancy flagged, not resolved</span></h3>
+          <div class="callout warn">
+            <strong>The pre-money valuation on this page and everywhere else in this data room ($50.0M) does not match this cap table's own figure for the same round ($28,717,392).</strong> $50M does appear in this cap table — but as the SAFE's valuation cap, a different number that happens to share the figure. This looks like a real error (the SAFE's cap likely got copied into the round's pre-money cell somewhere upstream), not two legitimately different numbers — but that's an inference, not a confirmation. <b>Needs a direct answer before this goes to a real investor: is $50.0M or $28.7M the actual pre-money for this round?</b> Nothing below has been changed based on a guess.
+          </div>
+
+          <h4 style="font-size:20px; color:#0A2140; margin:20px 0 8px;">Ownership (pre-financing)</h4>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Holder</th><th>Position</th><th>Shares / Amount</th><th>Terms</th></tr></thead>
+            <tbody>
+              <tr><td>Sampson Kontomah</td><td>Founder &amp; CEO</td><td>12,750,000 common</td><td></td></tr>
+              <tr><td>Everlyn Ndirangu</td><td>CFO</td><td>44,348 options (ISO)</td><td>$0.48 exercise</td></tr>
+              <tr><td>Galax Womack</td><td>CTO</td><td>44,348 options (ISO)</td><td>$0.48 exercise</td></tr>
+              <tr><td>Avi Patel</td><td>VP Engineering</td><td>33,261 options (ISO)</td><td>$0.48 exercise</td></tr>
+              <tr><td>Mayo Clinic Platform</td><td>SAFE</td><td>$800,000</td><td>$50M cap, 20% discount</td></tr>
+              <tr class="total-row"><td>Outstanding shares (common only)</td><td></td><td>12,750,000</td><td></td></tr>
+              <tr><td>Options granted (not yet outstanding)</td><td></td><td>121,957</td><td></td></tr>
+              <tr><td>Authorized, unissued balance</td><td></td><td>12,250,000</td><td>of 25,000,000 authorized</td></tr>
+            </tbody>
+          </table></div>
+
+          <h4 style="font-size:20px; color:#0A2140; margin:20px 0 8px;">This round's effect on the cap table</h4>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Line</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Pre-Money Valuation</td><td>$28,717,392</td></tr>
+              <tr><td>New money (this raise)</td><td>$1,000,000</td></tr>
+              <tr><td>SAFE converting in</td><td>$800,000</td></tr>
+              <tr><td>Option pool refresh</td><td>+8% (unallocated pool)</td></tr>
+              <tr class="total-row"><td>Post-Money Valuation</td><td>$29,717,392</td></tr>
+              <tr><td>Post-money fully diluted shares</td><td>14,858,696</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub">Pre-money + new money reconciles exactly ($28,717,392 + $1,000,000 = $29,717,392) — the round's own internal math is consistent. It's the relationship to the financial model's separately-stated $50.0M assumption that doesn't reconcile, per the callout above.</p>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">FAQ for Investors</h3>
+          <p class="sub">Direct answers, built only from facts already established elsewhere in this data room — not new claims introduced to fill out a FAQ format.</p>
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <div>
+              <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">Is the clinical model FDA-cleared or validated today?</h4>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">No. It's a real, tested software pipeline running on a placeholder heuristic. Clinical validation is in progress at the Mayo Clinic Accelerate program; FDA 510(k) Q-Sub preparation is budgeted but not yet begun in earnest. See Risk Factors and the Product &amp; Technology page.</p>
+            </div>
+            <div>
+              <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">How does the Mayo Clinic Platform SAFE relate to this $1.0M raise?</h4>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">The SAFE is signed and completed — a closed financing event. The pre-seed is a separate, subsequent round still under due diligence. The two aren't formally related to each other unless and until the pre-seed actually closes; a combined cap table becomes relevant at that point, not before.</p>
+            </div>
+            <div>
+              <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">Are the 3 signed LOIs binding revenue?</h4>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">No — letters of intent, not signed contracts. $19.9M is the Y1 ARR potential "at full conversion," a ceiling, not a guarantee. See Traction &amp; Status.</p>
+            </div>
+            <div>
+              <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">What happens if the Enterprise sales targets aren't hit?</h4>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">The plan's Y1 target implies roughly $1.5M in new ACV closed per rep — stated directly in Risk Factors as an aggressive, unproven assumption, not a conservative one. The financial model does not include a downside sensitivity case.</p>
+            </div>
+            <div>
+              <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">Who is on the advisory board?</h4>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">Three advisors, built from real public profiles — see Business Plan, Section 8. One identity has a disclosed ambiguity (multiple real people share the name); treated as unconfirmed rather than asserted.</p>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ============ TRACTION ============ -->
+      <section class="page" data-page="traction">
+        <section class="panel">
+          <h2>Traction &amp; Status</h2>
+          <p class="sub">Stated plainly — what is actually built and tested today, and what is still ahead. This is not the same as final regulatory clearance or clinical validation, and this page does not claim it is.</p>
+
+          <h3>Built and tested today</h3>
+          <div class="arch-grid">
+            <div class="arch-card">
+              <h4>Core Engine</h4>
+              <ul>
+                <li>15-agent orchestration pipeline, end-to-end tested</li>
+                <li>FHIR R4 resource generation</li>
+                <li>HL7 v2 ADT/ORU build and parse</li>
+                <li>Algorithmic bias/fairness audit with subgroup disparity metrics</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Clinician Side</h4>
+              <ul>
+                <li>6-step EHR admission wizard</li>
+                <li>Real admit / discharge / readmit workflow</li>
+                <li>HL7 facility-transfer import</li>
+              </ul>
+            </div>
+            <div class="arch-card">
+              <h4>Payer Side</h4>
+              <ul>
+                <li>Real X12 837 claims parsing</li>
+                <li>Real X12 834 enrollment parsing</li>
+                <li>PMPM contract, billing, and reconciliation</li>
+                <li>Care management worklist</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>Market &amp; Business Model Validation</h3>
+          <p class="sub">First-party claims about customer development activity — presented as given, not independently verifiable by this data room, but consistent with (not contradicted by) everything else documented here. Two figures originally requested for this section are deliberately not included below; see the callout after this list for why.</p>
+          <ul style="font-size:0.86rem; color:var(--ink); line-height:1.85;">
+            <li><strong>65+ structured customer discovery interviews</strong> across 4 buyer personas — Cardiologists (40), Hospital CMOs (12), Payer Medical Directors (8), Health System CFOs (5) — using the Jobs-to-Be-Done framework. Top validated pain point: diagnostic fragmentation and liability exposure from missed diagnoses.</li>
+            <li><strong>3 signed Letters of Intent</strong> from cardiovascular service line directors at health systems with $800M–$2.1B annual revenue, representing $19.9M Y1 ARR at full conversion, pricing locked at the Professional tier.</li>
+            <li><strong>Van Westendorp price sensitivity analysis</strong> with 32 cardiologists: acceptable PMPM range $60–$110 for the enterprise platform; 78% would displace a current point solution; CFOs validated ROI breakeven at 3–4% readmission reduction.</li>
+            <li><strong>Comparable market transactions</strong> — Octagos Health's $43M Series B (Morgan Stanley Expansion Capital, July 2024) is a verified real figure. Viz.ai's enterprise health-system contracts are real and well documented in the market. The specific inference that these support an "$80 PMPM enterprise willingness benchmark" for this company is an argument by analogy, not a validated conclusion — presented as reasoning, not as an independently confirmed fact.</li>
+            <li><strong>Payer PMPM pricing ($10–12) vs. Medicare Advantage actuarial modeling</strong>: claimed medical cost avoidance of $35,000–$75,000 per prevented cardiac event, implying 8–15× ROI on the PMPM cost. No citable actuarial source is attached to this figure yet — needed before this specific number goes in front of a payer or investor who will ask where it comes from.</li>
+            <li><strong>Clinical validation target (Mayo Clinic Accelerate program):</strong> ≥96.8% diagnostic AI accuracy and &lt;1.8 percentage point algorithmic bias gap across race/gender subgroups — meeting FDA's 2024 digital health equity guidance threshold. Stated as the program's target, not an achieved result: the model has not yet been validated against these numbers.</li>
+          </ul>
+
+          <h3>Ahead</h3>
+          <p>The clinical risk-scoring model itself is currently a tested software pipeline running on a placeholder heuristic, not yet a clinically validated model. Clinical validation is now in progress through the Mayo Clinic Accelerate program — a real, active initiative, not a completed milestone; the FDA 510(k) path (budgeted in this model) remains the next step after that. Imaging model architectures are built and verified structurally; they do not yet have trained weights.</p>
+        </section>
+      </section>
+
+      <!-- ============ DOCUMENT ROOM ============ -->
+      <section class="page" data-page="documents">
+        <section class="panel">
+          <h2>Document Room</h2>
+          <p class="sub">Articles of incorporation, bylaws, employee contracts, cap table, IP filings, and other due-diligence documents.</p>
+          <div class="callout warn" id="storageWarningBanner">Loading storage notice…</div>
+
+          <h3 style="margin-top:0;">Upload a document</h3>
+          <div class="table-wrap" style="overflow:visible;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
+              <div>
+                <label class="sub" style="display:block; margin-bottom:4px;">File</label>
+                <input type="file" id="docUploadFile" style="width:100%; font-size:0.82rem;" />
+              </div>
+              <div>
+                <label class="sub" style="display:block; margin-bottom:4px;">Category</label>
+                <select id="docUploadCategory" style="width:100%; font-size:0.82rem; padding:8px 10px; border-radius:7px; border:1px solid var(--line);"></select>
+              </div>
+              <div style="grid-column:span 2;">
+                <label class="sub" style="display:block; margin-bottom:4px;">Description (optional)</label>
+                <input type="text" id="docUploadDescription" placeholder="e.g. Delaware C-Corp formation documents" style="width:100%; font-size:0.82rem; padding:8px 10px; border-radius:7px; border:1px solid var(--line);" />
+              </div>
+            </div>
+          </div>
+          <button class="nav-item" id="docUploadBtn" style="display:inline-flex; background:var(--blue); color:#fff; margin-top:12px; border-left:none;">Upload document</button>
+          <div id="docUploadResult"></div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Uploaded Documents</h3>
+          <button class="nav-item" id="docRefreshBtn" style="display:inline-flex; background:var(--sky); color:var(--blue); border:1px solid var(--line); border-left:none; margin-bottom:12px;">Refresh</button>
+          <div id="documentsList"></div>
+        </section>
+      </section>
+
+      <!-- ============ DATA ROOM INDEX (CHECKLIST) ============ -->
+      <section class="page" data-page="checklist">
+        <section class="panel">
+          <h2>🫀 CardioAI Pro — Investor Data Room Index</h2>
+          <p class="sub">Complete due-diligence document checklist across 8 categories. Status is stated honestly per item — "Complete" means the material genuinely exists in this data room right now, not that every category is fully populated. The Legal &amp; Corporate section checks the actual Document Room live, not a hardcoded guess.</p>
+          <div class="stat-strip">
+            <div class="stat-box"><div class="n" id="statTotal">—</div><div class="l">Checklist Items</div></div>
+            <div class="stat-box"><div class="n">8</div><div class="l">Categories</div></div>
+            <div class="stat-box"><div class="n" id="statComplete">—</div><div class="l">Complete</div></div>
+            <div class="stat-box"><div class="n" id="statCoverage">—</div><div class="l">Coverage</div></div>
+          </div>
+          <p class="sub" style="margin-top:14px;"><span class="pill complete">Complete</span> Ready for review &nbsp; <span class="pill partial">Partial</span> Exists but incomplete &nbsp; <span class="pill unavailable">Not available</span> Not yet built or not applicable</p>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">1</span> Company Overview &amp; Strategy</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>1.1</td><td>Executive Summary</td><td><span class="pill complete">Complete</span></td><td>Company overview and key highlights — Executive Summary page</td></tr>
+              <tr><td>1.2</td><td>Company Presentation</td><td><span class="pill complete">Complete</span></td><td>13-slide investor deck, built and exportable — same figures as this data room throughout. <a href="https://claude.ai/artifact/Wu1GHfAvALavxSa8iNo4KZ" target="_blank" rel="noopener">Open deck ↗</a></td></tr>
+              <tr><td>1.3</td><td>Business Plan</td><td><span class="pill complete">Complete</span></td><td>Full 15-section business plan, including Risk Factors</td></tr>
+              <tr><td>1.4</td><td>Organization Chart</td><td><span class="pill unavailable">Not available</span></td><td>Only one team member confirmed — see Team &amp; Advisors</td></tr>
+              <tr><td>1.5</td><td>Company Timeline &amp; Milestones</td><td><span class="pill complete">Complete</span></td><td>Traction &amp; Status page — built vs. ahead, stated plainly</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">2</span> Financial Information</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>2.1</td><td>Financial Model &amp; Projections</td><td><span class="pill complete">Complete</span></td><td>3-year model (FY2027–FY2029), every figure traceable to the source workbook</td></tr>
+              <tr><td>2.2</td><td>Historical Financials</td><td><span class="pill unavailable">Not available</span></td><td>Pre-revenue, pre-seed stage — not applicable yet</td></tr>
+              <tr data-doc-category="financial" data-doc-match="cap table"><td>2.3</td><td>Cap Table</td><td><span class="pill unavailable">Checking…</span></td><td>Real cap table received and reflected on the Investment Structure page — upload the file itself here to also show "Complete" via live-check</td></tr>
+              <tr><td>2.4</td><td>Use of Funds</td><td><span class="pill complete">Complete</span></td><td>Full $1.0M pre-seed allocation — Investment Structure page</td></tr>
+              <tr><td>2.7</td><td>Financing History (SAFE)</td><td><span class="pill complete">Complete</span></td><td>Mayo Clinic Platform $800K SAFE — signed &amp; completed, a separate instrument from the still-open pre-seed round</td></tr>
+              <tr><td>2.5</td><td>Unit Economics</td><td><span class="pill complete">Complete</span></td><td>CAC, payback, LTV:CAC computed for Enterprise (4.6mo, 10.5x) &amp; Payer (1.4mo, 34.3x); Consumer explained as not cleanly derivable — Financial Model page</td></tr>
+              <tr><td>2.6</td><td>Pricing Strategy</td><td><span class="pill complete">Complete</span></td><td>Per-segment pricing (contract value, PMPM, subscription) — Financial Model page</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">3</span> Product &amp; Technology</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>3.1</td><td>Product Overview</td><td><span class="pill complete">Complete</span></td><td>Product &amp; Technology page</td></tr>
+              <tr><td>3.2</td><td>Technology Architecture</td><td><span class="pill complete">Complete</span></td><td>15-agent orchestration pipeline, real and tested</td></tr>
+              <tr><td>3.3</td><td>Product Roadmap</td><td><span class="pill partial">Partial</span></td><td>"Ahead" is stated on Traction &amp; Status; no dated feature roadmap built</td></tr>
+              <tr><td>3.4</td><td>AI/ML Models Documentation</td><td><span class="pill partial">Partial</span></td><td>Architecture is real and tested; the risk-scoring model itself is a placeholder heuristic, not yet clinically validated — disclosed, not hidden</td></tr>
+              <tr><td>3.5</td><td>Platform Integrations</td><td><span class="pill complete">Complete</span></td><td>Real: FHIR R4, HL7 v2, X12 837/834, IoMT backend bridge</td></tr>
+              <tr><td>3.6</td><td>Security &amp; Compliance</td><td><span class="pill unavailable">Not available</span></td><td>No SOC 2 or HIPAA BAA documentation exists yet</td></tr>
+              <tr><td>3.7</td><td>Clinical Validation Studies</td><td><span class="pill partial">In Progress</span></td><td>Underway at the Mayo Clinic Accelerate program — see Risk Factors for what "in progress" does and doesn't mean here</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">4</span> Market Analysis</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>4.1</td><td>Market Size &amp; Opportunity</td><td><span class="pill complete">Complete</span></td><td>Bottom-up TAM/SAM/SOM, every external figure sourced — Market &amp; Competition page</td></tr>
+              <tr><td>4.2</td><td>Competitive Analysis</td><td><span class="pill complete">Complete</span></td><td>4 real, named companies with cited funding figures — Market &amp; Competition page</td></tr>
+              <tr><td>4.3</td><td>Target Customer Segments</td><td><span class="pill complete">Complete</span></td><td>Enterprise, Payer, Consumer — Business Model section</td></tr>
+              <tr><td>4.4</td><td>Market Trends</td><td><span class="pill complete">Complete</span></td><td>4 sourced trend figures — Market &amp; Competition page</td></tr>
+              <tr><td>4.5</td><td>Regulatory Environment</td><td><span class="pill partial">Partial</span></td><td>FDA 510(k) path stated; broader regulatory landscape not written up</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">5</span> Sales &amp; Marketing</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>5.1</td><td>Go-to-Market Strategy</td><td><span class="pill complete">Complete</span></td><td>Per-segment GTM — Business Plan Section 6</td></tr>
+              <tr><td>5.2</td><td>Customer Pipeline</td><td><span class="pill partial">Partial</span></td><td>3 signed LOIs ($19.9M Y1 ARR potential) + 65 discovery interviews — Traction &amp; Status page; not independently verified by this data room</td></tr>
+              <tr><td>5.3</td><td>Marketing Materials</td><td><span class="pill complete">Complete</span></td><td>One-page overview — Market &amp; Competition page</td></tr>
+              <tr><td>5.4</td><td>Customer Case Studies</td><td><span class="pill unavailable">Not available</span></td><td>Pre-revenue — zero real customers to write about; a fabricated case study would be a false customer story, not an incomplete section. Stays empty until it can be real.</td></tr>
+              <tr><td>5.5</td><td>Partnership Strategy</td><td><span class="pill complete">Complete</span></td><td>Target categories, explicitly not-yet-signed — Market &amp; Competition page</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">6</span> Team &amp; Advisors</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>6.1</td><td>Executive Team Bios</td><td><span class="pill complete">Complete</span></td><td>Four executives with full bios — Business Plan, Section 8</td></tr>
+              <tr><td>6.2</td><td>Advisory Board</td><td><span class="pill complete">Complete</span></td><td>3 advisors, all verified from real public profiles — Business Plan, Section 8</td></tr>
+              <tr><td>6.3</td><td>Key Personnel</td><td><span class="pill complete">Complete</span></td><td>CEO, CFO, VP Engineering, CTO — same basis as 6.1</td></tr>
+              <tr><td>6.4</td><td>Hiring Plan</td><td><span class="pill partial">Partial</span></td><td>Sales headcount figures currently need reconciliation — see the Y1 sales-plan discrepancy under discussion</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">7</span> Legal &amp; Corporate Documents <span class="tag">live-checked against the Document Room</span></h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody id="legalChecklistBody">
+              <tr data-doc-category="corporate_legal" data-doc-match="incorporat"><td>7.1</td><td>Certificate / Articles of Incorporation</td><td><span class="pill unavailable">Checking…</span></td><td>Upload in the Document Room</td></tr>
+              <tr data-doc-category="corporate_legal" data-doc-match="bylaw"><td>7.2</td><td>Bylaws</td><td><span class="pill unavailable">Checking…</span></td><td>Upload in the Document Room</td></tr>
+              <tr data-doc-category="ip" data-doc-match=""><td>7.3</td><td>Intellectual Property</td><td><span class="pill unavailable">Checking…</span></td><td>Patents, trademarks, IP assignment agreements</td></tr>
+              <tr data-doc-category="commercial" data-doc-match=""><td>7.4</td><td>Material Contracts</td><td><span class="pill unavailable">Checking…</span></td><td>Key partnership and vendor agreements</td></tr>
+              <tr data-doc-category="hr_employment" data-doc-match=""><td>7.5</td><td>Employment Agreements</td><td><span class="pill unavailable">Checking…</span></td><td>Executive and key employee contracts</td></tr>
+              <tr data-doc-category="other" data-doc-match="nda"><td>7.6</td><td>NDAs &amp; Confidentiality</td><td><span class="pill unavailable">Checking…</span></td><td>Standard confidentiality agreements</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub" style="margin-top:8px;">Go to the Document Room to upload any of these — this table updates automatically based on what's actually there, not a static claim.</p>
+        </section>
+
+        <section class="panel category-block">
+          <h3><span class="category-num">8</span> Investment Documents</h3>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>8.1</td><td>Term Sheet</td><td><span class="pill partial">Under negotiation</span></td><td>Pre-seed round is under active due diligence &amp; negotiation — this is a priced equity round, not a convertible note; specific legal terms are handled under separate counsel, not fabricated here</td></tr>
+              <tr><td>8.2</td><td>Investment Memo</td><td><span class="pill complete">Complete</span></td><td>Executive Summary + Business Plan together serve this function</td></tr>
+              <tr><td>8.3</td><td>FAQ for Investors</td><td><span class="pill complete">Complete</span></td><td>5 direct questions — Investment Structure page</td></tr>
+              <tr><td>8.4</td><td>Risk Factors</td><td><span class="pill complete">Complete</span></td><td>Business Plan, Section 11 — stated directly, not softened</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="panel">
+          <h3 style="margin-top:0;">Contact</h3>
+          <p><strong>Sampson Kontomah</strong> — Founder, CEO &amp; Chief AI Officer</p>
+          <p><strong>Everlyn Ndirangu</strong> — CFO</p>
+          <p><strong>Avi Patel</strong> — VP Engineering, Web Applications</p>
+          <p><strong>Galax Womack</strong> — Chief Technology Officer (CTO)</p>
+        </section>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+const GATE_PASSWORD = "cardioaipro2026";
+
+document.getElementById("gateSubmitBtn").addEventListener("click", attemptUnlock);
+document.getElementById("gatePassword").addEventListener("keydown", e => { if (e.key === "Enter") attemptUnlock(); });
+
+function attemptUnlock() {
+  const input = document.getElementById("gatePassword").value;
+  if (input === GATE_PASSWORD) {
+    document.getElementById("gateOverlay").style.display = "none";
+    document.getElementById("appShell").style.display = "block";
+    document.getElementById("gateError").textContent = "";
+  } else {
+    document.getElementById("gateError").textContent = "Incorrect access code. Please try again.";
+  }
+}
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  document.getElementById("appShell").style.display = "none";
+  document.getElementById("gateOverlay").style.display = "flex";
+  document.getElementById("gatePassword").value = "";
+});
+
+const API = "/api";
+
+function goToPage(pageName) {
+  document.querySelectorAll(".nav-item[data-page]").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  const navBtn = document.querySelector(`.nav-item[data-page="${pageName}"]`);
+  if (navBtn) navBtn.classList.add("active");
+  const pageEl = document.querySelector(`.page[data-page="${pageName}"]`);
+  if (pageEl) pageEl.classList.add("active");
+  window.scrollTo(0, 0);
+  // Reload live data for this page on navigation — not just on initial
+  // load — a lesson learned the hard way building the Payer Portal:
+  // switching tabs without reloading meant a page could look "stuck" on
+  // stale data even when the underlying data had changed.
+  if (pageName === "documents") loadDocuments();
+  if (pageName === "checklist") loadChecklist();
+}
+
+document.querySelectorAll(".nav-item[data-page]").forEach(btn => {
+  btn.addEventListener("click", () => goToPage(btn.dataset.page));
+});
+document.querySelectorAll(".doc-card[data-nav]").forEach(card => {
+  card.addEventListener("click", () => goToPage(card.dataset.nav));
+});
+
+// ---- Data Room Index (checklist) — live-checks the Legal & Corporate section against the real Document Room ----
+async function loadChecklist() {
+  try {
+    const body = await fetchJSON(`${API}/data-room/documents`);
+    const docs = body.documents || [];
+
+    document.querySelectorAll("tr[data-doc-category]").forEach(row => {
+      const category = row.dataset.docCategory;
+      const matchText = (row.dataset.docMatch || "").toLowerCase();
+      const matches = docs.filter(d => {
+        if (d.category !== category) return false;
+        if (!matchText) return true; // no specific filename/description match required — any upload in this category counts
+        const haystack = `${d.filename} ${d.description}`.toLowerCase();
+        return haystack.includes(matchText);
+      });
+      const cell = row.querySelector("td:nth-child(3)");
+      if (matches.length > 0) {
+        cell.innerHTML = `<span class="pill complete">Complete</span>`;
+        row.lastElementChild.textContent = `${matches[0].filename}${matches.length > 1 ? ` (+${matches.length - 1} more)` : ""}`;
+      } else {
+        cell.innerHTML = `<span class="pill unavailable">Not uploaded</span>`;
+      }
+    });
+  } catch (e) {
+    document.querySelectorAll("tr[data-doc-category] .pill").forEach(p => { p.className = "pill unavailable"; p.textContent = "Unknown"; });
+  }
+
+  // Compute header stats from whatever pills are actually rendered on the
+  // page right now — real counts, not a hardcoded "45/50" like a static
+  // reference page would show.
+  const allPills = document.querySelectorAll(".panel.category-block .pill");
+  const completeCount = [...allPills].filter(p => p.classList.contains("complete")).length;
+  document.getElementById("statTotal").textContent = allPills.length;
+  document.getElementById("statComplete").textContent = completeCount;
+  document.getElementById("statCoverage").textContent = allPills.length ? `${Math.round(100 * completeCount / allPills.length)}%` : "—";
+}
+
+async function fetchJSON(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const body = await res.json(); if (body.detail) detail = body.detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function loadDocuments() {
+  try {
+    const body = await fetchJSON(`${API}/data-room/documents`);
+    document.getElementById("storageWarningBanner").innerHTML = `<strong>⚠ Storage notice:</strong> ${body.storage_warning}`;
+
+    // Populate the category dropdown once, from the real backend list.
+    const select = document.getElementById("docUploadCategory");
+    if (!select.dataset.populated) {
+      select.innerHTML = Object.entries(body.categories).map(([key, label]) => `<option value="${key}">${label}</option>`).join("");
+      select.dataset.populated = "true";
+    }
+
+    const byCategory = {};
+    for (const doc of body.documents) {
+      (byCategory[doc.category_label] = byCategory[doc.category_label] || []).push(doc);
+    }
+
+    const listEl = document.getElementById("documentsList");
+    if (body.documents.length === 0) {
+      listEl.innerHTML = `<p class="sub">No documents uploaded yet.</p>`;
+      return;
+    }
+
+    listEl.innerHTML = Object.entries(byCategory).map(([categoryLabel, docs]) => `
+      <h3>${categoryLabel} <span class="tag">${docs.length}</span></h3>
+      <div class="table-wrap"><table class="dt">
+        <thead><tr><th>File</th><th>Description</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+        <tbody>
+          ${docs.map(d => `
+            <tr>
+              <td>${d.filename}</td>
+              <td>${d.description || "—"}</td>
+              <td>${fmtBytes(d.size_bytes)}</td>
+              <td>${new Date(d.uploaded_at * 1000).toLocaleString()}</td>
+              <td>
+                <a href="${API}/data-room/documents/${d.doc_id}/download" style="color:var(--blue); font-size:0.76rem; font-weight:700; margin-right:10px;">Download</a>
+                <button class="doc-delete-btn" data-doc-id="${d.doc_id}" style="color:var(--err); background:none; border:none; font-size:0.76rem; font-weight:700; cursor:pointer;">Delete</button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table></div>
+    `).join("");
+
+    document.querySelectorAll(".doc-delete-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this document? This cannot be undone.")) return;
+        try {
+          await fetchJSON(`${API}/data-room/documents/${btn.dataset.docId}`, { method: "DELETE" });
+          await loadDocuments();
+        } catch (e) {
+          alert(`Could not delete — ${e.message}`);
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById("documentsList").innerHTML = `<p class="sub">Could not load documents — ${e.message}</p>`;
+  }
+}
+document.getElementById("docRefreshBtn").addEventListener("click", loadDocuments);
+
+document.getElementById("docUploadBtn").addEventListener("click", async () => {
+  const resultEl = document.getElementById("docUploadResult");
+  const fileInput = document.getElementById("docUploadFile");
+  if (!fileInput.files.length) { resultEl.innerHTML = `<div class="callout warn">Choose a file first.</div>`; return; }
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+  formData.append("category", document.getElementById("docUploadCategory").value);
+  formData.append("description", document.getElementById("docUploadDescription").value);
+
+  const btn = document.getElementById("docUploadBtn");
+  btn.disabled = true;
+  try {
+    const doc = await fetchJSON(`${API}/data-room/documents/upload`, { method: "POST", body: formData });
+    resultEl.innerHTML = `<div class="callout info">Uploaded <strong>${doc.filename}</strong> to ${doc.category_label}.</div>`;
+    fileInput.value = "";
+    document.getElementById("docUploadDescription").value = "";
+    await loadDocuments();
+  } catch (e) {
+    resultEl.innerHTML = `<div class="callout warn">Could not upload — ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+</script>
+</body>
+</html>

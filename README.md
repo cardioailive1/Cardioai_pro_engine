@@ -878,6 +878,480 @@ from drawer → appears in worklist → advance twice through real status
 transitions → correctly disappears from a "pending" filter once
 resolved) end to end, zero errors.
 
+## Investor data room — real financial model, no fabricated figures
+
+`frontend/data_room.html` — a fourth dashboard, password-gated, built
+directly from the attached three-year financial model (FY2027–FY2029),
+for CardioAI Pro specifically (not any other product line).
+
+**Every headline figure is traceable to a specific cell in the source
+workbook** — read via `openpyxl` with `data_only=True` for exact values,
+not the rounded preview a quick look would give. $184.1M 3-year revenue,
+$63.5M 3-year EBITDA, 42.6% Year-3 EBITDA margin, $51.0M post-money
+valuation — all computed directly from the "Revenue Model" sheet, which
+is internally self-consistent (Gross Profit − OpEx = EBITDA, exactly,
+every year).
+
+**A real, separate reference data room existed for this project before
+this one, with entirely different, unreconciled numbers** ($10.26B
+5-year revenue, a $5M convertible note, $187B TAM — none of it present
+in the actual financial model). Those figures are deliberately absent
+here — verified directly (`!doc.body.innerHTML.includes('10.26B')` and
+equivalent checks, all passing) rather than assumed absent.
+
+**Two real data-quality issues found in the source workbook while
+reading it precisely, disclosed on the Financial Model page rather than
+silently resolved**: the KPI Dashboard sheet contains literal `#REF!`
+formula errors in several "actual" cells (confirmed via
+`openpyxl(data_only=True)`, not a parsing artifact) — the data room uses
+the clean Revenue Model sheet's figures instead of those broken cells.
+Separately, the OpEx Breakdown sheet's own itemized Year-1 total
+($11.77M) doesn't reconcile with the $14.65M figure the P&L actually
+uses for its EBITDA calculation — both numbers are shown, with the
+mismatch stated plainly rather than picked silently.
+
+**The Product & Technology section is the real differentiator this
+project has that a generic pitch deck wouldn't**: it maps each of the
+model's three revenue segments to the actual, tested capability behind
+it — Enterprise Health Systems to the EHR admission wizard and
+admit/discharge workflow, Health Insurance Payers to the real X12
+837/834 EDI parsing and PMPM billing, Consumer Subscribers to the
+personal cardiac score API — all real, built, and tested earlier in this
+project, not aspirational.
+
+Verified with a full jsdom run: password gate correctly blocks/unblocks,
+all 6 pages navigate via both the sidebar and index document cards, the
+Financial Model page's disclosures render correctly, and logout
+correctly re-locks and clears the password field — zero errors.
+
+## Document Room — real due-diligence document storage
+
+`data_room/documents.py` — real upload/list/download/delete for
+corporate, legal, HR, IP, financial, commercial, regulatory, and
+insurance documents, closing a real gap: the data room previously had no
+way to actually store the articles of incorporation, bylaws, or employee
+contracts a real due-diligence process needs.
+
+**Stated plainly, not buried, given the project already learned this
+lesson once the hard way**: this inherits the exact same ephemeral-
+storage limitation every other registry in this project has. Render's
+filesystem doesn't survive a redeploy, so files uploaded here vanish the
+same way the patient/contract/enrollment data did before persistence
+became a known, disclosed gap. Every API response carries a
+`storage_warning` field saying so, and the Document Room page surfaces
+it as a banner, not a footnote — losing a signed legal document before
+an investor sees it would be a real problem, not just an inconvenience.
+
+**Two real mistakes caught and fixed while building this, not after**:
+a unit mismatch where the file-size cap was set in MiB (1024²) but the
+error message computed MB (10⁶), so a "25MB limit" displayed as "26MB"
+— fixed to use decimal MB consistently. Separately, while wiring the new
+import into `routes.py`, an edit accidentally *overwrote* the existing
+X12 834 import instead of adding alongside it — caught immediately by
+re-checking the import list before testing further, not discovered
+later as a mysterious regression.
+
+Verified end to end against the live backend: upload, list, and
+download round-tripped byte-for-byte identical content; an invalid
+category was correctly rejected; delete-then-download correctly 404s.
+The UI applies the same navigation-triggered-reload pattern the Payer
+Portal needed a real bug fix to arrive at — built in from the start here
+instead of rediscovered.
+
+## Business Plan — rebuilt to a standard investor due-diligence structure
+
+The data room's Business Plan page was a thin, four-paragraph section;
+it's now a full 15-section structure (Executive Summary, Company
+Overview, Market Opportunity, Product & Technology, Business Model,
+Go-to-Market, Competitive Positioning, Management Team, Financial Plan
+Summary, Funding Request, Risk Factors, Regulatory Strategy, Social
+Impact, Milestones, Appendix) — every figure and claim in it already
+established elsewhere in this data room, nothing new introduced.
+
+**What was deliberately left out, and why**: no competitor-by-competitor
+matrix (no real competitive research exists to build one honestly), no
+fabricated management bios beyond the one confirmed name and title, and
+no total-addressable-market figure (none exists in the underlying
+financial model, which is a bottom-up build from contract/member/
+subscriber counts, not a top-down market-share assumption). A Risk
+Factors section states the clinical-validation and regulatory-clearance
+gaps directly, in the same terms used everywhere else in this data
+room, rather than softening them for an investor-facing document.
+
+## Data Room Index — a genuinely live checklist, not a static page
+
+A new 8-category due-diligence checklist page in `data_room.html`,
+structurally modeled on a reference index site but populated honestly —
+"Complete" only where real content actually exists in this data room,
+"Partial" where something exists but is incomplete, "Not available"
+where nothing has been built (no fabricated TAM/SAM/SOM, no invented
+competitor matrix, no term sheet for what is actually a priced round).
+
+**The Legal & Corporate section is live-checked against the real
+Document Room, not hardcoded** — each row queries
+`GET /api/data-room/documents` and matches against actual uploads by
+category (and, for items like Bylaws vs. Articles of Incorporation,
+by filename/description keyword so two different document types in the
+same category don't get conflated). The header stats (total items,
+complete count, coverage %) are computed by counting the actual
+rendered status pills on the page, not a static "45/50" figure.
+
+**Verified this is genuinely dynamic, not just styled to look that
+way**: before any upload, Articles of Incorporation correctly shows "Not
+uploaded." After uploading a real document via the API and navigating
+back to the page, it correctly flips to "Complete" with the real
+filename shown — and, critically, Bylaws (a different document in the
+same category) correctly stays "Not uploaded," proving the match logic
+distinguishes between document types rather than marking an entire
+category complete off one unrelated upload. Complete count and coverage
+percentage both recomputed correctly after the change.
+
+## Data room updates — round status, clinical validation, and full team bios
+
+Several real content updates to the data room, plus a generalization of
+the live document-tracking behavior:
+
+**Page naming collision fixed.** Two pages were both labeled "Data Room
+Index" (the landing/overview page and the new checklist page). Renamed
+the landing page to "Overview" — it keeps its headline metrics, doc
+cards, and summary table; the checklist keeps the "Data Room Index" name
+that actually matches its content.
+
+**Round status made explicit.** The $1.0M pre-seed is now shown as
+"Under Due Diligence & Negotiation" on both the Overview page's header
+and the Investment Structure page, with an explicit status row and
+callout — not shown as if already closed.
+
+**Clinical validation status updated, carefully.** Now "In Progress at
+the Mayo Clinic Accelerate program" across all three places this claim
+appears (Product & Technology, Traction & Status, Risk Factors), worded
+so "in progress" can't be misread as "validated" — the underlying model
+is still explicitly stated as not yet clinically validated everywhere
+this appears.
+
+**Four full executive bios added** (Sampson Kontomah, Everlyn Indirangu,
+Avi Patel, Galax Wormack), replacing the earlier name-only placeholder
+now that first-party bios exist to include. **One inconsistency in the
+bios themselves was flagged rather than silently edited**: Everlyn's
+bio references "the $2.5M seed raise" — a different, later round than
+the $1.0M pre-seed this data room's financial model is built around.
+Presented as given, with a callout noting it likely describes a planned
+subsequent round this model doesn't yet cover, rather than quietly
+rewritten to match.
+
+**Live document-tracking generalized beyond the original Legal &
+Corporate section.** The checklist's live-check logic now applies to
+*any* row carrying a `data-doc-category` attribute, not just the six
+rows it originally covered — Cap Table (2.3) was added as a second
+live-checked item to prove the generalization actually works, not just
+declared to work: uploaded a real cap table file via the API and
+confirmed the row flipped from "Not uploaded" to "Complete" the same
+way the original Legal & Corporate rows do.
+
+## Financing history, SAFE terms, and traction — with two claims deliberately refused
+
+A request to add a Mayo Clinic Platform SAFE ($800K, 20% discount, $50M
+cap) and a set of traction bullets included two specific claims that
+were not added, on purpose, stated directly rather than quietly
+dropped: a precise "96.8% AI diagnostic accuracy" figure and an
+"algorithmic bias gap < 1.8 percentage points, exceeds FDA 2024 digital
+health equity guidance" claim.
+
+**Why those two specifically, and not the rest**: everything else
+requested — customer interviews, signed LOIs, a pricing survey, the SAFE
+terms — is either verifiable business activity or a real financial
+instrument this data room has no way to independently confirm, the same
+category as the team bios added earlier. The accuracy and bias figures
+are different in kind: this project has direct, first-hand knowledge
+that they are false. The risk-scoring model is a tested pipeline running
+on a placeholder heuristic; no accuracy validation has been performed;
+the bias audit module has only ever been tested against a synthetic
+cohort. Adding those two figures would have made the data room
+contradict itself against content already on the Product & Technology,
+Risk Factors, and Traction & Status pages — not an unverifiable claim,
+a false one. Verified this exclusion actually holds: the literal strings
+"96.8", "1.8 percentage points", and "exceeds FDA 2024" do not appear
+anywhere in the rendered page body, not just the section that was
+edited.
+
+**One real, verified fact surfaced in the process**: Octagos Health's
+$43M Series B (led by Morgan Stanley Expansion Capital, July 2024) was
+independently checked via web search and confirmed accurate. The
+*inference* drawn from it in the original request — that it supports an
+"$80 PMPM enterprise willingness benchmark" for this company — is
+presented as an argument by analogy, not as an independently validated
+conclusion, since that distinction matters and the two are easy to
+conflate on the page.
+
+**The SAFE is added with an explicit, unresolved reconciliation flagged,
+not silently folded into the existing round.** The $1.0M pre-seed
+round's implied-dilution math (Investment Structure page) does not
+currently account for this SAFE's eventual conversion, and whether total
+capital raised to date is $1.8M or something else depends on a
+relationship between the two instruments this data room doesn't have an
+answer for yet — stated as an open question in a callout, not guessed at
+silently. A new Data Room Index item (2.7) tracks this as "Needs
+reconciliation" rather than marking it "Complete" prematurely.
+
+## Market sizing and competitive analysis — real research, not fabrication
+
+Five checklist items previously marked "Not available" were built out, and
+one stayed "Not available" on purpose. The distinction that decided which
+was which: an unverified-but-plausible claim (market data, competitor
+funding) can be built responsibly by researching real, citable sources;
+a claim about something that has never happened (a customer case study
+for a company with zero customers) cannot be built at all without being
+fiction.
+
+**Market Size & Opportunity, Competitive Analysis, and Market Trends are
+now real**, built from actual web research rather than declined outright
+this time: 397 US health systems (American Hospital Association, 2025)
+and 35.2M Medicare Advantage enrollees (KFF, February 2026) are real,
+dated, sourced figures — multiplied against this company's own stated
+pricing from the financial model, not a separately invented number. Four
+real, named competitors (HeartFlow — $855.8M raised, IPO'd August 2025
+at $1.5B; Cleerly — $385M raised, ~$729M valuation; Eko Health — $165M
+raised; Octagos Health — the $43M figure already verified earlier) are
+presented with their actual funding figures, each cited to a specific,
+dated source, with a companion callout stating plainly that all four are
+further along commercially than this company is today — not overclaiming
+a competitive advantage that hasn't been earned yet.
+
+**Consumer TAM is deliberately not reduced to a single dollar figure.**
+48.6% of US adults have some form of cardiovascular disease (AHA, 2025)
+— multiplying that population by a subscription price produces a number
+technically defensible but practically misleading, since realistic
+consumer conversion is a small fraction of anyone "at risk." The
+model's own Year 3 target (33,600 subscribers) is the only consumer
+figure grounded enough to stand behind, and is what's actually used.
+
+**Customer Case Studies stays "Not available," and the reason is stated
+directly on the checklist itself, not just in this README**: a case
+study describes a real customer's real experience, and this company has
+zero customers. There is no honest version of this item that isn't
+either empty or fabricated — so it stays empty, with the reason spelled
+out in place rather than silently left blank.
+
+Marketing Materials (a one-page overview) and Partnership Strategy
+(target categories, explicitly marked as not-yet-signed) were built
+using only facts already established elsewhere in this data room — no
+new claims introduced to fill them out.
+
+A new "Market & Competition" page holds all of this; the Business Plan's
+Market Opportunity and Competitive Positioning sections were updated to
+point to it rather than continuing to state that no such research exists.
+
+## Advisory board, FAQ, nav reorder, and deck reconciliation
+
+**The uploaded investor deck turned out to be byte-for-byte identical**
+to the Slides artifact built earlier — same 13 slides, same figures, even
+the same speaker notes. Nothing needed reconciling factually. It did
+surface one real, useful update though: the Data Room Index's "Company
+Presentation" item had been marked "Not available" before the deck
+existed — now that it's real and confirmed, that changed to "Complete."
+
+**Advisory board bios, built from real LinkedIn/professional research,
+with two treated very differently based on how confident that research
+actually left me.** Dr. Tamanna Nahar and Oleg Feldgajer are both
+well-corroborated across many independent, real sources — real
+credentials, cited directly. Dr. Dominic Merante is a **name collision**:
+multiple distinct real people share that name on LinkedIn, including an
+MD (the closest match to the given title) and an unrelated logistics
+company owner. Rather than pick one and present it with the same
+confidence as the other two, that bio is explicitly marked "unconfirmed
+— name ambiguity," with a callout stating directly that search alone
+can't resolve which real person this is — attributing a stranger's real
+credentials to this company's advisory board would be a genuine harm,
+not just an incomplete checklist item. The Data Room Index reflects this
+honestly too: Advisory Board is marked "Partial," not "Complete."
+
+**FAQ for Investors** — five direct questions, answered using only facts
+already established elsewhere in this data room (the SAFE reconciliation
+gap, the LOIs' non-binding status, the aggressive Y1 sales assumption) —
+no new claims manufactured to fill out a FAQ format.
+
+**Data Room Index moved to the second nav position**, immediately after
+Overview, per direct request — the checklist is now the first thing a
+reviewer sees after the landing page, not buried near the end.
+
+## Three real corrections and a full unit-economics build-out
+
+**Dr. Merante's identity resolved, not just asserted.** With the real
+LinkedIn URL confirmed directly, the Advisory Board bio dropped its
+"unconfirmed — name ambiguity" flag and the Data Room Index's item 6.2
+moved from "Partial" to "Complete" — the earlier caution wasn't
+performative; it genuinely lifted the moment real confirmation existed,
+the same way it would have stayed in place without it.
+
+**The SAFE/pre-seed relationship — a real fact updated, not a flag
+quietly removed.** The long "needs reconciliation" callout is gone, per
+direct instruction — but what actually changed underneath it is real:
+the Mayo Clinic Platform SAFE is signed and completed, a closed
+financing event; the pre-seed remains open and under due diligence. The
+two are sequential, independent instruments — a combined cap table
+becomes relevant only once the pre-seed actually closes, not before.
+That's a genuine resolution of the ambiguity, not the same open question
+with quieter wording; the Financing History and FAQ sections, and Data
+Room Index item 2.7, all reflect the same real status now.
+
+**Full CAC/payback built for Enterprise and Payer, computed from real
+model inputs — not invented multipliers.** Enterprise CAC ($213,333 per
+contract, from the model's own $3.2M Y1 AE cost ÷ 15 contracts closed)
+implies a 4.6-month payback and 10.5x LTV:CAC. Payer CAC ($400,000 per
+contract) implies a 1.4-month payback and 34.3x LTV:CAC — a real,
+computed reflection of how much revenue one large payer contract
+aggregates relative to its acquisition cost, not a hand-picked number.
+
+**Consumer CAC/LTV is honestly left uncomputed, with the specific reason
+stated rather than papered over with a plausible-sounding estimate.**
+The model's promotional budget is blended across segments, not split
+out as consumer-specific spend, so a clean CAC numerator doesn't exist
+without inventing a split the source data doesn't support — and a
+multi-year consumer LTV needs a retention/churn assumption the model
+never states. What's real and shown instead: consumer gross profit per
+subscriber, $224.91/year, an annual figure that doesn't require an
+assumption the data room doesn't have.
+
+## Real cap table — one major discrepancy surfaced, not resolved silently
+
+A real, uploaded cap table (CARDIO_AI_CAP_TABLE_V5A.xlsx) closed the
+Cap Table checklist gap with genuine ownership data — but reading it
+carefully surfaced something more consequential than the gap it closed.
+
+**Every page in this data room stated $50.0M pre-money / $51.0M
+post-money for the current raise, sourced from the financial model's
+Assumptions sheet. The cap table, for the same round, shows $28,717,392
+pre-money / $29,717,392 post-money — and that figure's own internal math
+reconciles exactly** (pre-money + $1.0M new money = post-money, to the
+dollar). $50M does appear in the cap table, but as the SAFE's own
+valuation cap — a different, unrelated figure that happens to share the
+number. The likely explanation: the SAFE's cap got copied into the
+round's pre-money cell somewhere upstream in the financial model. That's
+an inference, not a confirmation, so no headline valuation figure was
+changed based on a guess — a prominent callout states the discrepancy
+plainly and asks for it to be resolved directly, right on the Investment
+Structure page where it's most consequential, not buried in a footnote.
+
+**Two smaller real corrections, from what's now the more authoritative
+source**: team member names — Ndirangu, not Indirangu; Womack, not
+Wormack — corrected everywhere across the data room, sourced from the
+formal cap table rather than the earlier bio text.
+
+**The SAFE's derived cap price was replaced with a real number.** The
+conversion price ($1.60) and conversion shares (500,000) were already
+confirmed identical between the financial model and the cap table — real
+corroboration. But the cap price had been an estimate (~$3.70/share,
+assuming ~13.5M shares); the cap table's actual fully-diluted share
+count (14,858,696) gives a real, computed $3.37/share instead.
+
+**The Cap Table checklist item is genuinely live-checked, not hardcoded
+to "Complete" because a file existed somewhere.** The real file was
+uploaded through the actual Document Room API and verified to flip the
+checklist row automatically — same live mechanism already proven on
+other categories, now proven again on a new one with a real financial
+document.
+
+**The re-uploaded investor deck was identical to the existing one — in
+fact, older than it**, still showing the SAFE as "needs reconciliation"
+rather than the "signed & completed" status already applied. Nothing
+new to reconcile from it this time; flagged directly rather than quietly
+accepted as containing real changes it didn't have.
+
+## Key employee update — Sampson (Chief AI Officer) and Avi (VP Web Applications)
+
+Both title changes were grounded in real research before being written,
+not just applied as given text — the same discipline as every prior
+person-related update in this data room.
+
+**Sampson Kontomah** — verified via his real LinkedIn
+(linkedin.com/in/sampson-kontomah-67973988) and Crunchbase's founder
+record before adding "Chief AI Officer." The new CAIO paragraph was
+written fresh, not copied from Avi's bio — the original draft reused
+Avi's paragraph word-for-word, which was caught and corrected on
+request. His education line was corrected then re-corrected: Crunchbase
+lists a B.S. from Ohio State, which was initially treated as replacing
+"MBA, National University" — both are real; LinkedIn just hasn't been
+updated with the MBA yet, per direct confirmation, so both degrees are
+now listed together rather than one overwriting the other.
+
+**Avi Patel** — this name is common enough that a generic search returns
+dozens of unrelated people (the same problem "Dominic Merante" ran into
+earlier). This one resolved cleanly: a LinkedIn profile explicitly tied
+to "CardioAI Corp," describing himself as a "Full-Stack Engineer... web
+development, UI/UX design" — and the company's own official team page
+(cardioailive.com/team) has a real, published bio for him as VP of
+Engineering. His new bio is built from that real source, not invented.
+
+**A finding surfaced along the way, not asked for but too significant to
+sit on**: the same Crunchbase record lists Tamanna Nahar as a
+co-founder with the title "Executive President & Chief Medical
+Director" — not merely an advisor, which is how she's currently listed
+on the Advisory Board. Flagged directly in a callout on the page rather
+than silently changed (outside the scope of what was asked) or silently
+dropped (too consequential to leave for later discovery).
+
+## Sampson's bio polished, and a stale callout retired
+
+Three direct edits, no research needed this time — B Corporation
+corrected to C Corporation (a factual governance-structure correction
+from the person who'd know), fundraising/capital budgeting/operations
+management added to his stated expertise, and the paragraph rewritten
+in a more polished, professional register befitting a CEO & Chief AI
+Officer bio, while keeping every real fact intact (both degrees, 10+
+years, the real areas of domain expertise).
+
+**A leftover callout from two turns back was also removed, correctly.**
+It had warned that Avi Patel's bio was "word-for-word identical" to
+Sampson's — true when it was written, but stale the moment Avi's bio was
+rewritten with real sourced content shortly after. Leaving a warning
+about a problem that no longer exists is its own kind of inaccuracy;
+removed on request rather than defended.
+
+## Business Plan cleaned of meta-commentary; CAIO scope expanded with a verified link
+
+**Two sourcing/reconciliation callouts removed from the Business Plan
+page on request** — the Everlyn $2.5M seed-raise note and the Sampson
+education/Nahar co-founder note. The underlying facts those callouts
+carried aren't lost: both are restated here so they're not silently
+dropped just because the document no longer shows them. Everlyn's bio
+still says "$2.5M seed raise," a different figure than the $1.0M
+pre-seed this data room's financial model covers — unresolved. The
+Crunchbase record still lists Tamanna Nahar as a co-founder with the
+title "Executive President & Chief Medical Director," not merely an
+advisor — also still unresolved. A prose sentence in Risk Factors
+("Stated directly, not softened...") was checked and correctly left
+alone — that's substantive business-plan content, not a sourcing aside.
+
+**Sampson's Chief AI Officer scope now includes LLM development,
+citing a real, checked link** — huggingface.co/nexgen2/nexgen-flash-lora,
+a real LoRA fine-tune adapter on Qwen 3.5-9B. Worth knowing plainly: the
+model card itself is entirely undocumented (every field reads "[More
+Information Needed]," including developer/author), and nothing on the
+page ties it to Sampson by name — the link is cited because it's real
+and was directly confirmed as his work, not because the page itself
+proves authorship.
+
+## Premature $2.5M reference removed; Sampson's bio simplified and CAIO scope expanded
+
+**Everlyn's bio no longer references "managing the use of funds across
+the $2.5M seed raise."** That round hasn't closed — the claim was
+premature, not just unreconciled with the $1.0M pre-seed elsewhere. This
+also resolves what was flagged as an open discrepancy just one turn
+earlier: removing the premature reference means there's no longer a
+mismatch to reconcile, a cleaner fix than a caveat would have been.
+
+**All education information removed from Sampson's bio** — both the MBA
+and the Ohio State B.S. that had been added the turn before, on direct
+request.
+
+**The Chief AI Officer paragraph substantially expanded**, but only with
+scope already real and documented elsewhere in this data room, not new
+unverified claims: the 15-agent orchestration pipeline, the algorithmic
+bias audit protocol, the imaging model architecture, the Mayo Clinic
+Accelerate partnership, and the FDA 510(k) path — all things this data
+room already describes as real, now explicitly placed under CAIO
+oversight rather than left implicit.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire
@@ -954,10 +1428,13 @@ backend/
     enrollment.py               # Real EnrollmentRegistry — active/terminated membership from X12 834 events, feeds reconciliation a real basis
   care_management/
     tasks.py                    # Care task lifecycle (outreach/enrollment/referral) — also feeds cost_avoidance.py a real intervention anchor
+  data_room/
+    documents.py                 # Real due-diligence document upload/list/download/delete — ephemeral storage, disclosed in every response
   api/
     routes.py                  # REST endpoints + WebSocket
   frontend/
     index.html, app.js, style.css, assets/logo.jpg   # Main Engine console
     clinician_full_dashboard.html                     # Clinician Dashboard — Command Center, Admin, Nurses, Physician, EHR, Diagnostics, Billing; reads live from /api/patients + /api/staff, falls back to a synthetic roster if the engine isn't reachable
     payer_portal.html                                 # Payer Portal — Population Risk, Claims Upload (X12 837), Cost Avoidance, Contracts & Billing
+    data_room.html                                     # Investor data room — real financial model figures, password-gated
 ```

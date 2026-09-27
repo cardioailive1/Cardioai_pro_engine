@@ -13,7 +13,7 @@ import time
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response
 from pydantic import BaseModel
 
 from orchestrator.orchestrator import orchestrator
@@ -22,6 +22,7 @@ from integrations.hl7 import build_adt_a01, build_oru_r01, parse_hl7_message
 from integrations.dicom import DICOMService
 from integrations.x12_837 import parse_837_claims, claim_to_cardioai_record
 from integrations.x12_834 import parse_834_enrollment
+from data_room.documents import DOCUMENT_CATEGORIES, STORAGE_WARNING
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
 from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
@@ -740,6 +741,56 @@ async def list_enrollment(status: Optional[str] = None):
     if status:
         members = [m for m in members if m["status"] == status]
     return {"members": members, "active_count": len(orchestrator.enrollment_registry.active_member_ids())}
+
+
+# ---------------------------------------------------------------------------
+# Data room document storage (data_room/documents.py) — real upload/list/
+# download/delete for due-diligence documents. See that module's docstring
+# for the ephemeral-storage limitation this inherits from the rest of the
+# project; STORAGE_WARNING is surfaced in every response below rather than
+# only in the module's internal comments.
+# ---------------------------------------------------------------------------
+@router.post("/data-room/documents/upload")
+async def upload_data_room_document(
+    file: UploadFile = File(...), category: str = Form(...), description: str = Form(""),
+):
+    content = await file.read()
+    doc, error = orchestrator.document_registry.save(file.filename, category, description, content)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return {**doc.to_dict(), "storage_warning": STORAGE_WARNING}
+
+
+@router.get("/data-room/documents")
+async def list_data_room_documents(category: Optional[str] = None):
+    docs = orchestrator.document_registry.list_all(category=category)
+    return {
+        "documents": [d.to_dict() for d in docs],
+        "categories": DOCUMENT_CATEGORIES,
+        "storage_warning": STORAGE_WARNING,
+    }
+
+
+@router.get("/data-room/documents/{doc_id}/download")
+async def download_data_room_document(doc_id: str):
+    doc = orchestrator.document_registry.get(doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"No document {doc_id}")
+    content = orchestrator.document_registry.read_content(doc_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"Document {doc_id} has no content on disk — likely lost to a redeploy; see the ephemeral-storage warning.")
+    return Response(
+        content=content, media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
+    )
+
+
+@router.delete("/data-room/documents/{doc_id}")
+async def delete_data_room_document(doc_id: str):
+    deleted = orchestrator.document_registry.delete(doc_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"No document {doc_id}")
+    return {"deleted": True, "doc_id": doc_id}
 
 
 @router.post("/payer/contracts/{contract_id}/reconcile")
