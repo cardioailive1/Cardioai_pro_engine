@@ -1466,6 +1466,24 @@ independently (endpoint URL set / account ID set / neither set) and
 confirmed each correctly selects the right backend and builds the right
 connection — not just that the code compiles.
 
+## Two stale references to Merante's ambiguity found and fixed
+
+Merante's identity was confirmed via the exact LinkedIn URL match
+several turns ago, and the bio card itself was updated then — but a
+sweep for the word "ambiguity" found two places that had genuinely been
+missed at the time: the FAQ's "Who is on the advisory board?" answer
+still said one identity was "treated as unconfirmed," and the intro
+line directly above the Advisory Board bio cards still said "the third
+has a real, direct ambiguity." Both were the same real gap — updating
+the bio card doesn't automatically update every sentence elsewhere that
+described the old state.
+
+Both fixed to say all three are verified. A broad sweep confirmed
+nothing else references the old ambiguity, the incorrect "Dominic"
+spelling doesn't appear anywhere, and "Domenico Merante" (the confirmed
+correct spelling) appears exactly once, in the bio card — no duplicate
+or conflicting mentions.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire
