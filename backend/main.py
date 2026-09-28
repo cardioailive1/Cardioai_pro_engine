@@ -89,6 +89,33 @@ def _create_tables_on_startup():
     init_db()
 
 
+@app.on_event("startup")
+def _seed_legal_docs_into_data_room():
+    # Real BAA/Privacy Statement/Terms of Use, uploaded into the actual
+    # Document Room registry (not just served as static pages) so they
+    # show up in the Data Room and satisfy the corresponding checklist
+    # rows (7.9/7.10/2.2, 7.10, 7.11) automatically, without an admin
+    # having to manually upload them. Checks for an existing match by
+    # filename first — idempotent on restart, which matters once R2 is
+    # configured and documents genuinely persist across redeploys;
+    # re-seeding duplicates every restart would defeat that persistence.
+    from orchestrator.orchestrator import orchestrator
+    seeds = [
+        ("Business_Associate_Agreement.html", "baa.html", "regulatory", "Business Associate Agreement (BAA) — draft, not legally reviewed"),
+        ("Privacy_Statement.html", "privacy-statement.html", "regulatory", "Privacy Statement — draft, not legally reviewed"),
+        ("Terms_of_Use.html", "terms-of-use.html", "other", "Terms of Use — draft, not legally reviewed"),
+    ]
+    existing_filenames = {d.filename for d in orchestrator.document_registry.list_all()}
+    for display_name, source_name, category, description in seeds:
+        if display_name in existing_filenames:
+            continue
+        source_path = FRONTEND_DIR / "legal" / source_name
+        if not source_path.exists():
+            continue
+        content = source_path.read_bytes()
+        orchestrator.document_registry.save(display_name, category, description, content)
+
+
 # Which role set each org-RBAC-gated surface allows. Data Room is
 # deliberately absent — it isn't part of this system at all; see
 # DataRoomGate below for how it's actually protected.
@@ -118,7 +145,7 @@ def _surface_for_path(path: str) -> str | None:
 
 
 PUBLIC_PATHS = {"/healthz", "/login.html", "/data_room.html", "/api/auth/signup", "/api/auth/login", "/api/data-room/unlock", "/api/data-room/lock"}
-PUBLIC_PREFIXES = ("/assets/",)  # logo and any other static assets unauthenticated pages (login.html, data_room.html's own gate) need to render
+PUBLIC_PREFIXES = ("/assets/", "/legal/")  # /assets/ = logo etc. for unauthenticated pages; /legal/ = Terms/Privacy/BAA, readable before signup and by anyone with the link
 
 # Data Room API paths — protected by DataRoomGate's separate single-password
 # check below, never by org-RBAC. /data_room.html itself is in PUBLIC_PATHS

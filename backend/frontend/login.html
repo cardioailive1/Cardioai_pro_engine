@@ -45,6 +45,10 @@
   .panel { display: none; }
   .panel.visible { display: block; }
   .hint { font-size: 12px; color: var(--ink); margin-top: 4px; }
+  .legal-accept { margin-top: 16px; }
+  .checkbox-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; font-weight: 400; color: var(--ink); line-height: 1.5; }
+  .checkbox-row input { width: auto; margin-top: 2px; }
+  .checkbox-row a { color: var(--blue); }
 </style>
 </head>
 <body>
@@ -88,6 +92,9 @@
       <option value="admin">Admin — full access, can approve other users</option>
     </select>
     <div class="hint">If you're the first person at your organization, this is ignored — you become super admin automatically regardless of what's selected here.</div>
+    <div class="legal-accept">
+      <label class="checkbox-row"><input type="checkbox" id="signupAcceptLegal"> I have read and accept the <a href="/legal/terms-of-use.html" target="_blank">Terms of Use</a>, <a href="/legal/privacy-statement.html" target="_blank">Privacy Statement</a>, and <a href="/legal/baa.html" target="_blank">Business Associate Agreement</a>.</label>
+    </div>
     <button class="submit" id="signupBtn" onclick="doSignup()">Sign Up</button>
     <div class="msg" id="signupMsg"></div>
   </div>
@@ -138,6 +145,10 @@ async function doLogin() {
 
 async function doSignup() {
   const btn = document.getElementById('signupBtn');
+  if (!document.getElementById('signupAcceptLegal').checked) {
+    showMsg('signupMsg', 'You must accept the Terms of Use, Privacy Statement, and BAA to create an account.', true);
+    return;
+  }
   btn.disabled = true;
   try {
     const res = await fetch('/api/auth/signup', {
@@ -148,6 +159,7 @@ async function doSignup() {
         email: document.getElementById('signupEmail').value,
         password: document.getElementById('signupPassword').value,
         requested_role: document.getElementById('signupRole').value,
+        accepted_legal_docs: true,
       }),
     });
     const data = await res.json();

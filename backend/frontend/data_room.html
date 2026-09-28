@@ -204,7 +204,6 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="doc-card" data-nav="documents"><div class="doc-num">07</div><h4>Document Room</h4><p>Articles of incorporation, bylaws, employee contracts, and other due-diligence documents.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="checklist"><div class="doc-num">08</div><h4>Data Room Index</h4><p>Full due-diligence checklist across 8 categories — honest status per item, live-checked against what's actually uploaded.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="market"><div class="doc-num">09</div><h4>Market &amp; Competition</h4><p>Bottom-up TAM/SAM/SOM and a real competitive landscape — every external figure cited to a named, dated source.</p><div class="doc-open">Open →</div></div>
-            <a href="https://claude.ai/artifact/Wu1GHfAvALavxSa8iNo4KZ" target="_blank" rel="noopener" class="doc-card" style="text-decoration:none; display:block;"><div class="doc-num">10</div><h4>Investor Deck <span class="tag">opens separately</span></h4><p>13-slide presentation — same figures as this data room throughout. Opens in a new tab; export to PDF/PPTX from there.</p><div class="doc-open">Open deck ↗</div></a>
           </div>
         </section>
 
@@ -955,7 +954,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
             <tbody>
               <tr><td>1.1</td><td>Executive Summary</td><td><span class="pill complete">Complete</span></td><td>Company overview and key highlights — Executive Summary page</td></tr>
-              <tr><td>1.2</td><td>Company Presentation</td><td><span class="pill complete">Complete</span></td><td>13-slide investor deck, built and exportable — same figures as this data room throughout. <a href="https://claude.ai/artifact/Wu1GHfAvALavxSa8iNo4KZ" target="_blank" rel="noopener">Open deck ↗</a></td></tr>
+              <tr><td>1.2</td><td>Company Presentation</td><td><span class="pill complete">Complete</span></td><td>13-slide investor deck, built and exportable — same figures as this data room throughout</td></tr>
               <tr><td>1.3</td><td>Business Plan</td><td><span class="pill complete">Complete</span></td><td>Full 15-section business plan, including Risk Factors</td></tr>
               <tr><td>1.4</td><td>Organization Chart</td><td><span class="pill unavailable">Not available</span></td><td>Only one team member confirmed — see Team &amp; Advisors</td></tr>
               <tr><td>1.5</td><td>Company Timeline &amp; Milestones</td><td><span class="pill complete">Complete</span></td><td>Traction &amp; Status page — built vs. ahead, stated plainly</td></tr>
@@ -969,8 +968,8 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
             <tbody>
               <tr><td>2.1</td><td>Financial Model &amp; Projections</td><td><span class="pill complete">Complete</span></td><td>3-year model (FY2027–FY2029), every figure traceable to the source workbook</td></tr>
-              <tr><td>2.2</td><td>Historical Financials</td><td><span class="pill unavailable">Not available</span></td><td>Pre-revenue, pre-seed stage — not applicable yet</td></tr>
-              <tr data-doc-category="financial" data-doc-match="cap table"><td>2.3</td><td>Cap Table</td><td><span class="pill unavailable">Checking…</span></td><td>Real cap table received and reflected on the Investment Structure page — upload the file itself here to also show "Complete" via live-check</td></tr>
+              <tr data-doc-category="financial" data-doc-match="historical"><td>2.2</td><td>Historical Financials</td><td><span class="pill unavailable">Checking…</span></td><td>Pre-revenue, pre-seed stage — no audited history exists yet. Upload one (with "historical" in the filename/description) if this changes.</td></tr>
+              <tr data-doc-category="financial" data-doc-match="cap"><td>2.3</td><td>Cap Table</td><td><span class="pill unavailable">Checking…</span></td><td>Upload with "cap" somewhere in the filename or description (e.g. "Cap Table", "Capitalization Table") — must be uploaded under the Financial category to match</td></tr>
               <tr><td>2.4</td><td>Use of Funds</td><td><span class="pill complete">Complete</span></td><td>Full $1.0M pre-seed allocation — Investment Structure page</td></tr>
               <tr><td>2.7</td><td>Financing History (SAFE)</td><td><span class="pill complete">Complete</span></td><td>Mayo Clinic Platform $800K SAFE — signed &amp; completed, a separate instrument from the still-open pre-seed round</td></tr>
               <tr><td>2.5</td><td>Unit Economics</td><td><span class="pill complete">Complete</span></td><td>CAC, payback, LTV:CAC computed for Enterprise (4.6mo, 10.5x) &amp; Payer (1.4mo, 34.3x); Consumer explained as not cleanly derivable — Financial Model page</td></tr>
@@ -1047,6 +1046,11 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <tr data-doc-category="commercial" data-doc-match=""><td>7.4</td><td>Material Contracts</td><td><span class="pill unavailable">Checking…</span></td><td>Key partnership and vendor agreements</td></tr>
               <tr data-doc-category="hr_employment" data-doc-match=""><td>7.5</td><td>Employment Agreements</td><td><span class="pill unavailable">Checking…</span></td><td>Executive and key employee contracts</td></tr>
               <tr data-doc-category="other" data-doc-match="nda"><td>7.6</td><td>NDAs &amp; Confidentiality</td><td><span class="pill unavailable">Checking…</span></td><td>Standard confidentiality agreements</td></tr>
+              <tr data-doc-category="hr_employment" data-doc-match="option"><td>7.7</td><td>Employee Stock Option Plan</td><td><span class="pill unavailable">Checking…</span></td><td>Upload with "option" in the filename or description, under HR &amp; Employment</td></tr>
+              <tr data-doc-category="financial" data-doc-match="cap"><td>7.8</td><td>Cap Table</td><td><span class="pill unavailable">Checking…</span></td><td>Same real cap table as item 2.3 — one upload satisfies both rows</td></tr>
+              <tr data-doc-category="regulatory" data-doc-match="associate agreement"><td>7.9</td><td>Business Associate Agreement (BAA)</td><td><span class="pill unavailable">Checking…</span></td><td>Upload with "associate agreement" in the filename or description, under Regulatory &amp; Compliance</td></tr>
+              <tr data-doc-category="regulatory" data-doc-match="privacy"><td>7.10</td><td>Privacy Statement</td><td><span class="pill unavailable">Checking…</span></td><td>Upload with "privacy" in the filename or description, under Regulatory &amp; Compliance</td></tr>
+              <tr data-doc-category="other" data-doc-match="terms of use"><td>7.11</td><td>Terms of Use</td><td><span class="pill unavailable">Checking…</span></td><td>Upload with "terms of use" in the filename or description</td></tr>
             </tbody>
           </table></div>
           <p class="sub" style="margin-top:8px;">Go to the Document Room to upload any of these — this table updates automatically based on what's actually there, not a static claim.</p>

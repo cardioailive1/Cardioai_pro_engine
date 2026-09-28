@@ -40,6 +40,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    # create_all() only creates missing TABLES, not missing COLUMNS on
+    # tables that already exist — a real concern here since this column
+    # was added after the initial schema. Safe, idempotent for Postgres;
+    # a no-op error is swallowed for SQLite (used only in the no-DB-set
+    # local fallback), which doesn't support IF NOT EXISTS the same way.
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS accepted_legal_docs_at TIMESTAMPTZ"))
+    except Exception:
+        pass
 
 
 def get_db():

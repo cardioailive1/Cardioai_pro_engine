@@ -88,6 +88,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
     approved_by_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_legal_docs_at = Column(DateTime(timezone=True), nullable=True)  # single timestamp — all three (Terms, Privacy, BAA) are accepted together at signup, not tracked separately
 
     organization = relationship("Organization", back_populates="users")
     approved_by = relationship("User", remote_side=[id])
@@ -98,6 +99,7 @@ class User(Base):
             "status": self.status.value if self.status else None, "created_at": self.created_at.isoformat() if self.created_at else None,
             "org_id": self.org_id,
             "approved_at": self.approved_at.isoformat() if self.approved_at else None,
+            "accepted_legal_docs_at": self.accepted_legal_docs_at.isoformat() if self.accepted_legal_docs_at else None,
         }
         if include_email:
             d["email"] = self.email

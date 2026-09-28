@@ -37,6 +37,7 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=8, max_length=200)
     full_name: str = Field(min_length=1, max_length=200)
     requested_role: Role
+    accepted_legal_docs: bool = False
 
 
 class LoginRequest(BaseModel):
@@ -51,9 +52,12 @@ class ApproveRequest(BaseModel):
 
 @router.post("/signup")
 def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db)):
+    if not body.accepted_legal_docs:
+        raise HTTPException(400, "You must accept the Terms of Use, Privacy Statement, and Business Associate Agreement to create an account.")
     if body.requested_role not in REQUESTABLE_ROLES:
         raise HTTPException(400, f"requested_role must be one of {[r.value for r in REQUESTABLE_ROLES]} — super_admin is assigned automatically, never requested")
 
+    from auth.models import _now
     org = db.query(Organization).filter(func.lower(Organization.name) == body.org_name.strip().lower()).first()
 
     if org is None:
@@ -64,6 +68,7 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
         user = User(
             org_id=org.id, email=str(body.email).lower(), password_hash=hash_password(body.password),
             full_name=body.full_name, role=Role.super_admin, status=UserStatus.active,
+            accepted_legal_docs_at=_now(),
         )
         db.add(user)
         db.commit()
@@ -83,6 +88,7 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
     user = User(
         org_id=org.id, email=str(body.email).lower(), password_hash=hash_password(body.password),
         full_name=body.full_name, role=body.requested_role, status=UserStatus.pending,
+        accepted_legal_docs_at=_now(),
     )
     db.add(user)
     db.commit()

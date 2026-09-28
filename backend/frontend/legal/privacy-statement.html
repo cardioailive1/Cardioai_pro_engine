@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CardioAI Pro — Privacy Statement</title>
+<style>
+  body { max-width: 760px; margin: 40px auto; padding: 0 24px; font-family: Arial, sans-serif; color: #0A2140; line-height: 1.6; }
+  h1 { font-size: 24px; } h2 { font-size: 17px; margin-top: 28px; color: #1C7EC4; }
+  .draft-notice { background: #FDF3E3; border-left: 4px solid #C9820A; padding: 12px 16px; font-size: 14px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #DCE7EE; }
+</style>
+</head>
+<body>
+<h1>Privacy Statement</h1>
+<p style="font-size: 13px; color: #6A90AB; margin-top: -8px; margin-bottom: 24px;">Last updated: September 2026.</p>
+
+<h2>1. What We Collect</h2>
+<table>
+<tr><th>Category</th><th>Examples</th><th>Where it's stored</th></tr>
+<tr><td>Account data</td><td>Name, email, password (hashed, never stored in plain text), organization, role</td><td>Postgres (persistent)</td></tr>
+<tr><td>Clinical/vitals data</td><td>ECG readings, heart rate, QTc, HRV, imaging metadata, care-continuum status</td><td>In-memory on the application server — not currently persisted to a database; lost on server restart unless this has since changed</td></tr>
+<tr><td>Payer/claims data</td><td>X12 837/834 claims and enrollment data, contracts, invoices</td><td>In-memory on the application server — same persistence caveat as above</td></tr>
+<tr><td>Due-diligence documents</td><td>Files uploaded to the Data Room's Document Room</td><td>Cloudflare R2 if configured; otherwise local disk, which does not survive a redeploy</td></tr>
+<tr><td>Session data</td><td>A signed session token identifying your account and role</td><td>An httpOnly browser cookie — not readable by JavaScript, not stored server-side beyond the signature check</td></tr>
+</table>
+
+<h2>2. How We Use It</h2>
+<p>Account data is used to authenticate you and enforce role-based access. Clinical and payer data is used to run the risk-assessment pipeline and generate the reports, dashboards, and alerts the Service displays to authorized users within your organization. We do not sell data to third parties.</p>
+
+<h2>3. Who Can See What</h2>
+<p>Access is scoped by organization and role. A clinician-role account can reach clinical data through the Main Engine and Clinician Dashboard; a payer-analyst account can reach payer data through the Payer Portal; neither can reach the other's surface. Admins and super admins within an organization can see all data belonging to that organization. Data Room access uses a separate, single shared access code independent of organizational accounts, since due-diligence reviewers are typically not members of the company's own organization.</p>
+
+<h2>4. Data Retention and the Persistence Gap, Stated Directly</h2>
+<p>Some categories of data in this system are not yet backed by persistent storage — specifically clinical/vitals data and payer/claims data, which currently live only in the running application process's memory. This means that data does not currently survive a server restart or redeployment. Document Room uploads persist only if Cloudflare R2 has been configured; otherwise they are also lost on redeploy. This is disclosed here because it directly affects what "we retain your data" can honestly mean in the current state of this system — not a purely theoretical caveat.</p>
+
+<h2>5. Third-Party Infrastructure</h2>
+<p>This Service runs on Render (application hosting and managed Postgres) and, optionally, Cloudflare R2 (document storage). Neither has a signed Business Associate Agreement with us as of this document's last update — see the BAA document for what this means if real protected health information is involved.</p>
+
+<h2>6. Security Measures</h2>
+<p>Passwords are hashed with bcrypt, never stored in plaintext. Session tokens are signed (JWT) and delivered via httpOnly cookies. Role-based access control is enforced server-side on every request, not just hidden in the interface. Data Room access uses a separate, independently-checked access code.</p>
+
+<h2>7. Your Rights</h2>
+<p>You may request access to, correction of, or deletion of your account data by contacting your organization's admin or super admin, who can view and manage accounts within your organization, or by contacting us directly.</p>
+
+<h2>8. Contact</h2>
+<p>Questions about this Privacy Statement: invest@cardioailive.com</p>
+</body>
+</html>
