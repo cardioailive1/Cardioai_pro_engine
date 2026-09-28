@@ -1445,6 +1445,27 @@ deployment check) that `boto3` — now a real, live dependency — is
 genuinely captured in `requirements.txt`, not just present because it
 happened to already be installed.
 
+## R2 env var names made flexible — matching what Cloudflare actually hands you
+
+Real deployment feedback: `R2_ACCOUNT_ID` was set as a required variable
+name, but Cloudflare's current R2 API token screen doesn't surface a
+bare account ID at all — it hands you a ready-made "S3 API endpoint"
+URL instead. Requiring the bare ID meant asking for a value the UI
+doesn't actually show, or making someone parse it out of the endpoint
+URL themselves.
+
+**Fixed to accept either form**: `R2_ENDPOINT_URL` (the full URL,
+copied directly — now the primary, documented option) or `R2_ACCOUNT_ID`
+(the bare ID, still supported, endpoint built from it as before) — only
+one of the two is needed, not both. `render.yaml` updated to list
+`R2_ENDPOINT_URL` first, since that matches what the current Cloudflare
+UI actually presents.
+
+Verified directly, not assumed: tested both configurations
+independently (endpoint URL set / account ID set / neither set) and
+confirmed each correctly selects the right backend and builds the right
+connection — not just that the code compiles.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire

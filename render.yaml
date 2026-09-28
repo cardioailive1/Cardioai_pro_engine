@@ -28,7 +28,14 @@ services:
       # `sync: false` means Render prompts for these in the dashboard
       # rather than reading them from this file, so real credentials
       # never end up committed to the repo.
-      - key: R2_ACCOUNT_ID
+      #
+      # R2_ENDPOINT_URL is what Cloudflare's current R2 API token screen
+      # actually hands you as "S3 API endpoint" (the full
+      # https://<account-id>.r2.cloudflarestorage.com URL) — set that
+      # directly. R2_ACCOUNT_ID (just the bare ID, used to build the
+      # same URL) is accepted as an alternative if that's what you have
+      # instead; either one alone is enough, not both.
+      - key: R2_ENDPOINT_URL
         sync: false
       - key: R2_ACCESS_KEY_ID
         sync: false

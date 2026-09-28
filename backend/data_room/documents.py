@@ -74,7 +74,8 @@ class DataRoomDocument:
 
 
 def _r2_env_configured() -> bool:
-    return all(os.environ.get(k) for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"))
+    has_endpoint = bool(os.environ.get("R2_ACCOUNT_ID") or os.environ.get("R2_ENDPOINT_URL"))
+    return has_endpoint and all(os.environ.get(k) for k in ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"))
 
 
 class _LocalDiskBackend:
@@ -131,11 +132,18 @@ class _R2Backend:
 
     def __init__(self):
         import boto3
-        account_id = os.environ["R2_ACCOUNT_ID"]
         self.bucket = os.environ["R2_BUCKET_NAME"]
+        # Accept either form Cloudflare's dashboard hands you: a full
+        # endpoint URL directly (R2_ENDPOINT_URL — what the current R2
+        # token screen actually surfaces as "S3 API endpoint"), or just
+        # the bare account ID (R2_ACCOUNT_ID) to build it from. Forcing
+        # everyone to go dig the bare account ID out separately when
+        # Cloudflare already handed them the full URL is friction this
+        # doesn't need.
+        endpoint_url = os.environ.get("R2_ENDPOINT_URL") or f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com"
         self.client = boto3.client(
             "s3",
-            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+            endpoint_url=endpoint_url,
             aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
             aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
             region_name="auto",  # R2's S3-compatible API expects "auto", not a real AWS region
@@ -204,9 +212,9 @@ class DocumentRegistry:
             self.backend = _LocalDiskBackend()
             self.storage_warning = (
                 "Files stored here do NOT survive a redeploy or a free-tier spin-down "
-                "— R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET_NAME "
-                "are not all set, so this process has no persistent storage behind it. "
-                "Keep your own copy of anything uploaded here until those are configured."
+                "— (R2_ACCOUNT_ID or R2_ENDPOINT_URL), R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
+                "and R2_BUCKET_NAME are not all set, so this process has no persistent storage "
+                "behind it. Keep your own copy of anything uploaded here until those are configured."
             )
 
     def save(self, filename: str, category: str, description: str, content: bytes) -> tuple[Optional[DataRoomDocument], Optional[str]]:
