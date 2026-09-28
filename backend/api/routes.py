@@ -22,7 +22,7 @@ from integrations.hl7 import build_adt_a01, build_oru_r01, parse_hl7_message
 from integrations.dicom import DICOMService
 from integrations.x12_837 import parse_837_claims, claim_to_cardioai_record
 from integrations.x12_834 import parse_834_enrollment
-from data_room.documents import DOCUMENT_CATEGORIES, STORAGE_WARNING
+from data_room.documents import DOCUMENT_CATEGORIES
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
 from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
@@ -758,7 +758,7 @@ async def upload_data_room_document(
     doc, error = orchestrator.document_registry.save(file.filename, category, description, content)
     if error:
         raise HTTPException(status_code=400, detail=error)
-    return {**doc.to_dict(), "storage_warning": STORAGE_WARNING}
+    return {**doc.to_dict(), "storage_warning": orchestrator.document_registry.storage_warning}
 
 
 @router.get("/data-room/documents")
@@ -767,7 +767,7 @@ async def list_data_room_documents(category: Optional[str] = None):
     return {
         "documents": [d.to_dict() for d in docs],
         "categories": DOCUMENT_CATEGORIES,
-        "storage_warning": STORAGE_WARNING,
+        "storage_warning": orchestrator.document_registry.storage_warning,
     }
 
 

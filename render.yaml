@@ -21,6 +21,21 @@ services:
         value: 8000
       - key: PYTHON_VERSION
         value: 3.11.9
+      # Cloudflare R2 (S3-compatible) — persistent storage for the Data
+      # Room's Document Room. Leave unset and the app falls back to
+      # ephemeral local disk (works, but does not survive a redeploy or
+      # a free-tier spin-down) — no code change needed either way.
+      # `sync: false` means Render prompts for these in the dashboard
+      # rather than reading them from this file, so real credentials
+      # never end up committed to the repo.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
 
   # --- scale-out path (uncomment when moving beyond a single-process demo) ---
   # - type: worker

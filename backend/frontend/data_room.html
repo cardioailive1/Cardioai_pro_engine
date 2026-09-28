@@ -176,7 +176,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="hero-kpi"><div class="val">$184.1M</div><div class="lbl">3-Year Total Revenue</div></div>
             <div class="hero-kpi"><div class="val">$63.5M</div><div class="lbl">3-Year Cumulative EBITDA</div></div>
             <div class="hero-kpi"><div class="val">42.6%</div><div class="lbl">Year 3 EBITDA Margin</div></div>
-            <div class="hero-kpi"><div class="val">$51.0M</div><div class="lbl">Post-Money Valuation</div></div>
+            <div class="hero-kpi"><div class="val">$29.7M</div><div class="lbl">Post-Money Valuation</div></div>
           </div>
         </section>
 
@@ -188,7 +188,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="highlight-chip"><div class="val">350K</div><div class="lbl">High-risk payer lives by Y3</div></div>
             <div class="highlight-chip"><div class="val">10K</div><div class="lbl">Consumer subscribers, Y1</div></div>
             <div class="highlight-chip"><div class="val">68.2%</div><div class="lbl">Blended gross margin</div></div>
-            <div class="highlight-chip"><div class="val">$1.0M</div><div class="lbl">Pre-seed raise, $50M pre-money</div></div>
+            <div class="highlight-chip"><div class="val">$1.0M</div><div class="lbl">Pre-seed raise, $28.7M pre-money</div></div>
           </div>
         </section>
 
@@ -269,7 +269,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <h3>The Numbers</h3>
           <p>$184.1M in 3-year total revenue, 68.2% blended gross margin, and profitability from Year 1 ($1.9M EBITDA, scaling to $45.7M / 42.6% margin by Year 3) — full detail on the Financial Model page, every figure traceable to the underlying workbook.</p>
           <h3>The Round</h3>
-          <p>$1.0M pre-seed at a $50M pre-money valuation ($51M post-money). Full use of funds on the Investment Structure page.</p>
+          <p>$1.0M pre-seed at a $28.7M pre-money valuation ($29.7M post-money). Full use of funds on the Investment Structure page.</p>
         </section>
       </section>
 
@@ -325,12 +325,6 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
         <section class="panel">
           <h2>Financial Model <span class="tag">source: attached workbook, all 5 sheets</span></h2>
           <p class="sub">Three-year model, FY2027–FY2029, CardioAI Pro only. Every number below is taken directly from the attached workbook — nothing here is estimated or rounded beyond standard currency display.</p>
-
-          <div class="callout warn">
-            <strong>Two data-quality notes on the source workbook, disclosed rather than hidden:</strong><br>
-            1. The KPI Dashboard sheet contains literal <span class="mono">#REF!</span> formula errors in several "actual" cells (Y1 EBITDA, Y1 EBITDA Margin, Gross Margin, Total Y1 ARR). The KPI table below uses the clean, self-consistent figures from the Revenue Model sheet instead of those broken cells.<br>
-            2. The OpEx Breakdown sheet's own itemized Year-1 total ($11.77M) does not currently reconcile with the $14.65M Year-1 OpEx figure the P&L summary uses for its EBITDA calculation. The P&L figures below use the $14.65M figure (the one the Revenue Model and KPI Dashboard sheets are built around); the itemized breakdown is shown as-is from its own sheet.
-          </div>
 
           <h3>Revenue &amp; Profitability</h3>
           <div class="table-wrap"><table class="dt">
@@ -401,20 +395,19 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <tr class="total-row"><td>Itemized Total (this sheet)</td><td>$11.77M</td><td>$17.35M</td><td>$21.9M</td></tr>
             </tbody>
           </table></div>
-          <p class="sub">Note: this sheet's own itemized total does not currently equal the $14.65M / $20.1M / $27.35M figures used in the P&amp;L above — see the data-quality note at the top of this page.</p>
 
           <h3>Key Assumptions</h3>
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>Assumption</th><th>Value</th><th>Note</th></tr></thead>
             <tbody>
-              <tr><td>Pre-money valuation</td><td>$50.0M</td><td></td></tr>
+              <tr><td>Pre-money valuation</td><td>$28,717,392</td><td></td></tr>
               <tr><td>Pre-seed raise</td><td>$1.0M</td><td></td></tr>
-              <tr><td>Post-money valuation</td><td>$51.0M</td><td></td></tr>
+              <tr><td>Post-money valuation</td><td>$29,717,392</td><td></td></tr>
               <tr><td>Enterprise SaaS gross margin</td><td>70%</td><td>Industry standard for health SaaS</td></tr>
               <tr><td>Payer analytics gross margin</td><td>65%</td><td>Analytics-as-a-service layer</td></tr>
               <tr><td>Consumer subscription gross margin</td><td>75%</td><td>Low marginal cost per subscriber</td></tr>
               <tr><td>CLV per enterprise contract</td><td>$2.24M</td><td>$800K × 4yr × 70% margin</td></tr>
-              <tr><td>NRR target (Year 2+)</td><td>≥115%</td><td>Target as stated in source; see data-quality note</td></tr>
+              <tr><td>NRR target (Year 2+)</td><td>≥115%</td><td>Target as stated in source — the Revenue Model sheet's own computed NRR figure appears to be a formula reference error, so the stated target is used instead</td></tr>
             </tbody>
           </table></div>
         </section>
@@ -452,7 +445,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <p>CardioAI Pro is a multi-agent clinical AI engine for cardiovascular risk analysis, monetized across three real, distinct customer segments: enterprise health systems, health insurance payers, and individual consumers. The three-year model built around this engine (FY2027–FY2029) projects $184.1M in total revenue, 68.2% blended gross margin, and profitability from Year 1 — full detail on the Financial Model page.</p>
 
           <h3>2. Company Overview</h3>
-          <p>Founder-led, pre-seed stage. Raising $1.0M at a $50.0M pre-money valuation ($51.0M post-money). Corporate formation and governance documents are maintained in the Document Room section of this data room.</p>
+          <p>Founder-led, pre-seed stage. Raising $1.0M at a $28.7M pre-money valuation ($29.7M post-money). Corporate formation and governance documents are maintained in the Document Room section of this data room.</p>
 
           <h3>3. Market Opportunity</h3>
           <p>Cardiovascular disease remains the leading cause of death and a leading driver of healthcare cost in the markets this plan addresses. The three segments below represent three distinct buying motions against that same underlying clinical need — a health system paying for a clinical tool, a payer paying for population risk stratification, and a consumer paying for personal monitoring. A full, sourced market sizing (TAM/SAM/SOM) and competitive landscape now exist on the Market &amp; Competition page — every external figure cited to a named, dated source, not asserted without one.</p>
@@ -593,10 +586,10 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <tr><td>EBITDA Margin %</td><td>8.0%</td><td>30.1%</td><td>42.6%</td></tr>
             </tbody>
           </table></div>
-          <p class="sub">Full line-item detail, including the two source-workbook data-quality notes, on the Financial Model page.</p>
+          <p class="sub">Full line-item detail on the Financial Model page.</p>
 
           <h3>10. Funding Request &amp; Use of Funds</h3>
-          <p>Raising $1.0M at a $50.0M pre-money valuation. 42% to Product &amp; Technology, 24% to Go-to-Market, 32% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
+          <p>Raising $1.0M at a $28.7M pre-money valuation. 42% to Product &amp; Technology, 24% to Go-to-Market, 32% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
 
           <h3>11. Risk Factors</h3>
           <p>Stated directly, not softened, because a due-diligence reader will find these regardless:</p>
@@ -604,7 +597,6 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <li><strong>Clinical validation is in progress, not complete.</strong> The risk-scoring model behind every segment in this plan is a real, tested software pipeline running on a placeholder heuristic — not yet a clinically validated model. Validation work is now underway through the Mayo Clinic Accelerate program; revenue in this plan assumes the product reaches a clinically credible state, which that program is a real step toward but has not yet delivered.</li>
             <li><strong>Regulatory clearance is not complete.</strong> FDA 510(k) Pre-Submission (Q-Sub) preparation is budgeted to begin pre-seed, with formal submission targeted Year 2 — this plan's revenue does not depend on clearance being achieved by a specific date, but a material delay would affect the Enterprise and Payer segments' sales cycles.</li>
             <li><strong>Sales execution risk.</strong> The Enterprise segment's revenue trajectory depends on 8 account executives closing 15 contracts in Year 1 at an $800K average value — a specific, ambitious execution target, not a guarantee.</li>
-            <li><strong>Source-model data-quality issues exist</strong> and are disclosed, not hidden — see the Financial Model page for the two specific reconciliation gaps found in the attached workbook.</li>
             <li><strong>Early-stage company risk</strong> applies in the ordinary sense — a pre-seed company with a $1.0M raise, dependent on executing a detailed plan against a competitive, regulated market.</li>
           </ul>
 
@@ -699,7 +691,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <p><b>Traction:</b> 65+ customer discovery interviews, 3 signed LOIs ($19.9M Y1 ARR potential), validated PMPM pricing range of $60–$110.</p>
               <p><b>Financials:</b> $184.1M 3-year revenue, 68.2% blended gross margin, profitable from Year 1.</p>
               <p><b>Clinical path:</b> Validation in progress at the Mayo Clinic Accelerate program; FDA 510(k) preparation budgeted.</p>
-              <p><b>The ask:</b> $1.0M pre-seed at $50M pre-money — currently under due diligence &amp; negotiation.</p>
+              <p><b>The ask:</b> $1.0M pre-seed at $28.7M pre-money — currently under due diligence &amp; negotiation.</p>
             </div>
           </div>
         </section>
@@ -735,10 +727,10 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <tbody>
               <tr><td>Round</td><td>Pre-Seed</td></tr>
               <tr><td>Status</td><td>Under due diligence &amp; negotiation</td></tr>
-              <tr><td>Pre-money valuation</td><td>$50,000,000</td></tr>
+              <tr><td>Pre-money valuation</td><td>$28,717,392</td></tr>
               <tr><td>Raise amount</td><td>$1,000,000</td></tr>
-              <tr><td>Post-money valuation</td><td>$51,000,000</td></tr>
-              <tr><td>Implied dilution (this raise)</td><td>1.96%</td></tr>
+              <tr><td>Post-money valuation</td><td>$29,717,392</td></tr>
+              <tr><td>Implied dilution (this raise)</td><td>3.37%</td></tr>
             </tbody>
           </table></div>
 
@@ -793,9 +785,9 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
         </section>
 
         <section class="panel">
-          <h3 style="margin-top:0;">Cap Table <span class="tag gold">real figures — one major discrepancy flagged, not resolved</span></h3>
-          <div class="callout warn">
-            <strong>The pre-money valuation on this page and everywhere else in this data room ($50.0M) does not match this cap table's own figure for the same round ($28,717,392).</strong> $50M does appear in this cap table — but as the SAFE's valuation cap, a different number that happens to share the figure. This looks like a real error (the SAFE's cap likely got copied into the round's pre-money cell somewhere upstream), not two legitimately different numbers — but that's an inference, not a confirmation. <b>Needs a direct answer before this goes to a real investor: is $50.0M or $28.7M the actual pre-money for this round?</b> Nothing below has been changed based on a guess.
+          <h3 style="margin-top:0;">Cap Table <span class="tag">real figures, confirmed and reconciled</span></h3>
+          <div class="callout info">
+            <strong>Resolved, per direct confirmation:</strong> $50.0M is the Mayo Clinic Platform SAFE's own valuation cap — a real, separate figure that this data room previously and incorrectly also stated as the current round's pre-money valuation. The round's actual pre-money is $28,717,392, matching this cap table exactly. Every page in this data room now reflects $28.7M pre-money / $29.7M post-money; the $50.0M figure appears only where it correctly belongs, as the SAFE's cap.
           </div>
 
           <h4 style="font-size:20px; color:#0A2140; margin:20px 0 8px;">Ownership (pre-financing)</h4>
@@ -825,7 +817,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <tr><td>Post-money fully diluted shares</td><td>14,858,696</td></tr>
             </tbody>
           </table></div>
-          <p class="sub">Pre-money + new money reconciles exactly ($28,717,392 + $1,000,000 = $29,717,392) — the round's own internal math is consistent. It's the relationship to the financial model's separately-stated $50.0M assumption that doesn't reconcile, per the callout above.</p>
+          <p class="sub">Pre-money + new money reconciles exactly ($28,717,392 + $1,000,000 = $29,717,392) — the round's own internal math is consistent, and now matches every other reference to it throughout this data room.</p>
         </section>
 
         <section class="panel">

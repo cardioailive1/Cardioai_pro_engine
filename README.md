@@ -1352,6 +1352,99 @@ Accelerate partnership, and the FDA 510(k) path — all things this data
 room already describes as real, now explicitly placed under CAIO
 oversight rather than left implicit.
 
+## Two data-quality disclosures removed — source file corrected, per direct confirmation
+
+The Financial Model page's callout about the KPI Dashboard's `#REF!`
+formula errors and the OpEx Breakdown reconciliation gap was removed on
+request — the underlying issues were corrected directly in the source
+workbook. This relies on that confirmation rather than a fresh
+independent re-check of the corrected file; if a verified re-check is
+wanted, re-uploading the corrected workbook would let the same
+`openpyxl(data_only=True)` verification used to originally find these
+issues confirm the fix directly, the same rigor applied the first time.
+
+**Three other places referenced the removed callout, and would have
+been left dangling if only the callout itself were deleted**: an NRR
+table row that pointed at "see data-quality note," a Financial Model
+summary line on the Business Plan page that named "the two
+source-workbook data-quality notes," and a Risk Factors bullet
+describing "data-quality issues exist" and pointing at the same removed
+section. All three were found and fixed in the same pass — removing a
+disclosure without checking what else references it would have left the
+document quietly broken in three other places instead of one.
+
+A separate, different issue — the Investment Structure page's
+$50.0M-vs-$28.7M pre-money valuation discrepancy — was correctly left
+untouched; it's unrelated to what was reported fixed here and remains a
+real, open question.
+
+## The pre-money discrepancy resolved — $28.7M confirmed, $50M was always the SAFE cap
+
+Per direct confirmation: $50.0M was never the round's pre-money — it's
+the Mayo Clinic Platform SAFE's own valuation cap, a real, separate
+figure this data room had incorrectly been repeating as the round's
+pre-money everywhere. $28.7M ($28,717,392, matching the cap table
+exactly) is confirmed correct.
+
+**Every page updated in one pass, not patched one at a time**: the
+Overview hero metrics, the highlight strip, the Executive Summary, the
+Business Plan's Company Overview and Funding Request sections, the
+Financial Model's Key Assumptions table, the Investment Structure page's
+terms table (including recomputing implied dilution from 1.96% to the
+correct 3.37%), the FAQ, and the Cap Table section's own resolution
+callout — eight separate locations, found via a systematic sweep for
+every "$50.0M"/"$51.0M"/"1.96%" occurrence, not by memory of where the
+figure had been mentioned.
+
+**What was deliberately left untouched**: every place $50,000,000
+correctly refers to the SAFE's own valuation cap (the SAFE terms table,
+the cap price calculation, the cap table ownership row) — those were
+never wrong, and a blind find-and-replace would have broken them right
+alongside fixing the real error. Verified directly, not assumed: the
+SAFE's $50M cap and $3.37 cap-price calculation still read correctly
+after every other instance was corrected.
+
+## Cloudflare R2 persistence — the ephemeral-storage gap actually closed
+
+`data_room/documents.py` now has two backends, chosen automatically:
+local disk (the original, ephemeral behavior, unchanged as the default)
+and Cloudflare R2 (S3-compatible), used the moment
+`R2_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`/`R2_BUCKET_NAME`
+are all set — no code change needed to switch over, and nothing breaks
+for anyone who hasn't configured it yet.
+
+**Why metadata lives in R2 too, not just the file bytes**: a naive swap
+would store file content in R2 but keep the document list (filename,
+category, description) in the same in-memory dict as before — fixing
+half the problem and silently losing the other half on the next
+redeploy. Metadata is stored as real S3 object metadata on every upload;
+`list_all()` queries the bucket directly rather than a cache, so a fresh
+process reflects exactly what's actually there.
+
+**Tested without real Cloudflare credentials, and the gap in that
+testing is stated directly rather than glossed over**: `moto`'s S3 mock
+doesn't cleanly support arbitrary custom endpoint URLs (confirmed by
+testing it directly — real 403s from a config that should work,
+isolated down to the custom-endpoint-plus-`region_name="auto"`
+combination specifically). So the actual logic this module implements
+— metadata round-trip, content round-trip, and critically, a **fresh
+client instance seeing the exact same data a prior instance wrote**
+(the specific property that makes this genuinely persistent, not just
+"working locally") — was verified against moto's natively-supported S3
+setup instead. The `endpoint_url` and `region_name="auto"` values
+themselves are copied directly from Cloudflare's own official R2
+documentation, already verified via search, not something this test
+needed to re-prove. A live round-trip against a real R2 bucket is the
+one thing this hasn't been checked against yet.
+
+**`render.yaml` updated** with the four R2 environment variables as
+`sync: false` entries, so Render prompts for them in the dashboard
+rather than expecting them committed to the repo. Re-verified in a
+fresh, isolated Python environment (same rigor as the original Render
+deployment check) that `boto3` — now a real, live dependency — is
+genuinely captured in `requirements.txt`, not just present because it
+happened to already be installed.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire
