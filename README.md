@@ -1484,6 +1484,20 @@ spelling doesn't appear anywhere, and "Domenico Merante" (the confirmed
 correct spelling) appears exactly once, in the bio card — no duplicate
 or conflicting mentions.
 
+## A real diagnostic endpoint, because guessing at env var names twice was enough
+
+The storage warning persisted after renaming to the correct four
+variable names — rather than guess a third time, a real diagnostic
+endpoint now exists: `GET /api/data-room/storage-diagnostics`. It
+reports, per variable, whether *this actual running process* sees it
+set — true/false only, never the values themselves, so it's safe to
+check without exposing secrets.
+
+Tested against both the empty-env baseline and a deliberately
+incomplete configuration (3 of 4 set, one missing) to confirm it
+correctly pinpoints exactly which variable isn't detected, not just
+that something's wrong somewhere.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire

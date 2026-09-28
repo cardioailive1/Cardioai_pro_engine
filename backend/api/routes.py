@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from datetime import date
 from typing import Optional
@@ -768,6 +769,25 @@ async def list_data_room_documents(category: Optional[str] = None):
         "documents": [d.to_dict() for d in docs],
         "categories": DOCUMENT_CATEGORIES,
         "storage_warning": orchestrator.document_registry.storage_warning,
+    }
+
+
+@router.get("/data-room/storage-diagnostics")
+async def storage_diagnostics():
+    """
+    Reports which of the four R2 environment variables this actual
+    running process sees — presence only, never the values themselves,
+    so this is safe to check without exposing secrets. Exists because
+    "I set them and it's still showing the warning" needs a way to see
+    exactly which one the app isn't detecting, rather than guessing
+    through the list again.
+    """
+    keys = ["R2_ENDPOINT_URL", "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]
+    detected = {k: bool(os.environ.get(k)) for k in keys}
+    return {
+        "detected": detected,
+        "active_backend": type(orchestrator.document_registry.backend).__name__,
+        "note": "R2_ENDPOINT_URL and R2_ACCOUNT_ID are alternatives — only one of the two needs to be true. All of R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME must be true.",
     }
 
 
