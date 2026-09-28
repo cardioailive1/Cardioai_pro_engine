@@ -41,6 +41,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from typing import Any, Optional
+from urllib.parse import quote, unquote
 
 DOCUMENT_CATEGORIES = {
     "corporate_legal": "Corporate & Legal",       # Articles of Incorporation, Bylaws, Cap Table, Board Resolutions
@@ -150,12 +151,19 @@ class _R2Backend:
         )
 
     def _doc_from_head(self, doc_id: str, head: dict[str, Any]) -> DataRoomDocument:
+        # S3/R2 object metadata is ASCII-only at the HTTP-header level — a
+        # real filename or description containing an em-dash, curly quote,
+        # accented character, or emoji throws ParamValidationError on write
+        # otherwise, which is not a hypothetical: it crashed this exact
+        # startup path in production the first time a seeded description
+        # used "—". URL-quoting on write / unquoting on read round-trips
+        # any Unicode content safely through the ASCII-only constraint.
         meta = head.get("Metadata", {})
         return DataRoomDocument(
             doc_id=doc_id,
-            filename=meta.get("filename", doc_id),
-            category=meta.get("category", "other"),
-            description=meta.get("description", ""),
+            filename=unquote(meta.get("filename", doc_id)),
+            category=unquote(meta.get("category", "other")),
+            description=unquote(meta.get("description", "")),
             uploaded_at=float(meta.get("uploaded_at", 0)),
             size_bytes=head.get("ContentLength", 0),
         )
@@ -165,7 +173,10 @@ class _R2Backend:
         uploaded_at = time.time()
         self.client.put_object(
             Bucket=self.bucket, Key=doc_id, Body=content,
-            Metadata={"filename": filename, "category": category, "description": description, "uploaded_at": str(uploaded_at)},
+            Metadata={
+                "filename": quote(filename), "category": quote(category),
+                "description": quote(description), "uploaded_at": str(uploaded_at),
+            },
         )
         return DataRoomDocument(doc_id=doc_id, filename=filename, category=category, description=description, uploaded_at=uploaded_at, size_bytes=len(content))
 

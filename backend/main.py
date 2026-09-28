@@ -101,9 +101,9 @@ def _seed_legal_docs_into_data_room():
     # re-seeding duplicates every restart would defeat that persistence.
     from orchestrator.orchestrator import orchestrator
     seeds = [
-        ("Business_Associate_Agreement.html", "baa.html", "regulatory", "Business Associate Agreement (BAA) — draft, not legally reviewed"),
-        ("Privacy_Statement.html", "privacy-statement.html", "regulatory", "Privacy Statement — draft, not legally reviewed"),
-        ("Terms_of_Use.html", "terms-of-use.html", "other", "Terms of Use — draft, not legally reviewed"),
+        ("Business_Associate_Agreement.html", "baa.html", "regulatory", "Business Associate Agreement (BAA)"),
+        ("Privacy_Statement.html", "privacy-statement.html", "regulatory", "Privacy Statement"),
+        ("Terms_of_Use.html", "terms-of-use.html", "other", "Terms of Use"),
     ]
     existing_filenames = {d.filename for d in orchestrator.document_registry.list_all()}
     for display_name, source_name, category, description in seeds:
