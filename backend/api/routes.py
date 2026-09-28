@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 import time
 from datetime import date
 from typing import Optional
@@ -24,6 +25,8 @@ from integrations.dicom import DICOMService
 from integrations.x12_837 import parse_837_claims, claim_to_cardioai_record
 from integrations.x12_834 import parse_834_enrollment
 from data_room.documents import DOCUMENT_CATEGORIES
+from auth.security import create_data_room_token, DATA_ROOM_TOKEN_HOURS
+from auth.deps import DATA_ROOM_COOKIE_NAME
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
 from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
@@ -742,6 +745,43 @@ async def list_enrollment(status: Optional[str] = None):
     if status:
         members = [m for m in members if m["status"] == status]
     return {"members": members, "active_count": len(orchestrator.enrollment_registry.active_member_ids())}
+
+
+# ---------------------------------------------------------------------------
+# Data Room access — a separate, single-shared-password mechanism, entirely
+# independent of the org-RBAC system in auth/. Due-diligence investors come
+# from many different firms, not one organization's account system, so this
+# deliberately has no concept of users, orgs, or roles at all — one code,
+# shared with whoever needs access, the way a real investor data room
+# usually works. Genuinely server-enforced, unlike the page's earlier
+# client-side-only check: the endpoints below it (documents upload/list/
+# download/delete) now require the cookie this sets — reading the page's
+# JavaScript no longer reveals a bypass, since the check happens in
+# main.py's middleware on the server, not in the browser.
+# ---------------------------------------------------------------------------
+class DataRoomUnlockRequest(BaseModel):
+    password: str
+
+
+@router.post("/data-room/unlock")
+def data_room_unlock(body: DataRoomUnlockRequest, response: Response):
+    correct = os.environ.get("DATA_ROOM_PASSWORD")
+    if not correct:
+        raise HTTPException(status_code=503, detail="DATA_ROOM_PASSWORD is not set — the data room has no access code configured yet.")
+    if not secrets.compare_digest(body.password, correct):
+        raise HTTPException(status_code=401, detail="Incorrect access code.")
+    token = create_data_room_token()
+    response.set_cookie(
+        key=DATA_ROOM_COOKIE_NAME, value=token, httponly=True, samesite="lax",
+        secure=True, max_age=DATA_ROOM_TOKEN_HOURS * 3600, path="/",
+    )
+    return {"unlocked": True}
+
+
+@router.post("/data-room/lock")
+def data_room_lock(response: Response):
+    response.delete_cookie(DATA_ROOM_COOKIE_NAME, path="/")
+    return {"locked": True}
 
 
 # ---------------------------------------------------------------------------

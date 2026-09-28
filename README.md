@@ -1498,6 +1498,196 @@ incomplete configuration (3 of 4 set, one missing) to confirm it
 correctly pinpoints exactly which variable isn't detected, not just
 that something's wrong somewhere.
 
+## Real authentication, closing a gap that had existed since the start
+
+The Data Room's password gate is client-side JavaScript only — disclosed
+as such when it was built, but worth restating plainly: it never
+protected anything at the network level, since the actual HTML and API
+responses are served by the backend regardless of what the page's JS
+shows or hides. The Main Engine, Clinician Dashboard, and Payer Portal
+had no gate of any kind, ever. For a live, public Render URL now doing
+real ingestion and real persistent storage, that's a genuine exposure.
+
+**HTTP Basic Auth, enforced as raw ASGI middleware, not Starlette's
+`BaseHTTPMiddleware`** — that class only sees HTTP requests and silently
+lets WebSocket connections straight through unauthenticated, which would
+have left `/ws/stream` open even with auth "installed." Operating at the
+ASGI level catches both scope types.
+
+**Fails closed, deliberately different from how R2 was built**: if
+`APP_USERNAME`/`APP_PASSWORD` aren't both set, the app refuses all
+traffic (except `/healthz`, exempted so Render's own health check
+doesn't spiral into a restart loop) with a clear 503 explaining why —
+it does not fall back to serving unprotected. R2's graceful degradation
+to ephemeral local storage was the right call for a persistence
+convenience; the same pattern applied to authentication would mean the
+exposure this exists to close quietly reappears the moment someone
+forgets to set two variables. `render.yaml` updated accordingly, with a
+comment stating plainly that the app will be entirely unreachable until
+both are set — not a subtle warning buried in a warning banner.
+
+**Tested directly, not assumed**, across every real scenario: no
+credentials (fail-closed 503), wrong credentials (401 with a proper
+`WWW-Authenticate` header so browsers show their native login prompt),
+correct credentials (200), and `/healthz` staying exempt throughout.
+The WebSocket path specifically tested with the `websockets` library —
+no-auth and wrong-auth both correctly rejected at the handshake itself
+(HTTP 403, before any connection is even accepted), correct auth
+succeeds and receives real live data from the stream. Re-verified in a
+fresh, isolated Python environment (same rigor as the original Render
+deployment check and the R2 work) that nothing new was silently
+required beyond the standard library.
+
+**Twenty local regression test files updated to carry credentials**,
+since they now all get blocked by the very auth just built. Found and
+fixed a real bug in three of them along the way: a naive patch created
+a duplicate `beforeParse` key in the JSDOM options object, which
+JavaScript resolves by silently keeping the *second* one — discarding
+the injected auth header entirely without any error. Caught by checking
+occurrence counts across all patched files after the fact, not assumed
+correct because the patch script ran without complaint.
+
+## Real organization-scoped RBAC, replacing the shared password entirely
+
+**What this is, stated plainly, matching how it was framed before any
+code was written**: real, Postgres-backed multi-user authentication and
+organizational role-based access control — a genuine upgrade from a
+single shared HTTP Basic Auth credential to actual per-user identity,
+roles, and an approval workflow. **It is not SOC 2 certification and
+not HIPAA compliance.** SOC 2 requires a licensed third-party auditor
+examining real operational controls over an observation period — no
+code produces that. HIPAA requires Business Associate Agreements with
+every vendor touching PHI (this deployment's Render/Cloudflare
+infrastructure has none), a formal risk assessment, a designated
+Privacy/Security Officer, and workforce policies — also not something
+code produces. This system should keep running on synthetic data, not
+real PHI, until those separate, non-technical requirements are met.
+
+**The role model**: the first person to sign up for a given
+organization name becomes its `super_admin` automatically — not chosen,
+not requested, just what happens when a new org is created. Every
+subsequent signup for that same org name is created as `pending` and
+cannot log in until that org's admin approves it. `admin`, `clinician`
+(Main Engine + Clinician Dashboard), and `payer_analyst` (Payer Portal)
+are the other three roles; `super_admin`/`admin` reach everything,
+including a real approval panel at `/admin.html`.
+
+**A real architectural correction made mid-build, not glossed over**:
+this was initially designed around Bearer tokens, the way an API client
+typically authenticates. Partway through, a real problem surfaced —
+a Bearer token only reaches the server when JavaScript deliberately
+attaches it; a plain page navigation (typing a URL, a bookmark, a
+reload) cannot attach a custom header at all. Gating the actual HTML
+pages behind a Bearer-only check would have meant those pages could
+never load except via a JS-initiated fetch(), which isn't how logging
+into a website works. Rebuilt around an httpOnly session cookie instead
+— sent automatically by the browser on every request, including plain
+navigation, and unreadable by JavaScript. Both `main.py`'s ASGI
+middleware and `auth/deps.py`'s FastAPI dependency read the same
+cookie, so page-level and API-level gating use one consistent
+mechanism.
+
+**Real Postgres, not SQLite and not in-memory**, installed and tested
+locally at the exact major version `render.yaml` specifies (16) rather
+than assumed compatible. `render.yaml`'s `databases:` block (previously
+commented out) is now active, with `DATABASE_URL` auto-injected into
+the web service and a real auto-generated `JWT_SECRET_KEY`.
+
+**Tested end-to-end against that real, live Postgres-backed server**,
+not just unit-level: unauthenticated refusal, first-signup-becomes-
+super_admin (correctly overriding whatever role was requested), second-
+signup-for-the-same-org becomes pending, pre-approval login correctly
+blocked with a clear reason, admin approval, post-approval login,
+clinician blocked from the Payer Portal and the Admin panel while
+retaining Main Engine and Clinician Dashboard access, payer_analyst
+blocked from the Main Engine and from `/api/patients` specifically
+(API-level gating, not just page-level) while retaining Payer Portal
+and `/api/payer/*` access, logout actually clearing the session, and
+WebSocket connections correctly refused without a valid cookie — every
+one of these checked as a real request against the real server, not
+inferred from the code reading correctly. Also re-verified in a fresh,
+isolated Python environment (same rigor as every prior dependency
+change this size) that `requirements.txt` — now substantially larger,
+with SQLAlchemy, psycopg2, passlib, python-jose, and email-validator —
+is genuinely complete, not passing only because packages happened to
+already be installed.
+
+**Twenty-one local regression test files updated a second time**, from
+Basic Auth headers to the real session cookie, since the auth mechanism
+this app accepts changed entirely partway through this project. Full
+regression suite re-run clean across the Data Room, Clinician Dashboard,
+Payer Portal, and Engine dashboard afterward.
+
+**Not addressed here, and worth stating directly**: the Data Room's
+pre-existing client-side password gate is untouched — it now sits on
+top of "any authenticated org member" rather than being the only gate
+at all, but it's still the same client-side-only mechanism disclosed
+when it was originally built. Individual `/api/*` endpoints beyond
+`/api/payer/*` and `/api/data-room/*` are gated by broad surface
+membership (any clinician-role user reaches all of them), not by
+granular per-endpoint permissions — a real next step if finer-grained
+control is ever needed. And nothing here touches session revocation
+before a token's natural 12-hour expiry (e.g. forcibly logging someone
+out immediately) — disabling a user prevents new logins but doesn't
+invalidate a session they already hold until it expires on its own.
+
+## Data Room pulled out of RBAC entirely, given its own real password
+
+Real feedback on the RBAC build: due-diligence investors come from many
+different firms, not one company's organization account system.
+Requiring them to sign up for the company's org and wait for admin
+approval — the exact workflow built for clinicians and payer staff —
+would be actively wrong for how an investor data room is actually used.
+
+**The Data Room is no longer a fourth RBAC-gated surface — it's not
+part of that system at all.** `main.py`'s middleware checks for it as a
+separate code path, before the org-login requirement is even consulted.
+In its place: a real, server-enforced single-shared-password mechanism
+(`DATA_ROOM_PASSWORD`), matching how investor data rooms actually work
+in practice — one code, shared with whoever needs access.
+
+**This closes a real gap the original gate always had, not just a
+relocation.** The Data Room's password prompt was client-side
+JavaScript only from the start, disclosed as such at the time — it
+never protected the actual API underneath it. `/api/data-room/*`
+(the real uploaded due-diligence documents) now requires a genuine
+server-side check; reading the page's source no longer reveals a
+bypass. `/data_room.html` itself still loads for anyone, unchanged —
+it's specifically the endpoints serving real content that are now
+actually gated.
+
+**Verified the two systems are genuinely independent, not just
+nominally separate** — tested directly against the live server: an
+org-RBAC super_admin session does not unlock the Data Room API (still
+401), and a valid Data Room access code does not grant Main Engine
+access (still 401). Each requires its own distinct credential; neither
+can be used in place of the other.
+
+**A real routing bug caught before shipping, not after**: the new
+unlock/lock endpoints were initially registered under `auth/routes.py`'s
+`/auth`-prefixed router, landing at `/api/auth/data-room/unlock` —
+silently different from the `/api/data-room/unlock` path referenced
+everywhere else (the middleware, the frontend, this README). Caught by
+checking the actually-registered path against what was referenced, not
+assumed correct because the code looked right. Moved to `api/routes.py`,
+alongside the existing document endpoints, where the path is correct.
+
+**A real testing-environment gap found and fixed, not glossed over**:
+Node's `fetch` doesn't automatically maintain a cookie jar across
+separate calls the way a real browser does, so a jsdom test's
+`/unlock` call succeeding didn't mean its *subsequent* document-listing
+call would carry the resulting cookie forward — confirmed this was a
+real failure, not a hypothetical, then built an actual minimal cookie
+jar into the affected tests (capturing `Set-Cookie` from each response,
+attaching it to the next request) rather than working around it by
+skipping checks. This only affects the test harness; real browsers
+handle this automatically, which is exactly what full regression
+against the live server (not just the jsdom suite) already confirmed
+independently.
+
+Full regression suite re-run clean afterward, and re-verified end to
+end in a fresh, isolated Python environment.
+
 ## Connecting real hospital systems
 
 - **FHIR R4**: `integrations/fhir.py` builds correct resources today. Wire

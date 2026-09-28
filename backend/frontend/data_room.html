@@ -1079,23 +1079,35 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
 </div>
 
 <script>
-const GATE_PASSWORD = "cardioaipro2026";
-
 document.getElementById("gateSubmitBtn").addEventListener("click", attemptUnlock);
 document.getElementById("gatePassword").addEventListener("keydown", e => { if (e.key === "Enter") attemptUnlock(); });
 
-function attemptUnlock() {
+async function attemptUnlock() {
   const input = document.getElementById("gatePassword").value;
-  if (input === GATE_PASSWORD) {
-    document.getElementById("gateOverlay").style.display = "none";
-    document.getElementById("appShell").style.display = "block";
-    document.getElementById("gateError").textContent = "";
-  } else {
-    document.getElementById("gateError").textContent = "Incorrect access code. Please try again.";
+  const btn = document.getElementById("gateSubmitBtn");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/data-room/unlock", {
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+      body: JSON.stringify({ password: input }),
+    });
+    if (res.ok) {
+      document.getElementById("gateOverlay").style.display = "none";
+      document.getElementById("appShell").style.display = "block";
+      document.getElementById("gateError").textContent = "";
+    } else {
+      const data = await res.json().catch(() => ({}));
+      document.getElementById("gateError").textContent = data.detail || "Incorrect access code. Please try again.";
+    }
+  } catch (e) {
+    document.getElementById("gateError").textContent = "Could not reach the server. Please try again.";
+  } finally {
+    btn.disabled = false;
   }
 }
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  try { await fetch("/api/data-room/lock", { method: "POST", credentials: "same-origin" }); } catch (e) {}
   document.getElementById("appShell").style.display = "none";
   document.getElementById("gateOverlay").style.display = "flex";
   document.getElementById("gatePassword").value = "";

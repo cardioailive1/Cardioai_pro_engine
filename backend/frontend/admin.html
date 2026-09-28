@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CardioAI Pro — Organization Admin</title>
+<style>
+  :root {
+    --navy: #0A2140; --blue: #1C7EC4; --cream: #FBFBF8; --sky: #EAF5FC;
+    --ink: #3A4A5C; --border: #DCE7EE; --gold: #C9820A; --err: #C0392B; --ok: #1E8449;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'IBM Plex Sans', Arial, sans-serif; background: var(--sky); color: var(--navy); }
+  header { background: var(--navy); color: white; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; margin: 0; }
+  header a { color: #B9D3E5; text-decoration: none; font-size: 14px; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px; }
+  .panel { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--border); }
+  .panel h2 { font-size: 16px; margin: 0 0 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 8px 12px; color: var(--ink); font-size: 12px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .role-pill { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 12px; font-weight: 600; background: var(--sky); color: var(--blue); }
+  .status-pill { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 12px; font-weight: 600; }
+  .status-active { background: #E8F6EE; color: var(--ok); }
+  .status-pending { background: #FDF3E3; color: var(--gold); }
+  .status-disabled, .status-rejected { background: #FDEDEA; color: var(--err); }
+  button { border: none; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; margin-right: 6px; }
+  .btn-approve { background: var(--ok); color: white; }
+  .btn-reject { background: var(--err); color: white; }
+  .btn-disable { background: #FDEDEA; color: var(--err); }
+  .empty { color: var(--ink); font-size: 14px; padding: 8px 0; }
+  .denied { max-width: 500px; margin: 80px auto; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+const app = document.getElementById('app');
+
+async function api(path, opts) {
+  const res = await fetch(path, { credentials: 'same-origin', ...opts });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+function roleLabel(role) {
+  return { super_admin: 'Super Admin', admin: 'Admin', clinician: 'Clinician', payer_analyst: 'Payer Analyst' }[role] || role;
+}
+
+async function init() {
+  const me = await api('/api/auth/me');
+  if (!me.ok) { window.location.href = '/login.html'; return; }
+  if (!['super_admin', 'admin'].includes(me.data.role)) {
+    app.innerHTML = `<div class="denied"><h2>Admin access required</h2><p>You're signed in as ${roleLabel(me.data.role)}. This page is for organization admins only.</p><p><a href="/">Back to the app</a></p></div>`;
+    return;
+  }
+  renderShell(me.data);
+  await Promise.all([loadPending(), loadAllUsers()]);
+}
+
+function renderShell(me) {
+  app.innerHTML = `
+    <header>
+      <h1>Organization Admin — signed in as ${me.full_name} (${roleLabel(me.role)})</h1>
+      <a href="/">← Back to the app</a>
+    </header>
+    <main>
+      <div class="panel">
+        <h2>Pending approvals</h2>
+        <table><thead><tr><th>Name</th><th>Email</th><th>Requested role</th><th>Requested</th><th>Action</th></tr></thead>
+        <tbody id="pendingRows"></tbody></table>
+        <div class="empty" id="pendingEmpty" style="display:none;">No pending signups right now.</div>
+      </div>
+      <div class="panel">
+        <h2>All organization members</h2>
+        <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="allRows"></tbody></table>
+      </div>
+    </main>`;
+}
+
+async function loadPending() {
+  const { ok, data } = await api('/api/auth/pending');
+  if (!ok) return;
+  const rows = document.getElementById('pendingRows');
+  const empty = document.getElementById('pendingEmpty');
+  if (data.pending.length === 0) { rows.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  rows.innerHTML = data.pending.map(u => `
+    <tr>
+      <td>${u.full_name}</td>
+      <td>${u.email}</td>
+      <td><span class="role-pill">${roleLabel(u.role)}</span></td>
+      <td>${new Date(u.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn-approve" onclick="approve('${u.id}')">Approve</button>
+        <button class="btn-reject" onclick="reject('${u.id}')">Reject</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function loadAllUsers() {
+  const { ok, data } = await api('/api/auth/org/users');
+  if (!ok) return;
+  document.getElementById('allRows').innerHTML = data.users.map(u => `
+    <tr>
+      <td>${u.full_name}</td>
+      <td>${u.email}</td>
+      <td><span class="role-pill">${roleLabel(u.role)}</span></td>
+      <td><span class="status-pill status-${u.status}">${u.status}</span></td>
+      <td>${u.status === 'active' && u.role !== 'super_admin' ? `<button class="btn-disable" onclick="disableUser('${u.id}')">Disable</button>` : ''}</td>
+    </tr>`).join('');
+}
+
+async function approve(id) {
+  const { ok, data } = await api(`/api/auth/approve/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!ok) { alert(data.detail || 'Approve failed.'); return; }
+  await Promise.all([loadPending(), loadAllUsers()]);
+}
+
+async function reject(id) {
+  if (!confirm('Reject this signup request?')) return;
+  const { ok, data } = await api(`/api/auth/reject/${id}`, { method: 'POST' });
+  if (!ok) { alert(data.detail || 'Reject failed.'); return; }
+  await Promise.all([loadPending(), loadAllUsers()]);
+}
+
+async function disableUser(id) {
+  if (!confirm('Disable this user? They will not be able to log in until re-enabled.')) return;
+  const { ok, data } = await api(`/api/auth/users/${id}/disable`, { method: 'POST' });
+  if (!ok) { alert(data.detail || 'Disable failed.'); return; }
+  await loadAllUsers();
+}
+
+init();
+</script>
+</body>
+</html>

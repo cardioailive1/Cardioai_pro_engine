@@ -1,11 +1,11 @@
 # CardioAI Pro — Render deployment blueprint
 #
-# One service today (backend serves the frontend as static files, so the
-# app is fully connected out of the box). The two commented-out services
-# show how to split into hospital-grade production topology later:
-# a dedicated worker for stream ingestion/inference so a slow model call
-# never blocks the API, and a managed Postgres for the event log / FHIR
-# resource store (currently in-memory).
+# Two services: the web app, and a managed Postgres database backing
+# real user/organization/role data for RBAC — this cannot be in-memory
+# or on local disk the way earlier demo data was; losing every user
+# account on a redeploy would be a far worse failure than losing demo
+# documents. The worker line below is still commented out — stream
+# ingestion doesn't need its own process yet.
 
 services:
   - type: web
@@ -21,6 +21,19 @@ services:
         value: 8000
       - key: PYTHON_VERSION
         value: 3.11.9
+      # Real Postgres connection string, auto-injected by Render from
+      # the `databases:` block below — nothing to configure by hand.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cardioai-pro-db
+          property: connectionString
+      # Signs session tokens (JWTs) for the RBAC login system below.
+      # `generateValue: true` has Render generate and store a real
+      # random secret on first deploy — never committed to the repo,
+      # never typed in by hand. If this ever needs rotating, every
+      # issued session token is invalidated at once (by design).
+      - key: JWT_SECRET_KEY
+        generateValue: true
       # Cloudflare R2 (S3-compatible) — persistent storage for the Data
       # Room's Document Room. Leave unset and the app falls back to
       # ephemeral local disk (works, but does not survive a redeploy or
@@ -43,6 +56,14 @@ services:
         sync: false
       - key: R2_BUCKET_NAME
         sync: false
+      # Data Room access code — a single shared password, deliberately
+      # separate from the RBAC system above. Due-diligence investors
+      # come from many different firms, not this company's own
+      # organization account system, so they share one code the way a
+      # real investor data room typically works, rather than each
+      # needing an account approved by the company's org admin.
+      - key: DATA_ROOM_PASSWORD
+        sync: false
 
   # --- scale-out path (uncomment when moving beyond a single-process demo) ---
   # - type: worker
@@ -52,9 +73,9 @@ services:
   #   dockerContext: ./backend
   #   dockerCommand: python -m ingestion.worker
   #   plan: standard
-  #
-  # databases:
-  #   - name: cardioai-pro-db
-  #     plan: standard
-  #     region: ohio
-  #     postgresMajorVersion: 16
+
+databases:
+  - name: cardioai-pro-db
+    plan: standard
+    region: ohio
+    postgresMajorVersion: 16
