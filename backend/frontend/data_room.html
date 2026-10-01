@@ -316,6 +316,15 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
 
           <h3>Where This Model Is Honest About Its Own Limits</h3>
           <p>The underlying MACE risk-scoring model is a real, tested software pipeline running on a placeholder heuristic — not yet a clinically validated model. The infrastructure around it (ingestion, quality scoring, fusion, longitudinal tracking, billing, audit) is real and tested; the clinical scoring intelligence inside it is the next validation milestone. Clinical validation is now in progress through the <strong>Mayo Clinic Accelerate program</strong> — that work has started, but "in progress" means exactly that: the model is not yet validated, and this page does not claim otherwise until that work concludes.</p>
+
+          <h3>Imaging Model — Data &amp; Compute Access Confirmed <span class="tag">Sep 2026</span></h3>
+          <p>The imaging model architecture was built and structurally verified without trained weights — training requires real DICOM data and GPU compute, neither of which was confirmed available until Mayo Clinic Platform responded directly to both questions:</p>
+          <table style="width:100%; border-collapse:collapse; font-size:14px; margin:12px 0;">
+            <tr><td style="padding:8px 12px; border-bottom:1px solid #DCE7EE; font-weight:bold; width:45%;">Raw DICOM pixel array access</td><td style="padding:8px 12px; border-bottom:1px solid #DCE7EE;">Confirmed — 10,000 studies, de-identified, delivered in .dcm format</td></tr>
+            <tr><td style="padding:8px 12px; border-bottom:1px solid #DCE7EE; font-weight:bold;">GPU-backed compute in the Workspace notebook environment</td><td style="padding:8px 12px; border-bottom:1px solid #DCE7EE;">Confirmed — 11 shared reservations for a2-highgpu-1g (A100) instances; other machine types requestable but not reserved, subject to GCP availability at the time</td></tr>
+          </table>
+          <p style="font-size:13px; color:#6A90AB;"><strong>What this does and doesn't mean:</strong> this confirms the inputs needed to begin training exist and are accessible — it is not itself training progress, and the imaging model still has no trained weights as of this update. The 10,000-study dataset size and the shared (not dedicated) nature of the 11 GPU reservations are both real constraints worth factoring into any training timeline estimate, not just a green light.</p>
+
         </section>
       </section>
 
@@ -919,7 +928,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           </ul>
 
           <h3>Ahead</h3>
-          <p>The clinical risk-scoring model itself is currently a tested software pipeline running on a placeholder heuristic, not yet a clinically validated model. Clinical validation is now in progress through the Mayo Clinic Accelerate program — a real, active initiative, not a completed milestone; the FDA 510(k) path (budgeted in this model) remains the next step after that. Imaging model architectures are built and verified structurally; they do not yet have trained weights.</p>
+          <p>The clinical risk-scoring model itself is currently a tested software pipeline running on a placeholder heuristic, not yet a clinically validated model. Clinical validation is now in progress through the Mayo Clinic Accelerate program — a real, active initiative, not a completed milestone; the FDA 510(k) path (budgeted in this model) remains the next step after that. Imaging model architectures are built and verified structurally; the data (10,000 de-identified DICOM studies) and GPU compute (11 shared A100 reservations) needed to train them are now confirmed available via Mayo Clinic Platform, but training has not yet begun — the model does not yet have trained weights.</p>
         </section>
       </section>
 

@@ -114,6 +114,23 @@ function showMsg(id, text, isError) {
   el.className = 'msg ' + (isError ? 'error' : 'success');
 }
 
+function extractErrorMessage(detail, fallback) {
+  // FastAPI returns `detail` as a plain string for our own raised HTTPExceptions,
+  // but as an ARRAY of Pydantic validation-error objects (each with loc/msg/type)
+  // for automatic 422s — e.g. an invalid email or a too-short password. Rendering
+  // that array directly via textContent stringifies each object as "[object Object]".
+  if (!detail) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(e => {
+      if (typeof e === 'string') return e;
+      const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
+      return field ? `${field}: ${e.msg}` : e.msg;
+    }).join('; ') || fallback;
+  }
+  return fallback;
+}
+
 function redirectForRole(role) {
   if (role === 'payer_analyst') { window.location.href = '/payer_portal.html'; }
   else if (role === 'clinician') { window.location.href = '/clinician_full_dashboard.html'; }
@@ -133,7 +150,7 @@ async function doLogin() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) { showMsg('loginMsg', data.detail || 'Login failed.', true); return; }
+    if (!res.ok) { showMsg('loginMsg', extractErrorMessage(data.detail, 'Login failed.'), true); return; }
     showMsg('loginMsg', 'Logged in — redirecting…', false);
     setTimeout(() => redirectForRole(data.user.role), 600);
   } catch (e) {
@@ -163,7 +180,7 @@ async function doSignup() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) { showMsg('signupMsg', data.detail || 'Sign up failed.', true); return; }
+    if (!res.ok) { showMsg('signupMsg', extractErrorMessage(data.detail, 'Sign up failed.'), true); return; }
     showMsg('signupMsg', data.message, false);
     if (data.status === 'active') {
       setTimeout(() => redirectForRole(data.user.role), 1200);
