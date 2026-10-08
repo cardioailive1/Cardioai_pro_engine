@@ -1315,29 +1315,72 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
 </div>
 
 <script>
-const GATE_PASSWORD = "cardioaipro2026";
+// Real, server-enforced gate: the password check happens in the backend
+// (POST /api/data-room/unlock, compared against the DATA_ROOM_PASSWORD
+// environment variable with secrets.compare_digest, see api/routes.py),
+// which then sets an httpOnly session cookie. This page no longer knows
+// the password at all — reading this script reveals no bypass. If this
+// file is opened directly (file://, or any host without that backend
+// running behind /api), the unlock call will fail and the gate simply
+// won't open, which is correct: there is no server to authenticate against.
+const API = "/api";
 
 document.getElementById("gateSubmitBtn").addEventListener("click", attemptUnlock);
 document.getElementById("gatePassword").addEventListener("keydown", e => { if (e.key === "Enter") attemptUnlock(); });
 
-function attemptUnlock() {
-  const input = document.getElementById("gatePassword").value;
-  if (input === GATE_PASSWORD) {
-    document.getElementById("gateOverlay").style.display = "none";
-    document.getElementById("appShell").style.display = "block";
-    document.getElementById("gateError").textContent = "";
-  } else {
-    document.getElementById("gateError").textContent = "Incorrect access code. Please try again.";
-  }
+function showApp() {
+  document.getElementById("gateOverlay").style.display = "none";
+  document.getElementById("appShell").style.display = "block";
 }
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
+function showGate() {
   document.getElementById("appShell").style.display = "none";
   document.getElementById("gateOverlay").style.display = "flex";
   document.getElementById("gatePassword").value = "";
+}
+
+async function attemptUnlock() {
+  const input = document.getElementById("gatePassword").value;
+  const btn = document.getElementById("gateSubmitBtn");
+  const errEl = document.getElementById("gateError");
+  errEl.textContent = "";
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/data-room/unlock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: input }),
+    });
+    if (res.ok) {
+      showApp();
+    } else {
+      let detail = "Incorrect access code. Please try again.";
+      try { const body = await res.json(); if (body.detail) detail = body.detail; } catch {}
+      errEl.textContent = detail;
+    }
+  } catch (e) {
+    errEl.textContent = "Couldn't reach the server to check the access code. This page needs to be served by the backend (not opened as a local file) for login to work.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  try { await fetch(`${API}/data-room/lock`, { method: "POST" }); } catch {}
+  showGate();
 });
 
-const API = "/api";
+// On load, find out whether this browser already holds a valid data-room
+// session cookie (e.g. a reload, or a second tab) by probing a real,
+// cookie-gated endpoint — the cookie is httpOnly, so JS can't just read it.
+(async function checkExistingSession() {
+  try {
+    const res = await fetch(`${API}/data-room/documents`);
+    if (res.ok) { showApp(); } else { showGate(); }
+  } catch (e) {
+    showGate();
+  }
+})();
 
 function goToPage(pageName) {
   document.querySelectorAll(".nav-item[data-page]").forEach(b => b.classList.remove("active"));
