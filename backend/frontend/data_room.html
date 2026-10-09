@@ -177,7 +177,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="hero-kpi"><div class="val">$265.3M</div><div class="lbl">3-Year Total Revenue</div></div>
             <div class="hero-kpi"><div class="val">$140.1M</div><div class="lbl">3-Year Cumulative EBITDA</div></div>
             <div class="hero-kpi"><div class="val">55.4%</div><div class="lbl">Year 3 EBITDA Margin</div></div>
-            <div class="hero-kpi"><div class="val">$33.75M</div><div class="lbl">Post-Money Valuation — confirmed, see Investment Structure</div></div>
+            <div class="hero-kpi"><div class="val">$33.75M</div><div class="lbl">Post-Money Valuation — as proposed, under renegotiation; see Investment Structure</div></div>
           </div>
         </section>
 
@@ -224,7 +224,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <tr><td>EBITDA Margin %</td><td>49.4%</td><td>47.9%</td><td>55.4%</td><td>—</td></tr>
             </tbody>
           </table></div>
-          <p class="sub" style="margin-top:10px;">Source: attached financial model "CardioAI_RevenueModel_V7A.xlsx", Revenue Model sheet. FY2027 reflects 2 months of trading after the Nov 2027 go-live. Full detail and every underlying assumption on the Financial Model page.</p>
+          <p class="sub" style="margin-top:10px;">Source: attached financial model "CardioAI_RevenueModel_V7_7.xlsx" (figures unchanged from the prior V7A workbook — see the Financial Model page for the small set of narrative notes that did change), Revenue Model sheet. FY2027 reflects 2 months of trading after the Nov 2027 go-live. Full detail and every underlying assumption on the Financial Model page.</p>
         </section>
 
         <section class="panel">
@@ -293,7 +293,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <h3>The Numbers</h3>
           <p>$265.3M in 3-year total revenue, 68.0% blended gross margin, and profitability from Year 1 ($4.3M EBITDA, scaling to $95.1M / 55.4% margin by Year 3) — full detail on the Financial Model page, every figure traceable to the underlying workbook.</p>
           <h3>The Round</h3>
-          <p>$1.0M pre-seed; pre-money valuation of $32,754,892 ($33,754,892 post-money), confirmed by two independent sources — see the Investment Structure page for the full reconciliation. Full use of funds on the Investment Structure page.</p>
+          <p>$1.0M pre-seed; pre-money valuation of $32,754,892 ($33,754,892 post-money) as proposed — internally consistent between the financial model and the cap table, but the round structure itself is now under renegotiation (SIV, see Investment Structure page for the full picture). Full use of funds on the Investment Structure page.</p>
         </section>
       </section>
 
@@ -347,7 +347,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
       <!-- ============ FINANCIAL MODEL ============ -->
       <section class="page" data-page="financial">
         <section class="panel">
-          <h2>Financial Model <span class="tag">source: attached workbook "CardioAI_RevenueModel_V7A.xlsx", all 8 sheets</span></h2>
+          <h2>Financial Model <span class="tag">source: attached workbook "CardioAI_RevenueModel_V7_7.xlsx", all 8 sheets</span></h2>
           <p class="sub">Three-year model, FY2027–FY2029, CardioAI Pro plus its two complementary launch products (MedCRM, IoMT-RPM). Every number below is taken directly from the attached workbook, recalculated clean (zero formula errors across 512 formulas) — nothing here is estimated or rounded beyond standard currency display.</p>
 
           <div class="callout info">
@@ -448,7 +448,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>Assumption</th><th>Value</th><th>Note</th></tr></thead>
             <tbody>
-              <tr><td>Pre-money valuation</td><td><span class="pill complete">$32,754,892</span></td><td>Confirmed against the updated cap table (CAP_TABLE_V6A.xlsx) — see Investment Structure page</td></tr>
+              <tr><td>Pre-money valuation</td><td><span class="pill partial">$32,754,892 (proposed)</span></td><td>Internally consistent with the updated cap table (CAP_TABLE_V6A.xlsx), but the round structure itself is under renegotiation — SIV has indicated it must change. See Investment Structure page</td></tr>
               <tr><td>Pre-seed raise</td><td>$1.0M</td><td></td></tr>
               <tr><td>Enterprise SaaS gross margin</td><td>70%</td><td>Industry standard for health SaaS</td></tr>
               <tr><td>Payer analytics gross margin</td><td>65%</td><td>Analytics-as-a-service layer</td></tr>
@@ -504,6 +504,22 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <div class="callout info">
             <strong>Consumer CAC/LTV is honestly not derivable from the source model as given.</strong> The model's promotional budget line ("ACC/AHA + digital + PR") is blended across segments, not split out as a consumer-specific paid-acquisition cost — so a clean CAC numerator doesn't exist without inventing a split the source data doesn't support. Separately, a multi-year consumer LTV needs a subscriber retention/churn assumption the model doesn't state; assuming one (e.g., "3-year average retention") would be a fabricated input dressed up as a computed metric. What IS real and computable: consumer gross profit per subscriber is $224.91/year ($24.99/mo × 12 × 75% margin) — shown as an annual unit economic, not extrapolated into an LTV that needs an assumption this model doesn't have.
           </div>
+
+          <h3>Monthly Cash Runway <span class="tag">source: attached workbook "CardioAI_SIV_Sheet_V7.xlsx"</span></h3>
+          <p class="sub">A separate 36-month monthly model (Jan 2027–Dec 2029) with a full income statement, balance sheet, and cash flow statement, built to cross-check the annual Revenue Model above — its own check rows confirm the two reconcile to the penny on total revenue and operating expenses. It adds monthly cash-runway detail this data room didn't otherwise show.</p>
+          <div class="callout warn">
+            <strong>Important assumption, not yet a fact:</strong> this cash-runway model's opening cash and every scenario below assume an illustrative $7,000,000 Seed round closing October 2027 — a future, unraised round, separate from and much larger than the $1,000,000 pre-seed round that is the actual subject of this data room. Without that $7M, the runway picture would look materially different. Treat the Seed round as a modeling assumption, not a commitment.
+          </div>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Case</th><th>Minimum cash (36 mo)</th><th>Month of minimum</th><th>First month below zero</th><th>Extra funding needed</th></tr></thead>
+            <tbody>
+              <tr><td>Base</td><td>$1,105,781</td><td>Sep 2027</td><td>None in 36 months</td><td>$0</td></tr>
+              <tr><td>Conservative (1-yr delay, 50% scale)</td><td>$840,000</td><td>Sep 2027</td><td>None in 36 months</td><td>$0</td></tr>
+              <tr><td>Downside (2-yr delay, 30% scale)</td><td>$840,000</td><td>Sep 2027</td><td>None in 36 months</td><td>$0</td></tr>
+              <tr><td>Base, incl. working capital &amp; tax</td><td>$1,067,995</td><td>Sep 2027</td><td>None in 36 months</td><td>$0</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub" style="margin-top:4px;">Opening cash Jan 1, 2027 = $1,560,000 (Mayo SAFE $800K + the $1.0M pre-seed raise − an assumed $240K of Q4 2026 spend) — so this figure already presumes the pre-seed round in this data room has closed. Checked against the underlying monthly cash flow: the minimum-cash month (Sep 2027) falls the month <em>before</em> the illustrative Seed round closes (Oct 2027), so that trough is actually cleared on the Mayo SAFE and pre-seed money alone, without the $7M yet in hand — a more conservative result than the headline "assumes a $7M Seed" framing above might suggest. One simplification to flag: all three cases (including Conservative and Downside, which otherwise model a slower, smaller business) still assume the same $7M Seed closing on the same October 2027 date — a real delay or downside scenario would plausibly delay or shrink that next round too, which this model doesn't test.</p>
         </section>
       </section>
 
@@ -517,7 +533,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <p>CardioAI Pro is a multi-agent clinical AI engine for cardiovascular risk analysis, monetized across four real, distinct customer segments — enterprise health systems, health insurance payers, individual consumers, and a Professional tier for single-site practices — plus two complementary products launching alongside it, MedCRM and IoMT-RPM. The three-year model built around this engine (FY2027–FY2029) projects $265.3M in total revenue, 68.0% blended gross margin, and profitability from Year 1 — full detail on the Financial Model page.</p>
 
           <h3>2. Company Overview</h3>
-          <p>Founder-led, pre-seed stage. Raising $1.0M at a $32,754,892 pre-money valuation ($33,754,892 post-money), confirmed by the financial model and the updated cap table — see the Investment Structure page for the full reconciliation. Corporate formation and governance documents are maintained in the Document Room section of this data room.</p>
+          <p>Founder-led, pre-seed stage. Raising $1.0M at a $32,754,892 pre-money valuation ($33,754,892 post-money) as currently proposed — internally consistent between the financial model and the updated cap table, but the round structure itself is under renegotiation with SIV — see the Investment Structure page for the full picture. Corporate formation and governance documents are maintained in the Document Room section of this data room.</p>
 
           <h3>3. Market Opportunity</h3>
           <p>Cardiovascular disease remains the leading cause of death and a leading driver of healthcare cost in the markets this plan addresses. The three segments below represent three distinct buying motions against that same underlying clinical need — a health system paying for a clinical tool, a payer paying for population risk stratification, and a consumer paying for personal monitoring. A full, sourced market sizing (TAM/SAM/SOM) and competitive landscape now exist on the Market &amp; Competition page — every external figure cited to a named, dated source, not asserted without one.</p>
@@ -695,21 +711,22 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <p class="sub">Full line-item detail, including how FY2027 OpEx reconciles between the run-rate and phased figures, on the Financial Model page.</p>
 
           <h3>10. Funding Request &amp; Use of Funds</h3>
-          <p>Raising $1.0M at a $32,754,892 pre-money valuation, confirmed (see Section 2 and the Investment Structure page). 29% to Product &amp; Technology, 34.5% to Go-to-Market, 34.5% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
+          <p>Raising $1.0M at a $32,754,892 pre-money valuation, as currently proposed — see Section 2 and the Investment Structure page for the open item with SIV on round structure. 29% to Product &amp; Technology, 34.5% to Go-to-Market, 34.5% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
 
           <h3>11. Risk Factors</h3>
           <p>Stated directly, not softened, because a due-diligence reader will find these regardless:</p>
           <ul style="font-size:0.86rem; color:var(--ink); line-height:1.8;">
             <li><strong>Clinical validation is in progress, not complete.</strong> The risk-scoring model behind every segment in this plan is a real, tested software pipeline running on a placeholder heuristic — not yet a clinically validated model. Validation work is now underway through the Mayo Clinic Accelerate program; revenue in this plan assumes the product reaches a clinically credible state, which that program is a real step toward but has not yet delivered.</li>
-            <li><strong>Regulatory clearance is not complete.</strong> FDA 510(k) Pre-Submission (Q-Sub) preparation is budgeted to begin pre-seed, with formal submission targeted Year 2 — this plan's revenue does not depend on clearance being achieved by a specific date, but a material delay would affect the Enterprise and Payer segments' sales cycles.</li>
+            <li><strong>Regulatory clearance is not complete.</strong> FDA 510(k) submissions (echo, ECG, longitudinal prediction) are now targeted for Jan 2027, with clearance of all CardioAI Pro functions targeted May–Jun 2027 — before the Nov 2027 go-live, per the company's current roadmap (see the Roadmap page). This plan's revenue does not depend on clearance being achieved by that specific date, but a material delay would push clearance past go-live and affect the Enterprise and Payer segments' sales cycles. Note: the R&amp;D &amp; Regulatory budget below, from the attached financial model (V7A), was built against an earlier, slower submission timeline and has not yet been reconciled against this accelerated roadmap — the dollar figures are real workbook figures, but their phasing may not match the dates above.</li>
             <li><strong>Sales execution risk.</strong> The Enterprise segment's revenue trajectory depends on 4 reps — paid temporarily below market rate — closing 15 contracts in Year 1 at an $800K average value; the realistic case is 8 contracts (3 signed LOIs + 5 named prospects), not a guarantee. The Scenarios sheet models Conservative (50% scale, 1-year delay) and Downside (30% scale, 2-year delay) cases.</li>
-            <li><strong>Option pool increase pending approval.</strong> The confirmed $32,754,892 pre-money valuation assumes a $2.0M option pool increase that is not yet approved by the Board and stockholders — see the Investment Structure page. Disclosed, not hidden; the headline figures reconcile either way, but this specific line item is pending.</li>
+            <li><strong>Round structure under renegotiation.</strong> The $32,754,892 pre-money / $2.00-per-share structure above is internally consistent (the financial model and the cap table agree with each other), but SIV's own diligence has indicated the round structure must change — the company and SIV have not yet landed on final terms. See the Investment Structure page.</li>
+            <li><strong>Option pool increase pending approval.</strong> The proposed $32,754,892 pre-money valuation assumes a $2.0M option pool increase that is not yet approved by the Board and stockholders — see the Investment Structure page. Disclosed, not hidden; the headline figures reconcile either way, but this specific line item is pending.</li>
             <li><strong>Temporarily suppressed compensation.</strong> Founder/executive salaries and sales rep pay are held below market rate through FY2028, subject to Board review — a real cost-structure choice that makes near-term unit economics (CAC, EBITDA margin) look stronger than a fully-loaded, sustainable structure would; see Unit Economics on the Financial Model page.</li>
             <li><strong>Early-stage company risk</strong> applies in the ordinary sense — a pre-seed company with a $1.0M raise, dependent on executing a detailed plan against a competitive, regulated market.</li>
           </ul>
 
           <h3>12. Regulatory Strategy</h3>
-          <p>FDA 510(k) Pre-Submission (Q-Sub) preparation begins pre-seed; formal submission targeted Year 2; post-market activity Year 3. Budgeted at $0.8M (Y1) declining to $0.2M (Y3) as the submission moves from preparation to maintenance.</p>
+          <p>Q-Sub submitted Nov 2026 (predicates, validation design, Study Risk Determination); feedback ~Jan 2027 (~70-day FDA turnaround). 510(k) submissions for echo, ECG, and longitudinal prediction follow in Jan 2027, using known predicates (echo: Ultromics EchoGo Core, K191171). FDA clearance of all CardioAI Pro functions is targeted May–Jun 2027 — before the Nov 2027 go-live, not after it. Echo wall motion and the women-specific (WCVD) functions are not in this timeline; they follow later as De Novo requests and are not in the attached financial model. Budgeted at $0.8M (Y1) declining to $0.2M (Y3) in the attached financial model, built against the prior, slower submission timeline — see the Risk Factors note above on this not yet being reconciled to the dates here.</p>
 
           <h3>13. Social Impact</h3>
           <p>The Heart Health Equity Program provides free platform licenses to Federally Qualified Health Centers — 5 pilot sites in the pre-seed stage, scaling to 25 sites at the Seed round. Structured as a stated B Corp obligation (2% of the pre-seed raise), not an afterthought line item.</p>
@@ -761,13 +778,13 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <li><strong>Mayo Clinic Platform SAFE:</strong> $800K, signed, effective Oct 5, 2026 — Investment Structure page.</li>
             <li><strong>65 customer discovery interviews:</strong> 16 enterprise health systems, 22 custom deployments, 27 payers.</li>
             <li><strong>3 signed nonbinding LOIs:</strong> TMC Health (Tucson, AZ), Erlanger Health System (Chattanooga, TN), AtlantiCare Health System (Atlantic City, NJ).</li>
-            <li><strong>Named Year 1 pipeline:</strong> 10 additional proposal-stage health systems behind the 3 signed LOIs.</li>
+            <li><strong>Named Year 1 pipeline:</strong> 10 additional proposal-stage health systems behind the 3 signed LOIs — plus 57 more named organizations tracked into FY2028–FY2029 as a cross-check, not a forecast driver; see Extended Pipeline below.</li>
             <li><strong>Professional tier priced at $85K/year</strong> — Business Plan, Section 5.</li>
             <li><strong>Data room assembled;</strong> diligence cleanup under way (cap table, legal documents, financial model).</li>
             <li><strong>BAA, Privacy Statement and Terms of Use</strong> drafted; counsel review pending.</li>
           </ul>
           <div class="callout info">
-            <strong>Resolved:</strong> the "Revenue Model V7" referenced in the source roadmap materials ($149.8M) has now been superseded by the actual attached workbook, <span class="mono">CardioAI_RevenueModel_V7A.xlsx</span>, which totals <strong>$265.3M</strong> over the same three years — higher than either the $149.8M the roadmap cited or the $184.1M model it replaced, reflecting corrections made between V7 and V7A (recurring revenue from existing contracts, mid-year convention for new customers, a corrected NRR input, and a phased rather than flat Year 1 OpEx) in addition to adding MedCRM and IoMT-RPM. This is now the data room's financial record of truth — see the Financial Model page for full detail. The pre-money valuation V7A assumes ($32,754,892) is now also confirmed against the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) — see the Investment Structure page.
+            <strong>Resolved:</strong> the "Revenue Model V7" referenced in the source roadmap materials ($149.8M) has now been superseded by the actual attached workbook, <span class="mono">CardioAI_RevenueModel_V7_7.xlsx</span>, which totals <strong>$265.3M</strong> over the same three years — higher than either the $149.8M the roadmap cited or the $184.1M model it replaced, reflecting corrections made between V7 and V7A (recurring revenue from existing contracts, mid-year convention for new customers, a corrected NRR input, and a phased rather than flat Year 1 OpEx) in addition to adding MedCRM and IoMT-RPM. This is now the data room's financial record of truth — see the Financial Model page for full detail. The pre-money valuation this workbook assumes ($32,754,892) is internally confirmed against the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) — but the round structure itself is now under renegotiation (SIV) — see the Investment Structure page.
           </div>
         </section>
 
@@ -778,19 +795,20 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <tbody>
               <tr><td>Mayo Clinic Platform SAFE effective ($800K)</td><td>Oct 5, 2026</td><td>—</td></tr>
               <tr><td>Pre-seed round ($1.0M)</td><td>Q4 2026 (under negotiation)</td><td>Funds lean operations for ~12 months, until the seed round</td></tr>
+              <tr><td>Q-Sub submitted (predicates, validation design, Study Risk Determination)</td><td>Nov 2026</td><td>—</td></tr>
               <tr><td>Mayo Clinic Accelerator validation complete</td><td>Dec 5, 2026</td><td>—</td></tr>
-              <tr><td>Study Risk Determination (Q-Sub) result</td><td>~Mar 2027</td><td>Submitted immediately after Mayo validation; 60–90 day FDA turnaround</td></tr>
-              <tr><td>Retrospective validation complete</td><td>~Mar 2027</td><td>Runs in parallel with the Q-Sub, on existing Mayo platform data</td></tr>
-              <tr><td>Client pilot studies begin</td><td>Apr 2027</td><td>After the Study Risk Determination result, not before</td></tr>
+              <tr><td>Q-Sub feedback and Study Risk Determination result</td><td>~Jan 2027</td><td>~70-day FDA turnaround</td></tr>
+              <tr><td>Retrospective validation complete (incl. subgroup analysis)</td><td>Jan 2027</td><td>Mayo platform data; evidence for the 510(k)s</td></tr>
+              <tr><td>510(k) submissions: echo, ECG, longitudinal prediction</td><td>Jan 2027</td><td>Known predicates (echo: Ultromics EchoGo Core, K191171)</td></tr>
+              <tr><td>Client pilot studies begin</td><td>Apr 2027</td><td>After the Study Risk Determination result; investigational use until clearance</td></tr>
+              <tr><td>FDA clearance target: all CardioAI Pro functions</td><td>May–Jun 2027</td><td>~4–5 month review with known predicates; before revenue starts</td></tr>
               <tr><td>Target definitive agreements</td><td>Sep 2027</td><td>Pilot completion (4 months)</td></tr>
               <tr><td>Seed round target close</td><td>Oct 2027</td><td>Pilot results; funds the scale-up</td></tr>
-              <tr><td>Target go-live: CardioAI Pro + IoMT-RPM + MedCRM</td><td>Nov 2027</td><td>Definitive agreements; functions limited to those not requiring FDA clearance until cleared</td></tr>
+              <tr><td>Target go-live: CardioAI Pro + IoMT-RPM + MedCRM</td><td>Nov 2027</td><td>Definitive agreements; FDA clearance of CardioAI Pro functions (May–Jun 2027)</td></tr>
               <tr><td>Year 1 result: 8 enterprise contracts, $6.4M ARR</td><td>Dec 2027</td><td>3 LOIs + 5 named prospects; realistic range $6.2M–$8.4M; sales target 15</td></tr>
-              <tr><td>Formal 510(k) submission</td><td>Jan 2028</td><td>Year 2, per the OpEx model's sequencing</td></tr>
-              <tr><td>FDA clearance target</td><td>Jun 2028</td><td>~5–6 month review with a known predicate (echo LVEF: Ultromics EchoGo Core, K191171); diagnostic claims only after clearance. ECG and longitudinal-alert 510(k)s follow in 2028</td></tr>
             </tbody>
           </table></div>
-          <p class="sub" style="margin-top:10px;">CardioAI Pro goes live in November 2027, before the June 2028 clearance target. Until clearance, it is used only for functions and claims that do not require FDA clearance; regulatory counsel to confirm which features qualify.</p>
+          <p class="sub" style="margin-top:10px;">FDA clearance of all CardioAI Pro functions is targeted for May–June 2027, before revenue starts with the November 2027 go-live. Pilots before clearance run under investigational protocols. Echo wall motion and the women-specific functions follow as De Novo requests and are not in this data room's financial model.</p>
         </section>
 
         <section class="panel">
@@ -810,11 +828,35 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
         </section>
 
         <section class="panel">
+          <h3 style="margin-top:0;">Extended pipeline, Years 2–3 <span class="tag">cross-check only — source: CardioAI_SIV_Sheet_V7.xlsx</span></h3>
+          <p class="sub">A separate, more detailed workbook ("the SIV model") rebuilds Revenue Model V7 on a 36-month monthly basis and includes a named-organization pipeline tracker extending through FY2029 — not just the 10 Year 1 candidates above. Its own header states this explicitly: <em>"Cross-check only; Financials use the Assumptions forecast."</em> It does not drive this data room's revenue numbers, which remain the Revenue Model's top-down segment assumptions — it is a bottom-up sanity check layered on top, and the two are shown separately rather than blended into one claim.</p>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>Segment</th><th>LOI</th><th>Proposal</th><th>Demo</th><th>Discovery</th><th>Total named orgs</th></tr></thead>
+            <tbody>
+              <tr><td>Enterprise</td><td>3</td><td>10</td><td>18</td><td>7</td><td>38</td></tr>
+              <tr><td>Payer</td><td>—</td><td>5</td><td>10</td><td>14</td><td>29</td></tr>
+              <tr class="total-row"><td>Total</td><td>3</td><td>15</td><td>28</td><td>21</td><td>67</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub" style="margin-top:4px;">The 3 LOI and 10 Enterprise Proposal-stage names match the Year 1 pipeline above exactly — the other 54 (18 Enterprise Demo/Discovery, 29 Payer) are additional named organizations tracked for FY2028–FY2029, not yet reflected anywhere else in this data room. Full organization-by-organization detail (close probability, expected MRR, target close date) is in the attached workbook, not reproduced here.</p>
+          <div class="table-wrap" style="margin-top:14px;"><table class="dt">
+            <thead><tr><th>Year</th><th>Probability-weighted pipeline revenue</th><th>Forecast revenue (Revenue Model)</th><th>Pipeline coverage</th></tr></thead>
+            <tbody>
+              <tr><td>FY2027</td><td>$0.2M</td><td>$8.7M</td><td>2.3%</td></tr>
+              <tr><td>FY2028</td><td>$12.9M</td><td>$85.0M</td><td>15.2%</td></tr>
+              <tr><td>FY2029</td><td>$15.7M</td><td>$171.6M</td><td>9.1%</td></tr>
+              <tr class="total-row"><td>3-Yr Total</td><td>$28.8M</td><td>$265.3M</td><td>10.8%</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sub" style="margin-top:4px;">Low coverage is expected, not a red flag understated here: this pipeline only covers the Enterprise and Payer segments (Consumer, Professional, MedCRM, and IoMT-RPM have no named-account pipeline of this kind), most of the 67 organizations are early-stage (Demo or Discovery, not yet Proposal or LOI), and the probability weights (5%–50% by stage) already discount for that. It corroborates the near-term numbers it can reach — not the full three-year forecast.</p>
+        </section>
+
+        <section class="panel">
           <h3 style="margin-top:0;">Product detail, Wave 1–3</h3>
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>Wave</th><th>Product</th><th>Status today</th><th>Gate before launch</th><th>Launch target</th><th>In financial forecast?</th></tr></thead>
             <tbody>
-              <tr><td><span class="tag">1</span></td><td>CardioAI Pro Engine</td><td>Built and tested end to end; risk model not yet clinically validated</td><td>Mayo validation (Dec 2026), Q-Sub result (~Mar 2027), client pilots (Apr–Aug 2027); diagnostic claims only after 510(k) clearance (target Jun 2028)</td><td>Nov 2027</td><td>Yes — this data room's financial model</td></tr>
+              <tr><td><span class="tag">1</span></td><td>CardioAI Pro Engine</td><td>Built and tested end to end; risk model not yet clinically validated</td><td>Mayo validation (Dec 2026), Q-Sub result (~Jan 2027), 510(k) submissions (echo, ECG, longitudinal prediction — Jan 2027), client pilots under investigational use (Apr–Aug 2027); FDA clearance of all functions targeted May–Jun 2027, before go-live</td><td>Nov 2027</td><td>Yes — this data room's financial model</td></tr>
               <tr><td><span class="tag">1</span></td><td>IoMT-RPM</td><td>Deployed (cardioailiverpm.com)</td><td>Device integrations for pilot sites; device data display is likely not a device; predictive alerts need a 510(k) (21 CFR 870.2210, predicate eCART K233253)</td><td>Nov 2027</td><td>Not yet — see note above</td></tr>
               <tr><td><span class="tag">1</span></td><td>MedCRM</td><td>Deployed (cardioaimed.com)</td><td>HIPAA controls and BAA in place for pilot sites</td><td>Nov 2027</td><td>Not yet — see note above</td></tr>
               <tr><td><span class="tag">2</span></td><td>CardioAI Main Engine (multi-agent)</td><td>Working system; engine behind CardioAI Pro</td><td>Validation of agent outputs at scale; regulatory assessment of standalone claims</td><td>Q4 2028</td><td>No — upside, not modeled</td></tr>
@@ -823,6 +865,9 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             </tbody>
           </table></div>
           <p class="sub" style="margin-top:10px;">Not shown: the CardioAI mobile app (iOS and Android, in beta) and internal applications (Operations Command, Sales Engine, CardioAI Pro CRM). Wave 2–3 launch dates are proposed and depend on validation results, regulatory pathway, and funding after the seed round.</p>
+          <div class="callout info" style="margin-top:14px;">
+            <strong>Note on this table's source:</strong> the CardioAI Pro Engine row above now reflects the company's most recent regulatory roadmap (full FDA clearance targeted May–Jun 2027, before the Nov 2027 go-live). An earlier version of the source technology roadmap still circulating separately shows a slower Wave 1 path (submission Jan 2028, clearance Jun 2028, partial-feature launch) — that version is superseded by the dates in this table and the Key Milestones above. Wave 2–3 rows (Main Engine, CVD Risk Calculators, WCVD) are unaffected and unchanged.
+          </div>
         </section>
       </section>
 
@@ -906,7 +951,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <p><b>Traction:</b> 65 customer discovery interviews, 3 signed nonbinding LOIs ($6.4M Y1 ARR potential at 8 contracts), validated PMPM pricing range of $60–$110.</p>
               <p><b>Financials:</b> $265.3M 3-year revenue, 68.0% blended gross margin, profitable from Year 1.</p>
               <p><b>Clinical path:</b> Validation in progress at the Mayo Clinic Accelerate program; FDA 510(k) preparation budgeted.</p>
-              <p><b>The ask:</b> $1.0M pre-seed at a $32,754,892 pre-money valuation, confirmed across the financial model and the cap table; see Investment Structure page.</p>
+              <p><b>The ask:</b> $1.0M pre-seed at a $32,754,892 pre-money valuation, as currently proposed; round structure under renegotiation with SIV — see Investment Structure page.</p>
             </div>
           </div>
         </section>
@@ -940,15 +985,18 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <div class="callout info">
             <strong>Resolved:</strong> the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) now matches V7A's financial model exactly — pre-money, option pool, and SAFE terms all reconcile to the same figures. The earlier three-way conflict ($50.0M / $28.7M / $32.75M) is resolved in favor of <strong>$32,754,892</strong>, the figure both the financial model and this updated cap table independently land on. One open item remains: $2.0M of the option pool this valuation assumes is a pending increase awaiting Board and stockholder approval — see the Cap Table section below.
           </div>
+          <div class="callout warn">
+            <strong>New, separate open item:</strong> the attached financial model's Assumptions sheet now notes, against the $2.00 proposed price per share, that <strong>"SIV has indicated the round structure must change"</strong> — SIV's own diligence is pushing back on the proposed pricing/structure itself, independent of the internal-consistency reconciliation above. The figures in the table below are the structure as currently modeled and as the cap table reflects — not yet what SIV and the company land on. This data room will be updated once that negotiation resolves; until then, treat the terms below as the company's proposal, not an agreed price.
+          </div>
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>Term</th><th>Value</th></tr></thead>
             <tbody>
               <tr><td>Round</td><td>Pre-Seed</td></tr>
-              <tr><td>Status</td><td>Under due diligence &amp; negotiation</td></tr>
-              <tr><td>Pre-money valuation</td><td>$32,754,892</td></tr>
+              <tr><td>Status</td><td>Under due diligence &amp; negotiation — round structure itself under discussion with SIV</td></tr>
+              <tr><td>Pre-money valuation</td><td>$32,754,892 <span class="tag">as proposed — see note above</span></td></tr>
               <tr><td>Raise amount</td><td>$1,000,000</td></tr>
-              <tr><td>Post-money valuation</td><td>$33,754,892</td></tr>
-              <tr><td>Price per share</td><td>$2.00 <span class="tag">confirmed — V7A and the cap table agree</span></td></tr>
+              <tr><td>Post-money valuation</td><td>$33,754,892 <span class="tag">as proposed — see note above</span></td></tr>
+              <tr><td>Price per share</td><td>$2.00 <span class="tag gold">proposed — SIV has indicated this must change</span></td></tr>
               <tr><td>Implied dilution (this raise)</td><td>2.96%</td></tr>
             </tbody>
           </table></div>
@@ -1058,7 +1106,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <div style="display:flex; flex-direction:column; gap:20px;">
             <div>
               <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">Is the clinical model FDA-cleared or validated today?</h4>
-              <p style="font-size:15px; color:#3A4A5C; margin:0;">No. It's a real, tested software pipeline running on a placeholder heuristic. Clinical validation is in progress at the Mayo Clinic Accelerate program; FDA 510(k) Q-Sub preparation is budgeted but not yet begun in earnest. See Risk Factors and the Product &amp; Technology page.</p>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">No. It's a real, tested software pipeline running on a placeholder heuristic. Clinical validation is in progress at the Mayo Clinic Accelerate program; the FDA Q-Sub is targeted for Nov 2026, with clearance of all CardioAI Pro functions targeted May–Jun 2027 — before the Nov 2027 go-live. See Risk Factors and the Roadmap page.</p>
             </div>
             <div>
               <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">How does the Mayo Clinic Platform SAFE relate to this $1.0M raise?</h4>
@@ -1074,7 +1122,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             </div>
             <div>
               <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">What is the actual pre-money valuation?</h4>
-              <p style="font-size:15px; color:#3A4A5C; margin:0;">$32,754,892 pre-money / $33,754,892 post-money — confirmed by two independent sources (the financial model's Assumptions sheet and the updated cap table), with matching dollar math and matching share math. See the Cap Table section above for the full reconciliation. One open item: $2.0M of the assumed option pool is a pending increase awaiting Board and stockholder approval.</p>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">$32,754,892 pre-money / $33,754,892 post-money, as currently proposed — the financial model's Assumptions sheet and the updated cap table independently agree with each other on this figure (matching dollar math and matching share math; see the Cap Table section above). That internal agreement is not the same as investor sign-off: the financial model's own notes now say SIV has indicated the round structure must change, so this proposed structure is itself under renegotiation. A $2.0M option pool increase it assumes is also still pending Board and stockholder approval.</p>
             </div>
             <div>
               <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">Who is on the advisory board?</h4>
@@ -1124,7 +1172,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <p class="sub">First-party claims about customer development activity — presented as given, not independently verifiable by this data room, but consistent with (not contradicted by) everything else documented here. Full milestone-by-milestone detail and the Year 1 pipeline sit on the Roadmap page; the two items below are restated here in short form.</p>
           <ul style="font-size:0.86rem; color:var(--ink); line-height:1.85;">
             <li><strong>65 customer discovery interviews</strong> — 16 enterprise health systems, 22 custom deployments, 27 payers. See the Roadmap page for the full breakdown.</li>
-            <li><strong>3 signed nonbinding Letters of Intent</strong> — TMC Health (Tucson, AZ), Erlanger Health System (Chattanooga, TN), and AtlantiCare Health System (Atlantic City, NJ) — plus 10 additional Year 1 proposal-stage health systems behind them. At the Enterprise tier's $800K average contract value, the 3 LOIs plus the 5 nearest-stage named prospects (8 contracts) project to $6.4M Year 1 ARR, within a realistic $6.2M–$8.4M range, against this plan's 15-contract Year 1 sales target. Full pipeline and dates on the Roadmap page.</li>
+            <li><strong>3 signed nonbinding Letters of Intent</strong> — TMC Health (Tucson, AZ), Erlanger Health System (Chattanooga, TN), and AtlantiCare Health System (Atlantic City, NJ) — plus 10 additional Year 1 proposal-stage health systems behind them, and 57 further named organizations (Enterprise and Payer) tracked as an FY2028–FY2029 cross-check in a separate monthly model. At the Enterprise tier's $800K average contract value, the 3 LOIs plus the 5 nearest-stage named prospects (8 contracts) project to $6.4M Year 1 ARR, within a realistic $6.2M–$8.4M range, against this plan's 15-contract Year 1 sales target. Full pipeline and dates on the Roadmap page.</li>
             <li><strong>Van Westendorp price sensitivity analysis</strong> with 32 cardiologists: acceptable PMPM range $60–$110 for the enterprise platform; 78% would displace a current point solution; CFOs validated ROI breakeven at 3–4% readmission reduction.</li>
             <li><strong>Comparable market transactions</strong> — Octagos Health's $43M Series B (Morgan Stanley Expansion Capital, July 2024) is a verified real figure. Viz.ai's enterprise health-system contracts are real and well documented in the market. The specific inference that these support an "$80 PMPM enterprise willingness benchmark" for this company is an argument by analogy, not a validated conclusion — presented as reasoning, not as an independently confirmed fact.</li>
             <li><strong>Payer PMPM pricing ($10–12) vs. Medicare Advantage actuarial modeling</strong>: claimed medical cost avoidance of $35,000–$75,000 per prevented cardiac event, implying 8–15× ROI on the PMPM cost. No citable actuarial source is attached to this figure yet — needed before this specific number goes in front of a payer or investor who will ask where it comes from.</li>
@@ -1132,7 +1180,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           </ul>
 
           <h3>Ahead</h3>
-          <p>The clinical risk-scoring model itself is currently a tested software pipeline running on a placeholder heuristic, not yet a clinically validated model. Clinical validation is now in progress through the Mayo Clinic Accelerate program — a real, active initiative, not a completed milestone; the FDA 510(k) path (budgeted in this model) remains the next step after that. Imaging model architectures are built and verified structurally; they do not yet have trained weights.</p>
+          <p>The clinical risk-scoring model itself is currently a tested software pipeline running on a placeholder heuristic, not yet a clinically validated model. Clinical validation is now in progress through the Mayo Clinic Accelerate program — a real, active initiative, not a completed milestone; the FDA 510(k) path (budgeted in this model) is the next step after that, now targeted to clear all CardioAI Pro functions by May–Jun 2027, before the Nov 2027 go-live — see the Roadmap page. Imaging model architectures are built and verified structurally; they do not yet have trained weights.</p>
         </section>
       </section>
 
