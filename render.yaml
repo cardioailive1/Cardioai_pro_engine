@@ -34,6 +34,18 @@ services:
       # issued session token is invalidated at once (by design).
       - key: JWT_SECRET_KEY
         generateValue: true
+      # Application-level encryption at rest (encryption.py) for Data Room
+      # documents — independent of whatever the storage backend (local
+      # disk, Cloudflare R2) does on its own. Same pattern as
+      # JWT_SECRET_KEY: Render generates and stores a real random key on
+      # first deploy, never committed to the repo. Rotate by setting a new
+      # value AND moving the old one into APP_ENCRYPTION_KEY_PREVIOUS
+      # (comma-separated if rotating more than once) so previously
+      # encrypted documents stay readable — see encryption.py.
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY_PREVIOUS
+        sync: false
       # Cloudflare R2 (S3-compatible) — persistent storage for the Data
       # Room's Document Room. Leave unset and the app falls back to
       # ephemeral local disk (works, but does not survive a redeploy or
@@ -64,6 +76,21 @@ services:
       # needing an account approved by the company's org admin.
       - key: DATA_ROOM_PASSWORD
         sync: false
+      # PACS query/retrieve (integrations/dicom.py's pacs_find()/pacs_move(),
+      # real DICOM C-FIND/C-MOVE via pynetdicom — see
+      # integrations/pacs_local_test.py for how it's tested without a real
+      # PACS). Left unset by default: /api/dicom/pacs/find and
+      # /api/dicom/pacs/move return 503 until a hospital's actual PACS
+      # connection details are entered here — this project has no PACS to
+      # point at yet, so there is nothing real to default these to.
+      - key: PACS_HOST
+        sync: false
+      - key: PACS_PORT
+        value: "104"
+      - key: PACS_AE_TITLE
+        sync: false
+      - key: PACS_CALLING_AE_TITLE
+        value: CARDIOAI_PRO
 
   # --- scale-out path (uncomment when moving beyond a single-process demo) ---
   # - type: worker
@@ -73,6 +100,24 @@ services:
   #   dockerContext: ./backend
   #   dockerCommand: python -m ingestion.worker
   #   plan: standard
+
+  # Audit log retention (auth/audit.py, scripts/purge_audit_log.py): deletes
+  # audit_log rows older than AUDIT_LOG_RETENTION_DAYS (default 400). Runs
+  # daily at 03:00 UTC, off-peak. Shares DATABASE_URL with the web service
+  # below (same `fromDatabase` wiring) — no separate credentials to manage.
+  - type: cron
+    name: cardioai-pro-audit-purge
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: python -m scripts.purge_audit_log
+    schedule: "0 3 * * *"
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cardioai-pro-db
+          property: connectionString
 
 databases:
   - name: cardioai-pro-db

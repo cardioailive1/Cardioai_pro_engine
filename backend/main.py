@@ -222,6 +222,38 @@ class RBACSessionMiddleware:
         await self.app(scope, receive, send)
 
 
+class SecurityHeadersMiddleware:
+    """
+    Raw ASGI middleware (same reasoning as RBACSessionMiddleware above —
+    BaseHTTPMiddleware silently lets WebSocket scopes through
+    unmodified, which is fine for header injection specifically, but
+    kept consistent with the rest of this file rather than mixing
+    middleware styles). Adds HSTS so a browser that has ever loaded this
+    app over HTTPS refuses to downgrade to plain HTTP for the pinned
+    duration, even if something upstream (a misconfigured proxy, a
+    stale link) ever serves it over HTTP — defense in depth on top of,
+    not a replacement for, Render terminating TLS at its edge.
+    """
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append((b"strict-transport-security", b"max-age=63072000; includeSubDomains"))
+                headers.append((b"x-content-type-options", b"nosniff"))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # tighten to your hospital/payer domains in production
@@ -246,4 +278,7 @@ app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="fronte
 
 # Wraps the whole ASGI app, including the static mount and the WebSocket
 # router — added last (outermost) so nothing added above it can bypass it.
+# SecurityHeadersMiddleware is outermost of all: it must see every
+# response, including the 401s RBACSessionMiddleware itself generates.
 app = RBACSessionMiddleware(app)
+app = SecurityHeadersMiddleware(app)

@@ -28,6 +28,7 @@ WHAT'S REAL HERE AND WHAT ISN'T:
 from __future__ import annotations
 
 import os
+import ssl
 from typing import Any, Optional
 
 import httpx
@@ -36,11 +37,29 @@ IOMT_BACKEND_URL = os.environ.get("IOMT_BACKEND_URL", "https://cardioailiverpm.c
 IOMT_BACKEND_API_KEY = os.environ.get("IOMT_BACKEND_API_KEY", "")
 
 
+def _min_tls_context() -> ssl.SSLContext:
+    """
+    Explicit, app-level TLS floor for this app's own outbound calls —
+    independent of whatever Render's edge does for INBOUND traffic to
+    this service. httpx's default context already disables SSLv2/v3 and
+    TLS 1.0/1.1 on modern OpenSSL, but that default is implicit and
+    could silently change with an OpenSSL/Python upgrade; pinning it
+    here makes "TLS 1.2 minimum" a property of this codebase, not an
+    assumption about whatever happens to ship with the base image.
+    Verification (certificate validation) stays on — this only raises
+    the version floor, it never weakens anything.
+    """
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
 class IoMTBackendClient:
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None, timeout: float = 10.0):
         self.base_url = (base_url or IOMT_BACKEND_URL).rstrip("/")
         self.api_key = api_key if api_key is not None else IOMT_BACKEND_API_KEY
         self.timeout = timeout
+        self._ssl_context = _min_tls_context()
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -50,7 +69,7 @@ class IoMTBackendClient:
 
     async def get_devices(self, patient_id: Optional[str] = None) -> dict[str, Any]:
         """Pulls the registered device list — GET /devices, auth required."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, verify=self._ssl_context) as client:
             params = {"patient_id": patient_id} if patient_id else None
             resp = await client.get(f"{self.base_url}/devices", headers=self._headers(), params=params)
             resp.raise_for_status()
@@ -58,14 +77,14 @@ class IoMTBackendClient:
 
     async def get_alerts(self) -> dict[str, Any]:
         """Pulls active alerts — GET /alerts, auth required."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, verify=self._ssl_context) as client:
             resp = await client.get(f"{self.base_url}/alerts", headers=self._headers())
             resp.raise_for_status()
             return resp.json()
 
     async def get_reports(self) -> dict[str, Any]:
         """Pulls clinical reports — GET /reports, auth required."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, verify=self._ssl_context) as client:
             resp = await client.get(f"{self.base_url}/reports", headers=self._headers())
             resp.raise_for_status()
             return resp.json()
@@ -90,7 +109,7 @@ class IoMTBackendClient:
             "automation_tier": automation.get("tier") if automation else None,
             "requires_signoff": automation.get("requires_human_signoff") if automation else None,
         }
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, verify=self._ssl_context) as client:
             resp = await client.post(
                 f"{self.base_url}/clinical/cardioai-pro/results", headers=self._headers(), json=payload,
             )

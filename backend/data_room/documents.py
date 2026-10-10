@@ -43,6 +43,8 @@ from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.parse import quote, unquote
 
+from encryption import encrypt_bytes, decrypt_bytes, is_configured as _encryption_configured
+
 DOCUMENT_CATEGORIES = {
     "corporate_legal": "Corporate & Legal",       # Articles of Incorporation, Bylaws, Cap Table, Board Resolutions
     "hr_employment": "HR & Employment",             # Employee Contracts, Offer Letters, Equity Grants
@@ -213,19 +215,29 @@ class _R2Backend:
 
 class DocumentRegistry:
     def __init__(self):
+        if not _encryption_configured():
+            # Fail closed, same posture as auth/security.py's JWT_SECRET_KEY:
+            # due-diligence documents are sensitive enough that "silently
+            # store it unencrypted" is the wrong default behavior.
+            raise RuntimeError(
+                "APP_ENCRYPTION_KEY is not set — Data Room documents are encrypted at the application "
+                "layer before they reach storage (see encryption.py) and refuse to initialize without "
+                "it. render.yaml generates this automatically on deploy (generateValue: true)."
+            )
+        encryption_note = "Content is encrypted at the application layer (AES via Fernet) before it reaches storage, independent of the backend below."
         if _r2_env_configured():
             self.backend = _R2Backend()
             self.storage_warning = (
                 "Files stored here persist in Cloudflare R2 — they survive redeploys and spin-downs. "
-                "This does not replace normal backups or access controls on the bucket itself."
+                f"{encryption_note} This does not replace normal backups or access controls on the bucket itself."
             )
         else:
             self.backend = _LocalDiskBackend()
             self.storage_warning = (
                 "Files stored here do NOT survive a redeploy or a free-tier spin-down "
                 "— (R2_ACCOUNT_ID or R2_ENDPOINT_URL), R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
-                "and R2_BUCKET_NAME are not all set, so this process has no persistent storage "
-                "behind it. Keep your own copy of anything uploaded here until those are configured."
+                f"and R2_BUCKET_NAME are not all set, so this process has no persistent storage behind it. {encryption_note} "
+                "Keep your own copy of anything uploaded here until those are configured."
             )
 
     def save(self, filename: str, category: str, description: str, content: bytes) -> tuple[Optional[DataRoomDocument], Optional[str]]:
@@ -235,13 +247,27 @@ class DocumentRegistry:
             return None, f"File is {len(content)/1_000_000:.1f}MB — the {MAX_FILE_SIZE_BYTES//1_000_000}MB limit guards against something oversized landing in storage, not a real capacity figure."
         if not filename:
             return None, "filename is required"
-        return self.backend.save(filename, category, description, content), None
+        # Application-level encryption (see encryption.py) BEFORE the bytes
+        # ever reach either storage backend — real encryption at rest this
+        # app controls, independent of whatever the local disk or R2
+        # already does on its own. Fails closed: if APP_ENCRYPTION_KEY
+        # isn't set, this raises rather than silently storing plaintext.
+        # size_bytes on the returned/stored record reflects the encrypted
+        # payload (Fernet adds a small fixed overhead plus base64 framing,
+        # typically ~35-40% on top), not the original file size — display
+        # only, never used for the MAX_FILE_SIZE_BYTES check above, which
+        # runs on the real, original content.
+        doc = self.backend.save(filename, category, description, encrypt_bytes(content))
+        return doc, None
 
     def get(self, doc_id: str) -> Optional[DataRoomDocument]:
         return self.backend.get(doc_id)
 
     def read_content(self, doc_id: str) -> Optional[bytes]:
-        return self.backend.read_content(doc_id)
+        stored = self.backend.read_content(doc_id)
+        if stored is None:
+            return None
+        return decrypt_bytes(stored)
 
     def delete(self, doc_id: str) -> bool:
         return self.backend.delete(doc_id)

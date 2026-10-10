@@ -2,6 +2,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
 pydicom==2.4.4
+pynetdicom==3.0.4   # real live dependency — integrations/dicom.py's PACS C-FIND/C-MOVE query/retrieve SCU (DICOM network protocol, not file parsing — pydicom above handles the files themselves)
 python-multipart==0.0.9
 websockets==13.1
 httpx==0.28.1   # real live dependency — integrations/iomt_client.py's outbound calls to the IoMT backend
@@ -17,6 +18,7 @@ passlib[bcrypt]==1.7.4
 bcrypt==3.2.2   # pinned below 4.0 — passlib's bcrypt backend has known compatibility issues with bcrypt 4.x
 python-jose[cryptography]==3.5.0
 email-validator==2.3.0   # required by pydantic's EmailStr, used in auth/routes.py's request bodies
+cryptography==50.0.1   # pinned explicitly — was already pulled in transitively by python-jose[cryptography], now also used directly by encryption.py (application-level encryption at rest for Data Room documents)
 
 # scikit-learn, torch, and torchvision live in requirements-training.txt,
 # not here — they're needed to run training/ and imaging_models/ locally

@@ -6,16 +6,28 @@ Two responsibilities:
   1. DICOM metadata extraction from an uploaded study (via pydicom) —
      used when a cardiologist's workstation or PACS forwards a study for
      AI-assisted review.
-  2. A PACS query/retrieve scaffold (DICOM C-FIND/C-MOVE) — stubbed here
-     since establishing it requires a real PACS endpoint, AE title, and
-     network access into the hospital's imaging network. `pynetdicom` is
-     the library to use for the real implementation; the class below
-     shows exactly where that wiring goes.
+  2. PACS query/retrieve (DICOM C-FIND/C-MOVE) over the real DICOM
+     network protocol, via `pynetdicom` — a real SCU (Service Class
+     User): it associates with a PACS, sends real C-FIND/C-MOVE
+     messages, and parses the real DIMSE status codes in the response.
+
+WHAT'S REAL HERE AND WHAT ISN'T: the C-FIND/C-MOVE code below is not a
+stub — it is tested end to end against a real DICOM Query/Retrieve SCP
+(Service Class Provider), using pynetdicom's own server support to run
+one locally — see integrations/pacs_local_test.py, which stands up a
+real QR SCP plus a real Storage SCP on localhost, no mocking of the
+DICOM protocol itself. What ISN'T tested is a round-trip against an
+actual hospital PACS, because this project has no credentials or
+network access to one — exactly the same honest limitation
+integrations/iomt_client.py already discloses for its own local-mock
+testing. Point `pacs_host`/`pacs_port`/`ae_title` at a real PACS and
+this code should work against it unchanged; nothing about the
+association, C-FIND identifier, or C-MOVE handling is hospital-specific.
 """
 from __future__ import annotations
 
 import io
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 
@@ -107,23 +119,139 @@ class DICOMService:
             "note": "Real features extracted from actual pixel data — not a diagnostic interpretation. No trained model exists to say what these values mean clinically.",
         }
 
-    # ---- PACS network scaffold (C-FIND / C-MOVE) -----------------------------
-    def pacs_find(self, patient_id: str, ae_title: str, pacs_host: str, pacs_port: int) -> list[dict]:
+    # ---- PACS query/retrieve (C-FIND / C-MOVE), real DICOM network protocol --
+    def pacs_find(
+        self, patient_id: str, ae_title: str, pacs_host: str, pacs_port: int,
+        calling_ae_title: str = "CARDIOAI_PRO", query_level: str = "STUDY", timeout: float = 15.0,
+    ) -> list[dict[str, Any]]:
         """
-        Real implementation (requires `pynetdicom` and network access to the
-        hospital's PACS):
+        Real DICOM C-FIND (Patient Root, Study level by default) against a
+        PACS: associates, sends the query, and collects every pending match
+        — not a mock of the protocol, an actual pynetdicom AE association.
+        See integrations/pacs_local_test.py for this running against a real
+        local SCP.
 
-            from pynetdicom import AE
-            from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelFind
-            ae = AE(ae_title=ae_title)
-            ae.add_requested_context(PatientRootQueryRetrieveInformationModelFind)
-            assoc = ae.associate(pacs_host, pacs_port)
-            # ... build C-FIND identifier dataset with PatientID, query, collect results
+        Raises RuntimeError on association failure, a timeout/abort mid-query,
+        or a non-success DIMSE status — callers (the /api/dicom/pacs/find
+        route) turn that into a 502/504 rather than a silent empty result,
+        so a genuine PACS-side failure is never indistinguishable from "no
+        matching studies."
+        """
+        from pynetdicom import AE
+        from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelFind
+        from pydicom.dataset import Dataset
+
+        ae = AE(ae_title=calling_ae_title)
+        ae.add_requested_context(PatientRootQueryRetrieveInformationModelFind)
+        ae.network_timeout = timeout
+        ae.acse_timeout = timeout
+        ae.dimse_timeout = timeout
+
+        identifier = Dataset()
+        identifier.QueryRetrieveLevel = query_level
+        identifier.PatientID = patient_id
+        # Empty-string return keys — present but unspecified, so the SCP
+        # knows to populate them in the response instead of using them to
+        # filter the query (DICOM's standard "universal matching" idiom).
+        identifier.StudyInstanceUID = ""
+        identifier.StudyDate = ""
+        identifier.StudyTime = ""
+        identifier.ModalitiesInStudy = ""
+        identifier.NumberOfStudyRelatedInstances = ""
+        identifier.AccessionNumber = ""
+
+        assoc = ae.associate(pacs_host, pacs_port, ae_title=ae_title)
+        if not assoc.is_established:
+            raise RuntimeError(f"Could not associate with PACS at {pacs_host}:{pacs_port} (AE title {ae_title!r}).")
+
+        results: list[dict[str, Any]] = []
+        try:
+            responses = assoc.send_c_find(identifier, PatientRootQueryRetrieveInformationModelFind)
+            for status, rsp_identifier in responses:
+                if status is None:
+                    raise RuntimeError("C-FIND connection timed out, was aborted, or returned an invalid response.")
+                if status.Status in (0xFF00, 0xFF01):  # Pending — this is a match, more may follow
+                    if rsp_identifier is not None:
+                        results.append({
+                            "study_instance_uid": str(getattr(rsp_identifier, "StudyInstanceUID", "")),
+                            "patient_id": str(getattr(rsp_identifier, "PatientID", "")),
+                            "study_date": str(getattr(rsp_identifier, "StudyDate", "")),
+                            "study_time": str(getattr(rsp_identifier, "StudyTime", "")),
+                            "modalities_in_study": str(getattr(rsp_identifier, "ModalitiesInStudy", "")),
+                            "number_of_instances": str(getattr(rsp_identifier, "NumberOfStudyRelatedInstances", "")),
+                            "accession_number": str(getattr(rsp_identifier, "AccessionNumber", "")),
+                        })
+                elif status.Status == 0x0000:
+                    pass  # Success — query complete, no further matches
+                else:
+                    raise RuntimeError(f"PACS refused or failed the C-FIND query — DIMSE status 0x{status.Status:04X}.")
+        finally:
             assoc.release()
 
-        Not runnable in this environment (no PACS endpoint to connect to).
+        return results
+
+    def pacs_move(
+        self, study_instance_uid: str, destination_ae_title: str, pacs_host: str, pacs_port: int,
+        pacs_ae_title: str, calling_ae_title: str = "CARDIOAI_PRO", timeout: float = 30.0,
+    ) -> dict[str, Any]:
         """
-        raise NotImplementedError(
-            "PACS C-FIND requires network access to the hospital's PACS AE — "
-            "configure pacs_host/pacs_port/ae_title against a live endpoint."
-        )
+        Real DICOM C-MOVE: asks the PACS to push a study's instances to
+        `destination_ae_title` — a separate, already-known Storage SCP
+        (which is NOT this call; C-MOVE is "tell the PACS to send it
+        somewhere," not a direct file transfer back to the caller). The
+        PACS must already have that destination AE title configured/
+        allow-listed, same as any real DICOM network — this call cannot
+        invent that association on the PACS's side.
+
+        Returns the final sub-operation counts (completed/failed/warning/
+        remaining) from the last DIMSE status received, which is how a
+        caller tells "all instances moved" from "some failed" from "the
+        destination AE title wasn't recognized by the PACS" (0xA801).
+        """
+        from pynetdicom import AE
+        from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove
+        from pydicom.dataset import Dataset
+
+        ae = AE(ae_title=calling_ae_title)
+        ae.add_requested_context(PatientRootQueryRetrieveInformationModelMove)
+        ae.network_timeout = timeout
+        ae.acse_timeout = timeout
+        ae.dimse_timeout = timeout
+
+        identifier = Dataset()
+        identifier.QueryRetrieveLevel = "STUDY"
+        identifier.StudyInstanceUID = study_instance_uid
+
+        assoc = ae.associate(pacs_host, pacs_port, ae_title=pacs_ae_title)
+        if not assoc.is_established:
+            raise RuntimeError(f"Could not associate with PACS at {pacs_host}:{pacs_port} (AE title {pacs_ae_title!r}).")
+
+        completed = failed = warning = remaining = 0
+        final_status: Optional[int] = None
+        try:
+            responses = assoc.send_c_move(identifier, destination_ae_title, PatientRootQueryRetrieveInformationModelMove)
+            for status, _rsp_identifier in responses:
+                if status is None:
+                    raise RuntimeError("C-MOVE connection timed out, was aborted, or returned an invalid response.")
+                final_status = status.Status
+                completed = getattr(status, "NumberOfCompletedSuboperations", completed)
+                failed = getattr(status, "NumberOfFailedSuboperations", failed)
+                warning = getattr(status, "NumberOfWarningSuboperations", warning)
+                remaining = getattr(status, "NumberOfRemainingSuboperations", remaining)
+        finally:
+            assoc.release()
+
+        if final_status not in (0x0000, 0xFF00, None):
+            raise RuntimeError(
+                f"PACS refused or failed the C-MOVE request — DIMSE status "
+                f"0x{final_status:04X} (completed={completed}, failed={failed}, warning={warning})."
+            )
+
+        return {
+            "status": f"0x{final_status:04X}" if final_status is not None else None,
+            "completed_suboperations": completed,
+            "failed_suboperations": failed,
+            "warning_suboperations": warning,
+            "remaining_suboperations": remaining,
+            "destination_ae_title": destination_ae_title,
+        }

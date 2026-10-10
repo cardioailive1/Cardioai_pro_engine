@@ -15,8 +15,9 @@ import time
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from orchestrator.orchestrator import orchestrator
 from ingestion.streaming import STREAMS
@@ -26,7 +27,10 @@ from integrations.x12_837 import parse_837_claims, claim_to_cardioai_record
 from integrations.x12_834 import parse_834_enrollment
 from data_room.documents import DOCUMENT_CATEGORIES
 from auth.security import create_data_room_token, DATA_ROOM_TOKEN_HOURS
-from auth.deps import DATA_ROOM_COOKIE_NAME
+from auth.deps import DATA_ROOM_COOKIE_NAME, require_admin
+from auth.db import get_db
+from auth.models import User
+from auth.audit import query_events
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
 from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
@@ -134,6 +138,56 @@ async def dicom_ingest(patient_id: str, file: UploadFile = File(...)):
         "pixel_features": pixel_features,
     }
     result = await orchestrator.dispatch("imaging", record, source="dicom upload — real pixel data")
+    return result
+
+
+# ---------------------------------------------------------------------------
+# PACS query/retrieve (C-FIND / C-MOVE) — real DICOM network protocol via
+# integrations/dicom.py's pacs_find()/pacs_move() (pynetdicom), tested
+# against a real local SCP in integrations/pacs_local_test.py. Connection
+# details default to env vars so a deployment just needs the hospital's
+# real PACS_HOST/PACS_PORT/PACS_AE_TITLE set — nothing hospital-specific
+# is hardcoded here or in integrations/dicom.py.
+# ---------------------------------------------------------------------------
+PACS_HOST = os.environ.get("PACS_HOST", "")
+PACS_PORT = int(os.environ.get("PACS_PORT", "104"))  # 104 is DICOM's conventional default port
+PACS_AE_TITLE = os.environ.get("PACS_AE_TITLE", "")
+PACS_CALLING_AE_TITLE = os.environ.get("PACS_CALLING_AE_TITLE", "CARDIOAI_PRO")
+
+
+def _require_pacs_config() -> None:
+    if not PACS_HOST or not PACS_AE_TITLE:
+        raise HTTPException(
+            status_code=503,
+            detail="PACS_HOST and PACS_AE_TITLE are not set — no hospital PACS is configured for this deployment yet.",
+        )
+
+
+@router.get("/dicom/pacs/find")
+def dicom_pacs_find(patient_id: str):
+    _require_pacs_config()
+    try:
+        results = dicom_service.pacs_find(patient_id, PACS_AE_TITLE, PACS_HOST, PACS_PORT, calling_ae_title=PACS_CALLING_AE_TITLE)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"patient_id": patient_id, "studies": results, "pacs_host": PACS_HOST, "pacs_ae_title": PACS_AE_TITLE}
+
+
+class PacsMoveRequest(BaseModel):
+    study_instance_uid: str
+    destination_ae_title: str
+
+
+@router.post("/dicom/pacs/move")
+def dicom_pacs_move(body: PacsMoveRequest):
+    _require_pacs_config()
+    try:
+        result = dicom_service.pacs_move(
+            body.study_instance_uid, body.destination_ae_title, PACS_HOST, PACS_PORT, PACS_AE_TITLE,
+            calling_ae_title=PACS_CALLING_AE_TITLE,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
     return result
 
 
@@ -1051,3 +1105,21 @@ async def validate_training_labels(req: LabelValidationRequest):
         },
         "early_detection_eval_set_size": len(eval_set),
     }
+
+
+# ---------------------------------------------------------------------------
+# Persisted audit log — admin-only. Backs the "Audit controls" line in the
+# HIPAA/Security packet: real, persisted, queryable rows in Postgres (see
+# auth/audit.py), not just the in-memory agent-hop trace used by the live
+# dashboard. Scoped to require_admin specifically (narrower than the
+# main_engine surface role check main.py's middleware already applies to
+# every /api/* path) — a clinician shouldn't be able to pull the org's
+# login/approval history just because they can reach the clinical API.
+# ---------------------------------------------------------------------------
+@router.get("/audit/events")
+def list_audit_events(
+    action: str | None = None, limit: int = 100,
+    current: User = Depends(require_admin), db: Session = Depends(get_db),
+):
+    events = query_events(db, org_id=current.org_id, action=action, limit=limit)
+    return {"events": [e.to_dict() for e in events], "count": len(events)}

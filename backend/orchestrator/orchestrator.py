@@ -25,6 +25,8 @@ from orchestrator.agents import (
     PatientIntakeAgent, PatientRegistryAgent, ClinicalReportAgent, ClaimsAggregatorAgent,
     LongitudinalAgent, FusionAgent, AlertAgent,
 )
+from auth.db import SessionLocal
+from auth.audit import record_event
 from ingestion.quality import DataQualityEngine
 from integrations.fhir import FHIRBuilder
 from integrations.dicom import DICOMService
@@ -115,6 +117,26 @@ class CentralOrchestrator:
             if not q.full():
                 q.put_nowait(event)
 
+    def _record_audit(self, *, action: str, status: str, task_id: str, modality: str, metadata: dict[str, Any]) -> None:
+        # Persisted, one row per pipeline run (not per agent hop — the
+        # in-memory event log above already covers hop-level tracing for
+        # the live dashboard). Opens its own short-lived DB session since
+        # the orchestrator is a module-level singleton, not a per-request
+        # FastAPI dependency, so there's no request-scoped session to
+        # reuse here. Failure to write an audit row must never break the
+        # clinical pipeline it's describing, so this is best-effort.
+        db = SessionLocal()
+        try:
+            record_event(
+                db, action=action, status=status, actor_label="system:orchestrator",
+                resource_type="pipeline_task", resource_id=task_id,
+                metadata={"modality": modality, **metadata},
+            )
+        except Exception:
+            pass
+        finally:
+            db.close()
+
     def _record_stat(self, msg: AgentMessage) -> None:
         s = self.stats[msg.agent]
         s["runs"] += 1
@@ -155,12 +177,21 @@ class CentralOrchestrator:
 
             if msg.status == "error":
                 self._publish({"type": "task_error", "task_id": task_id, "agent": msg.agent, "timestamp": time.time()})
+                self._record_audit(
+                    action="pipeline.task_error", status="failure", task_id=task_id, modality=modality,
+                    metadata={"failed_agent": msg.agent, "error": msg.payload.get("error"), "hops": len(trace)},
+                )
                 return {"task_id": task_id, "modality": modality, "ok": False, "failed_agent": msg.agent,
                         "error": msg.payload.get("error"), "trace": trace}
 
             payload = msg.payload  # each agent's output becomes the next agent's input
 
         self._publish({"type": "task_completed", "task_id": task_id, "modality": modality, "timestamp": time.time()})
+        flagged_agents = [t["agent"] for t in trace if t["status"] == "flagged"]
+        self._record_audit(
+            action="pipeline.task_completed", status="success", task_id=task_id, modality=modality,
+            metadata={"hops": len(trace), "flagged_agents": flagged_agents, "source": source},
+        )
         return {"task_id": task_id, "modality": modality, "ok": True, "result": payload, "trace": trace}
 
     def status(self) -> dict[str, Any]:
