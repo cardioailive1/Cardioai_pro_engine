@@ -15,7 +15,7 @@ import time
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,7 @@ from auth.security import create_data_room_token, DATA_ROOM_TOKEN_HOURS
 from auth.deps import DATA_ROOM_COOKIE_NAME, require_admin
 from auth.db import get_db
 from auth.models import User
-from auth.audit import query_events
+from auth.audit import query_events, record_event
 from fairness.bias_audit import run_audit
 from reports.compliance_report import ComplianceReportGenerator
 from reports.cost_avoidance import population_cost_avoidance_report, compute_member_cost_trend
@@ -845,6 +845,22 @@ def data_room_lock(response: Response):
 # project; STORAGE_WARNING is surfaced in every response below rather than
 # only in the module's internal comments.
 # ---------------------------------------------------------------------------
+def _data_room_client_ip(request: Request) -> Optional[str]:
+    # Same reasoning as auth/routes.py's _client_ip: Render terminates TLS
+    # at its edge and proxies to this service, so the real client IP
+    # arrives via X-Forwarded-For, not request.client (Render's internal
+    # proxy address). Duplicated locally rather than imported from
+    # auth.routes to keep that module's helpers private to RBAC.
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+def _data_room_user_agent(request: Request) -> Optional[str]:
+    return request.headers.get("user-agent")
+
+
 @router.post("/data-room/documents/upload")
 async def upload_data_room_document(
     file: UploadFile = File(...), category: str = Form(...), description: str = Form(""),
@@ -886,13 +902,25 @@ async def storage_diagnostics():
 
 
 @router.get("/data-room/documents/{doc_id}/download")
-async def download_data_room_document(doc_id: str):
+async def download_data_room_document(doc_id: str, request: Request, db: Session = Depends(get_db)):
     doc = orchestrator.document_registry.get(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail=f"No document {doc_id}")
     try:
         content = orchestrator.document_registry.read_content(doc_id)
     except ValueError as exc:
+        # Logged even on failure — a decrypt failure on a real download
+        # attempt is itself worth having in the record, not just silently
+        # 500ing. org_id/user_id are both None: the Data Room has no
+        # per-investor identity (single shared password), so "who" here
+        # means IP + user agent, not a named person — see record_event
+        # calls below for the same reasoning on the success path.
+        record_event(
+            db, action="data_room.document.download", status="failure",
+            resource_type="document", resource_id=doc_id,
+            ip_address=_data_room_client_ip(request), user_agent=_data_room_user_agent(request),
+            metadata={"filename": doc.filename, "category": doc.category, "error": str(exc)},
+        )
         # decrypt_bytes() raises ValueError when the stored bytes were
         # encrypted under a key APP_ENCRYPTION_KEY no longer has (key was
         # rotated without moving the old value into
@@ -911,10 +939,36 @@ async def download_data_room_document(doc_id: str):
         ) from exc
     if content is None:
         raise HTTPException(status_code=404, detail=f"Document {doc_id} has no content on disk — likely lost to a redeploy; see the ephemeral-storage warning.")
+    record_event(
+        db, action="data_room.document.download", status="success",
+        resource_type="document", resource_id=doc_id,
+        ip_address=_data_room_client_ip(request), user_agent=_data_room_user_agent(request),
+        metadata={"filename": doc.filename, "category": doc.category},
+    )
     return Response(
         content=content, media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
     )
+
+
+@router.get("/data-room/download-log")
+def data_room_download_log(limit: int = 200, current: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """
+    Who downloaded what, as far as this app can actually know: the Data
+    Room has no per-investor login (one shared password — see the
+    data-room/unlock route above), so "who" here is IP address + browser
+    user agent, timestamped, not a named person. Good enough to answer
+    "did anyone download this, and roughly how many distinct visitors,"
+    not "which specific person." Gated behind the org-RBAC admin check
+    (require_admin), not the Data Room's own password, since this is an
+    internal view for the company, not something to expose to investors.
+    query_events(org_id=None) intentionally does NOT scope by the
+    admin's own org_id — these events have no org at all (data_room.* is
+    recorded with org_id=None, unlike RBAC's login/signup events), so
+    filtering on the admin's org_id would silently return nothing.
+    """
+    events = query_events(db, org_id=None, action="data_room.document.download", limit=limit)
+    return {"events": [e.to_dict() for e in events], "count": len(events)}
 
 
 @router.delete("/data-room/documents/{doc_id}")

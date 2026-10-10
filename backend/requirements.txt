@@ -3,11 +3,12 @@ uvicorn[standard]==0.30.6
 pydantic==2.9.2
 pydicom==3.0.2   # pynetdicom 3.0.4 below requires pydicom>=3,<4 — bumped from 2.4.4 (which pynetdicom 3.x cannot install alongside) after confirming the metadata/pixel-extraction code and the PACS C-FIND/C-MOVE test harness both still pass unchanged on pydicom 3.x
 pynetdicom==3.0.4   # real live dependency — integrations/dicom.py's PACS C-FIND/C-MOVE query/retrieve SCU (DICOM network protocol, not file parsing — pydicom above handles the files themselves)
-python-multipart==0.0.9
+python-multipart==0.0.18   # bumped from 0.0.9 — pip-audit (now run in CI, see .github/workflows/ci.yml) found 6 known CVEs fixed by 0.0.18; re-tested the Data Room's actual file-upload path against this version, still works
 websockets==13.1
 httpx==0.28.1   # real live dependency — integrations/iomt_client.py's outbound calls to the IoMT backend
 boto3==1.43.103   # real live dependency — data_room/documents.py's Cloudflare R2 backend (S3-compatible), used only once R2_* env vars are set; app runs fine without it configured
 numpy==2.1.3   # real live dependency — integrations/dicom.py (pixel feature extraction) and longitudinal/trend_engine.py both import it directly
+sentry-sdk[fastapi]==2.18.0   # real live dependency — main.py's error-tracking/alerting (monitoring gap closed 2026-10-10); inert unless SENTRY_DSN is set, see main.py's init block
 
 # RBAC — real, live dependencies. auth/ requires a real Postgres
 # (DATABASE_URL, auto-injected by render.yaml's databases: block) —
@@ -19,6 +20,24 @@ bcrypt==3.2.2   # pinned below 4.0 — passlib's bcrypt backend has known compat
 python-jose[cryptography]==3.5.0
 email-validator==2.3.0   # required by pydantic's EmailStr, used in auth/routes.py's request bodies
 cryptography==50.0.1   # pinned explicitly — was already pulled in transitively by python-jose[cryptography], now also used directly by encryption.py (application-level encryption at rest for Data Room documents)
+
+# --- Known pip-audit findings, deliberately not yet actioned (as of 2026-10-10) ---
+# starlette 0.38.6 (pulled in by fastapi==0.115.0): several known CVEs,
+# fixed starting in 0.40.0/1.x. Not bumped yet because fastapi 0.115.0
+# pins starlette<0.39 — fixing this means bumping fastapi to a version
+# that allows a newer starlette, which is a bigger change needing a full
+# regression pass across every route in api/routes.py, not a drop-in
+# swap. Tracked, not ignored — see pip-audit's CI output for the current
+# full list of specific CVE IDs.
+# python-jose 3.5.0: CVE-2026-85394, no upstream fix version exists yet.
+# The actual exploit needs the app to accept an attacker-supplied key at
+# decode time; auth/security.py's jwt.decode() call explicitly pins
+# algorithms=[JWT_ALGORITHM] (HS256 only), which is the documented
+# mitigation — verified this app already does that, so treating this as
+# a non-issue here rather than blocked-on-upstream.
+# ecdsa (transitive, via python-jose): no fix version — a known,
+# long-standing side-channel-timing finding upstream has not patched;
+# commonly accepted as-is across the ecosystem for this reason.
 
 # scikit-learn, torch, and torchvision live in requirements-training.txt,
 # not here — they're needed to run training/ and imaging_models/ locally

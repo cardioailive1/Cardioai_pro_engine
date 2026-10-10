@@ -59,6 +59,7 @@ signup/login/data-room-unlock endpoints are the only exemptions, and
 they're exemptions from *authentication*, not from anything else —
 each still enforces its own real check inside its own route handler.
 """
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -76,6 +77,36 @@ from auth.deps import SESSION_COOKIE_NAME, DATA_ROOM_COOKIE_NAME
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
+
+# Monitoring/alerting — optional, real, off by default. Closes a gap the
+# data room's own Technical Architecture Packet disclosed plainly:
+# "no ... monitoring/alerting tooling found in the codebase today." This
+# is genuine Sentry error tracking (unhandled exceptions, and a sample of
+# request traces), not a stub — but it only activates once a real
+# SENTRY_DSN is set (render.yaml adds the env var slot, sync: false, so
+# it's never committed), because there is no Sentry project to point at
+# yet. Import is wrapped so a deploy where sentry-sdk somehow isn't
+# installed still boots the app rather than crashing on a monitoring
+# dependency — monitoring tooling failing closed and taking down the
+# whole service would be the wrong failure mode for this specific piece.
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            environment=os.environ.get("RENDER_SERVICE_NAME", "cardioai-pro-engine"),
+            # 10% of requests get full performance traces — enough to see
+            # real latency/error patterns without the overhead or the
+            # Sentry-quota cost of tracing every single request.
+            traces_sample_rate=0.1,
+            send_default_pii=False,  # never send request bodies/headers that could carry PHI
+        )
+    except Exception:
+        # A monitoring-tool misconfiguration (bad DSN, package issue)
+        # should never be why the actual application fails to start.
+        pass
 
 app = FastAPI(title="CardioAI Pro — Main Engine", version="0.3.0")
 
@@ -103,7 +134,12 @@ def _seed_legal_docs_into_data_room():
     seeds = [
         ("Business_Associate_Agreement.html", "baa.html", "regulatory", "Business Associate Agreement (BAA)"),
         ("Privacy_Statement.html", "privacy-statement.html", "regulatory", "Privacy Statement"),
-        ("Terms_of_Use.html", "terms-of-use.html", "other", "Terms of Use"),
+        # Filed under "regulatory" (not "other") so all three legal
+        # documents land together under Regulatory & Compliance in the
+        # Document Room and the Data Room Index, rather than splitting
+        # Terms of Use off into a different category for no functional
+        # reason.
+        ("Terms_of_Use.html", "terms-of-use.html", "regulatory", "Terms of Use"),
     ]
     existing_filenames = {d.filename for d in orchestrator.document_registry.list_all()}
     for display_name, source_name, category, description in seeds:
