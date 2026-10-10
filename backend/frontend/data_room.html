@@ -75,6 +75,21 @@ main { flex:1; min-width:0; padding:26px 30px 70px; display:grid; gap:20px; }
 .doc-card p { margin:0; font-size:0.76rem; color:var(--ink-soft); line-height:1.5; }
 .doc-card .doc-open { margin-top:8px; font-size:0.72rem; color:var(--blue); font-weight:700; }
 
+.deck-viewer { max-width:920px; margin:0 auto; }
+.deck-stage { position:relative; background:var(--navy-deep); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-md); }
+.deck-stage img { display:block; width:100%; height:auto; }
+.deck-nav-btn { position:absolute; top:50%; transform:translateY(-50%); background:rgba(14,36,64,0.55); color:#fff; border:none; width:42px; height:42px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.12s ease; }
+.deck-nav-btn:hover { background:rgba(14,36,64,0.85); }
+.deck-prev { left:14px; }
+.deck-next { right:14px; }
+.deck-controls { display:flex; align-items:center; justify-content:space-between; margin-top:12px; font-size:0.8rem; color:var(--ink-soft); }
+.deck-dl-tag { color:var(--blue); font-weight:600; text-decoration:none; font-size:0.76rem; }
+.deck-dl-tag:hover { text-decoration:underline; }
+.deck-thumbs { display:flex; gap:8px; overflow-x:auto; margin-top:16px; padding-bottom:6px; }
+.deck-thumbs img { width:84px; height:auto; border-radius:6px; border:2px solid transparent; cursor:pointer; opacity:0.65; transition:opacity 0.12s ease, border-color 0.12s ease; flex-shrink:0; }
+.deck-thumbs img:hover { opacity:1; }
+.deck-thumbs img.active { opacity:1; border-color:var(--blue); }
+
 .table-wrap { overflow-x:auto; margin-top:10px; }
 table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
 .dt th { text-align:right; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.02em; color:var(--ink-soft); border-bottom:2px solid var(--line); padding:8px 10px; white-space:nowrap; }
@@ -160,6 +175,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
       <button class="nav-item" data-page="terms"><span class="ic">&#128188;</span> Investment Structure</button>
       <button class="nav-item" data-page="traction"><span class="ic">&#9873;</span> Traction &amp; Status</button>
       <button class="nav-item" data-page="documents"><span class="ic">&#128193;</span> Document Room</button>
+      <button class="nav-item" data-page="deck"><span class="ic">&#128202;</span> Investor Deck</button>
 
       <div class="sidebar-logout">
         <button class="nav-item" id="logoutBtn"><span class="ic">&#128274;</span> Lock data room</button>
@@ -206,7 +222,9 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="doc-card" data-nav="checklist"><div class="doc-num">08</div><h4>Data Room Index</h4><p>Full due-diligence checklist across 8 categories — honest status per item, live-checked against what's actually uploaded.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="market"><div class="doc-num">09</div><h4>Market &amp; Competition</h4><p>Bottom-up TAM/SAM/SOM and a real competitive landscape — every external figure cited to a named, dated source.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="roadmap"><div class="doc-num">10</div><h4>Roadmap</h4><p>Launch waves, key milestones, and the Year 1 pilot/LOI pipeline, Q4 2026 through Q4 2029.</p><div class="doc-open">Open →</div></div>
-            <a href="https://claude.ai/artifact/Wu1GHfAvALavxSa8iNo4KZ" target="_blank" rel="noopener" class="doc-card" style="text-decoration:none; display:block;"><div class="doc-num">11</div><h4>Investor Deck <span class="tag">opens separately</span></h4><p>13-slide presentation — same figures as this data room throughout. Opens in a new tab; export to PDF/PPTX from there.</p><div class="doc-open">Open deck ↗</div></a>
+            <div class="doc-card" data-nav="documents"><div class="doc-num">11</div><h4>Technical Architecture Packet</h4><p>Full system architecture writeup — the 15-agent pipeline, integrations, deployment environment, and AI models, confirmed against the actual codebase. Download from the Document Room.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="documents"><div class="doc-num">12</div><h4>HIPAA, Security &amp; SOC 2 Packet</h4><p>Security architecture, encryption, audit logging, and SOC 2 readiness — what's actually implemented today, stated plainly against what's still planned. Download from the Document Room.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="deck"><div class="doc-num">13</div><h4>Investor Deck</h4><p>14-slide presentation — same figures as this data room throughout. Viewed directly here, no separate sign-in required.</p><div class="doc-open">Open →</div></div>
           </div>
         </section>
 
@@ -293,7 +311,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <h3>The Numbers</h3>
           <p>$265.3M in 3-year total revenue, 68.0% blended gross margin, and profitability from Year 1 ($4.3M EBITDA, scaling to $95.1M / 55.4% margin by Year 3) — full detail on the Financial Model page, every figure traceable to the underlying workbook.</p>
           <h3>The Round</h3>
-          <p>$1.0M pre-seed; pre-money valuation of $32,754,892 ($33,754,892 post-money) as proposed — internally consistent between the financial model and the cap table, but the round structure itself is now under renegotiation (SIV, see Investment Structure page for the full picture). Full use of funds on the Investment Structure page.</p>
+          <p>$1.0M pre-seed; pre-money valuation of $32,754,892 ($33,754,892 post-money) as proposed — internally consistent between the financial model and the cap table, but the round structure itself remains open to negotiation — see Investment Structure page for the full picture. Full use of funds on the Investment Structure page.</p>
         </section>
       </section>
 
@@ -448,7 +466,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>Assumption</th><th>Value</th><th>Note</th></tr></thead>
             <tbody>
-              <tr><td>Pre-money valuation</td><td><span class="pill partial">$32,754,892 (proposed)</span></td><td>Internally consistent with the updated cap table (CAP_TABLE_V6A.xlsx), but the round structure itself is under renegotiation — SIV has indicated it must change. See Investment Structure page</td></tr>
+              <tr><td>Pre-money valuation</td><td><span class="pill partial">$32,754,892 (proposed)</span></td><td>Internally consistent with the updated cap table (CAP_TABLE_V6A.xlsx), but the round structure itself remains open to negotiation. See Investment Structure page</td></tr>
               <tr><td>Pre-seed raise</td><td>$1.0M</td><td></td></tr>
               <tr><td>Enterprise SaaS gross margin</td><td>70%</td><td>Industry standard for health SaaS</td></tr>
               <tr><td>Payer analytics gross margin</td><td>65%</td><td>Analytics-as-a-service layer</td></tr>
@@ -533,7 +551,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <p>CardioAI Pro is a multi-agent clinical AI engine for cardiovascular risk analysis, monetized across four real, distinct customer segments — enterprise health systems, health insurance payers, individual consumers, and a Professional tier for single-site practices — plus two complementary products launching alongside it, MedCRM and IoMT-RPM. The three-year model built around this engine (FY2027–FY2029) projects $265.3M in total revenue, 68.0% blended gross margin, and profitability from Year 1 — full detail on the Financial Model page.</p>
 
           <h3>2. Company Overview</h3>
-          <p>Founder-led, pre-seed stage. Raising $1.0M at a $32,754,892 pre-money valuation ($33,754,892 post-money) as currently proposed — internally consistent between the financial model and the updated cap table, but the round structure itself is under renegotiation with SIV — see the Investment Structure page for the full picture. Corporate formation and governance documents are maintained in the Document Room section of this data room.</p>
+          <p>Founder-led, pre-seed stage. Raising $1.0M at a $32,754,892 pre-money valuation ($33,754,892 post-money) as currently proposed — internally consistent between the financial model and the updated cap table, but the round structure itself remains open to negotiation — see the Investment Structure page for the full picture. Corporate formation and governance documents, including board resolutions and stockholder approvals, are maintained in the Document Room section of this data room.</p>
 
           <h3>3. Market Opportunity</h3>
           <p>Cardiovascular disease remains the leading cause of death and a leading driver of healthcare cost in the markets this plan addresses. The three segments below represent three distinct buying motions against that same underlying clinical need — a health system paying for a clinical tool, a payer paying for population risk stratification, and a consumer paying for personal monitoring. A full, sourced market sizing (TAM/SAM/SOM) and competitive landscape now exist on the Market &amp; Competition page — every external figure cited to a named, dated source, not asserted without one.</p>
@@ -711,7 +729,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <p class="sub">Full line-item detail, including how FY2027 OpEx reconciles between the run-rate and phased figures, on the Financial Model page.</p>
 
           <h3>10. Funding Request &amp; Use of Funds</h3>
-          <p>Raising $1.0M at a $32,754,892 pre-money valuation, as currently proposed — see Section 2 and the Investment Structure page for the open item with SIV on round structure. 29% to Product &amp; Technology, 34.5% to Go-to-Market, 34.5% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
+          <p>Raising $1.0M at a $32,754,892 pre-money valuation, as currently proposed — the round structure remains open to negotiation; see Section 2 and the Investment Structure page. 29% to Product &amp; Technology, 34.5% to Go-to-Market, 34.5% to Operating Costs, 2% to the CSR program. Full breakdown on the Investment Structure page.</p>
 
           <h3>11. Risk Factors</h3>
           <p>Stated directly, not softened, because a due-diligence reader will find these regardless:</p>
@@ -719,7 +737,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <li><strong>Clinical validation is in progress, not complete.</strong> The risk-scoring model behind every segment in this plan is a real, tested software pipeline running on a placeholder heuristic — not yet a clinically validated model. Validation work is now underway through the Mayo Clinic Accelerate program; revenue in this plan assumes the product reaches a clinically credible state, which that program is a real step toward but has not yet delivered.</li>
             <li><strong>Regulatory clearance is not complete.</strong> FDA 510(k) submissions (echo, ECG, longitudinal prediction) are now targeted for Jan 2027, with clearance of all CardioAI Pro functions targeted May–Jun 2027 — before the Nov 2027 go-live, per the company's current roadmap (see the Roadmap page). This plan's revenue does not depend on clearance being achieved by that specific date, but a material delay would push clearance past go-live and affect the Enterprise and Payer segments' sales cycles. Note: the R&amp;D &amp; Regulatory budget below, from the attached financial model (V7A), was built against an earlier, slower submission timeline and has not yet been reconciled against this accelerated roadmap — the dollar figures are real workbook figures, but their phasing may not match the dates above.</li>
             <li><strong>Sales execution risk.</strong> The Enterprise segment's revenue trajectory depends on 4 reps — paid temporarily below market rate — closing 15 contracts in Year 1 at an $800K average value; the realistic case is 8 contracts (3 signed LOIs + 5 named prospects), not a guarantee. The Scenarios sheet models Conservative (50% scale, 1-year delay) and Downside (30% scale, 2-year delay) cases.</li>
-            <li><strong>Round structure under renegotiation.</strong> The $32,754,892 pre-money / $2.00-per-share structure above is internally consistent (the financial model and the cap table agree with each other), but SIV's own diligence has indicated the round structure must change — the company and SIV have not yet landed on final terms. See the Investment Structure page.</li>
+            <li><strong>Round structure open to negotiation.</strong> The $32,754,892 pre-money / $2.00-per-share structure above is internally consistent (the financial model and the cap table agree with each other), but final terms have not yet been agreed with investors. Supporting valuation/appraisal documentation, board resolutions, and stockholder approvals are available in the Document Room. See the Investment Structure page.</li>
             <li><strong>Option pool increase pending approval.</strong> The proposed $32,754,892 pre-money valuation assumes a $2.0M option pool increase that is not yet approved by the Board and stockholders — see the Investment Structure page. Disclosed, not hidden; the headline figures reconcile either way, but this specific line item is pending.</li>
             <li><strong>Temporarily suppressed compensation.</strong> Founder/executive salaries and sales rep pay are held below market rate through FY2028, subject to Board review — a real cost-structure choice that makes near-term unit economics (CAC, EBITDA margin) look stronger than a fully-loaded, sustainable structure would; see Unit Economics on the Financial Model page.</li>
             <li><strong>Early-stage company risk</strong> applies in the ordinary sense — a pre-seed company with a $1.0M raise, dependent on executing a detailed plan against a competitive, regulated market.</li>
@@ -784,7 +802,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <li><strong>BAA, Privacy Statement and Terms of Use</strong> drafted; counsel review pending.</li>
           </ul>
           <div class="callout info">
-            <strong>Resolved:</strong> the "Revenue Model V7" referenced in the source roadmap materials ($149.8M) has now been superseded by the actual attached workbook, <span class="mono">CardioAI_RevenueModel_V7_7.xlsx</span>, which totals <strong>$265.3M</strong> over the same three years — higher than either the $149.8M the roadmap cited or the $184.1M model it replaced, reflecting corrections made between V7 and V7A (recurring revenue from existing contracts, mid-year convention for new customers, a corrected NRR input, and a phased rather than flat Year 1 OpEx) in addition to adding MedCRM and IoMT-RPM. This is now the data room's financial record of truth — see the Financial Model page for full detail. The pre-money valuation this workbook assumes ($32,754,892) is internally confirmed against the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) — but the round structure itself is now under renegotiation (SIV) — see the Investment Structure page.
+            <strong>Resolved:</strong> the "Revenue Model V7" referenced in the source roadmap materials ($149.8M) has now been superseded by the actual attached workbook, <span class="mono">CardioAI_RevenueModel_V7_7.xlsx</span>, which totals <strong>$265.3M</strong> over the same three years — higher than either the $149.8M the roadmap cited or the $184.1M model it replaced, reflecting corrections made between V7 and V7A (recurring revenue from existing contracts, mid-year convention for new customers, a corrected NRR input, and a phased rather than flat Year 1 OpEx) in addition to adding MedCRM and IoMT-RPM. This is now the data room's financial record of truth — see the Financial Model page for full detail. The pre-money valuation this workbook assumes ($32,754,892) is internally confirmed against the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) — but the round structure itself remains open to negotiation — see the Investment Structure page.
           </div>
         </section>
 
@@ -951,7 +969,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <p><b>Traction:</b> 65 customer discovery interviews, 3 signed nonbinding LOIs ($6.4M Y1 ARR potential at 8 contracts), validated PMPM pricing range of $60–$110.</p>
               <p><b>Financials:</b> $265.3M 3-year revenue, 68.0% blended gross margin, profitable from Year 1.</p>
               <p><b>Clinical path:</b> Validation in progress at the Mayo Clinic Accelerate program; FDA 510(k) preparation budgeted.</p>
-              <p><b>The ask:</b> $1.0M pre-seed at a $32,754,892 pre-money valuation, as currently proposed; round structure under renegotiation with SIV — see Investment Structure page.</p>
+              <p><b>The ask:</b> $1.0M pre-seed at a $32,754,892 pre-money valuation, as currently proposed; round structure open to negotiation — see Investment Structure page.</p>
             </div>
           </div>
         </section>
@@ -986,17 +1004,17 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <strong>Resolved:</strong> the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) now matches V7A's financial model exactly — pre-money, option pool, and SAFE terms all reconcile to the same figures. The earlier three-way conflict ($50.0M / $28.7M / $32.75M) is resolved in favor of <strong>$32,754,892</strong>, the figure both the financial model and this updated cap table independently land on. One open item remains: $2.0M of the option pool this valuation assumes is a pending increase awaiting Board and stockholder approval — see the Cap Table section below.
           </div>
           <div class="callout warn">
-            <strong>New, separate open item:</strong> the attached financial model's Assumptions sheet now notes, against the $2.00 proposed price per share, that <strong>"SIV has indicated the round structure must change"</strong> — SIV's own diligence is pushing back on the proposed pricing/structure itself, independent of the internal-consistency reconciliation above. The figures in the table below are the structure as currently modeled and as the cap table reflects — not yet what SIV and the company land on. This data room will be updated once that negotiation resolves; until then, treat the terms below as the company's proposal, not an agreed price.
+            <strong>Round structure open to negotiation:</strong> the terms below — $32,754,892 pre-money, $2.00 per share — are the company's current proposal, internally consistent between the financial model and the updated cap table, but not yet an agreed price. Supporting valuation/appraisal documentation, board resolutions, and stockholder approvals are available in the Document Room. This data room will be updated once terms are finalized; until then, treat the figures below as the company's proposal, not a closed negotiation.
           </div>
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>Term</th><th>Value</th></tr></thead>
             <tbody>
               <tr><td>Round</td><td>Pre-Seed</td></tr>
-              <tr><td>Status</td><td>Under due diligence &amp; negotiation — round structure itself under discussion with SIV</td></tr>
+              <tr><td>Status</td><td>Under due diligence &amp; negotiation — open to negotiation</td></tr>
               <tr><td>Pre-money valuation</td><td>$32,754,892 <span class="tag">as proposed — see note above</span></td></tr>
               <tr><td>Raise amount</td><td>$1,000,000</td></tr>
               <tr><td>Post-money valuation</td><td>$33,754,892 <span class="tag">as proposed — see note above</span></td></tr>
-              <tr><td>Price per share</td><td>$2.00 <span class="tag gold">proposed — SIV has indicated this must change</span></td></tr>
+              <tr><td>Price per share</td><td>$2.00 <span class="tag gold">proposed — subject to negotiation</span></td></tr>
               <tr><td>Implied dilution (this raise)</td><td>2.96%</td></tr>
             </tbody>
           </table></div>
@@ -1122,7 +1140,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             </div>
             <div>
               <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">What is the actual pre-money valuation?</h4>
-              <p style="font-size:15px; color:#3A4A5C; margin:0;">$32,754,892 pre-money / $33,754,892 post-money, as currently proposed — the financial model's Assumptions sheet and the updated cap table independently agree with each other on this figure (matching dollar math and matching share math; see the Cap Table section above). That internal agreement is not the same as investor sign-off: the financial model's own notes now say SIV has indicated the round structure must change, so this proposed structure is itself under renegotiation. A $2.0M option pool increase it assumes is also still pending Board and stockholder approval.</p>
+              <p style="font-size:15px; color:#3A4A5C; margin:0;">$32,754,892 pre-money / $33,754,892 post-money, as currently proposed — the financial model's Assumptions sheet and the updated cap table independently agree with each other on this figure (matching dollar math and matching share math; see the Cap Table section above). That internal agreement is not the same as investor sign-off: this proposed structure remains open to negotiation. A $2.0M option pool increase it assumes is also still pending Board and stockholder approval. Supporting valuation/appraisal documentation, board resolutions, and stockholder approvals are available in the Document Room.</p>
             </div>
             <div>
               <h4 style="font-size:20px; color:#0A2140; margin:0 0 4px;">Who is on the advisory board?</h4>
@@ -1184,6 +1202,26 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
         </section>
       </section>
 
+      <!-- ============ INVESTOR DECK ============ -->
+      <section class="page" data-page="deck">
+        <section class="panel">
+          <h2 style="margin-top:0;">Investor Deck</h2>
+          <p class="sub">14-slide presentation — same figures as this data room throughout. Rendered directly from the attached PowerPoint, viewed here in the data room (no separate sign-in required).</p>
+          <div class="deck-viewer">
+            <div class="deck-stage">
+              <img id="deckSlideImg" src="assets/investor_deck/slide-01.jpg" alt="Investor deck slide" />
+              <button class="deck-nav-btn deck-prev" id="deckPrevBtn" aria-label="Previous slide">&#8592;</button>
+              <button class="deck-nav-btn deck-next" id="deckNextBtn" aria-label="Next slide">&#8594;</button>
+            </div>
+            <div class="deck-controls">
+              <span id="deckCounter">Slide 1 / 14</span>
+              <a id="deckDownloadLink" href="assets/investor_deck/slide-01.jpg" download class="deck-dl-tag">Download this slide</a>
+            </div>
+            <div class="deck-thumbs" id="deckThumbs"></div>
+          </div>
+        </section>
+      </section>
+
       <!-- ============ DOCUMENT ROOM ============ -->
       <section class="page" data-page="documents">
         <section class="panel">
@@ -1239,7 +1277,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
             <tbody>
               <tr><td>1.1</td><td>Executive Summary</td><td><span class="pill complete">Complete</span></td><td>Company overview and key highlights — Executive Summary page</td></tr>
-              <tr><td>1.2</td><td>Company Presentation</td><td><span class="pill complete">Complete</span></td><td>13-slide investor deck, built and exportable — same figures as this data room throughout. <a href="https://claude.ai/artifact/Wu1GHfAvALavxSa8iNo4KZ" target="_blank" rel="noopener">Open deck ↗</a></td></tr>
+              <tr><td>1.2</td><td>Company Presentation</td><td><span class="pill complete">Complete</span></td><td>14-slide investor deck — same figures as this data room throughout. See the Investor Deck page.</td></tr>
               <tr><td>1.3</td><td>Business Plan</td><td><span class="pill complete">Complete</span></td><td>Full 15-section business plan, including Risk Factors</td></tr>
               <tr><td>1.4</td><td>Organization Chart</td><td><span class="pill unavailable">Not available</span></td><td>Only one team member confirmed — see Team &amp; Advisors</td></tr>
               <tr><td>1.5</td><td>Company Timeline &amp; Milestones</td><td><span class="pill complete">Complete</span></td><td>Traction &amp; Status page — built vs. ahead, stated plainly</td></tr>
@@ -1269,11 +1307,11 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
             <tbody>
               <tr><td>3.1</td><td>Product Overview</td><td><span class="pill complete">Complete</span></td><td>Product &amp; Technology page</td></tr>
-              <tr><td>3.2</td><td>Technology Architecture</td><td><span class="pill complete">Complete</span></td><td>15-agent orchestration pipeline, real and tested</td></tr>
+              <tr><td>3.2</td><td>Technology Architecture</td><td><span class="pill complete">Complete</span></td><td>15-agent orchestration pipeline, real and tested — full detail in the Technical Architecture Packet, Document Room</td></tr>
               <tr><td>3.3</td><td>Product Roadmap</td><td><span class="pill complete">Complete</span></td><td>Dated Q4 2026–Q4 2029 timeline, launch waves, and milestones — Roadmap page</td></tr>
               <tr><td>3.4</td><td>AI/ML Models Documentation</td><td><span class="pill partial">Partial</span></td><td>Architecture is real and tested; the risk-scoring model itself is a placeholder heuristic, not yet clinically validated — disclosed, not hidden</td></tr>
               <tr><td>3.5</td><td>Platform Integrations</td><td><span class="pill complete">Complete</span></td><td>Real: FHIR R4, HL7 v2, X12 837/834, IoMT backend bridge</td></tr>
-              <tr><td>3.6</td><td>Security &amp; Compliance</td><td><span class="pill unavailable">Not available</span></td><td>No SOC 2 or HIPAA BAA documentation exists yet</td></tr>
+              <tr><td>3.6</td><td>Security &amp; Compliance</td><td><span class="pill partial">Partial</span></td><td>HIPAA, Security &amp; SOC 2 Packet now available (Document Room) — covers encryption at rest, persisted audit logging, and TLS; SOC 2 Type II audit itself has not yet been performed, so "compliant" is not yet a claim this makes</td></tr>
               <tr><td>3.7</td><td>Clinical Validation Studies</td><td><span class="pill partial">In Progress</span></td><td>Underway at the Mayo Clinic Accelerate program — see Risk Factors for what "in progress" does and doesn't mean here</td></tr>
             </tbody>
           </table></div>
@@ -1452,6 +1490,52 @@ document.querySelectorAll(".nav-item[data-page]").forEach(btn => {
 document.querySelectorAll(".doc-card[data-nav]").forEach(card => {
   card.addEventListener("click", () => goToPage(card.dataset.nav));
 });
+
+// ---- Investor Deck viewer: rendered slide images served from this app
+// (assets/investor_deck/), not an external claude.ai link — so it never
+// hits a sign-in wall for anyone who already has data room access. ----
+(function initDeckViewer() {
+  const DECK_SLIDE_COUNT = 14;
+  let deckIndex = 0;
+
+  const img = document.getElementById("deckSlideImg");
+  const counter = document.getElementById("deckCounter");
+  const dlLink = document.getElementById("deckDownloadLink");
+  const thumbsEl = document.getElementById("deckThumbs");
+  if (!img || !thumbsEl) return; // page not present in this build
+
+  function slideSrc(n) { return `assets/investor_deck/slide-${String(n).padStart(2, "0")}.jpg`; }
+
+  for (let i = 1; i <= DECK_SLIDE_COUNT; i++) {
+    const t = document.createElement("img");
+    t.src = slideSrc(i);
+    t.alt = `Slide ${i} thumbnail`;
+    t.addEventListener("click", () => showDeckSlide(i - 1));
+    thumbsEl.appendChild(t);
+  }
+
+  function showDeckSlide(i) {
+    deckIndex = Math.max(0, Math.min(DECK_SLIDE_COUNT - 1, i));
+    const src = slideSrc(deckIndex + 1);
+    img.src = src;
+    dlLink.href = src;
+    counter.textContent = `Slide ${deckIndex + 1} / ${DECK_SLIDE_COUNT}`;
+    thumbsEl.querySelectorAll("img").forEach((t, idx) => t.classList.toggle("active", idx === deckIndex));
+    const activeThumb = thumbsEl.children[deckIndex];
+    if (activeThumb) activeThumb.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+
+  document.getElementById("deckPrevBtn").addEventListener("click", () => showDeckSlide(deckIndex - 1));
+  document.getElementById("deckNextBtn").addEventListener("click", () => showDeckSlide(deckIndex + 1));
+  document.addEventListener("keydown", (e) => {
+    const deckPage = document.querySelector('.page[data-page="deck"]');
+    if (!deckPage || !deckPage.classList.contains("active")) return;
+    if (e.key === "ArrowLeft") showDeckSlide(deckIndex - 1);
+    if (e.key === "ArrowRight") showDeckSlide(deckIndex + 1);
+  });
+
+  showDeckSlide(0);
+})();
 
 // ---- Data Room Index (checklist) — live-checks the Legal & Corporate section against the real Document Room ----
 async function loadChecklist() {

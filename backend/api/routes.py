@@ -890,7 +890,25 @@ async def download_data_room_document(doc_id: str):
     doc = orchestrator.document_registry.get(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail=f"No document {doc_id}")
-    content = orchestrator.document_registry.read_content(doc_id)
+    try:
+        content = orchestrator.document_registry.read_content(doc_id)
+    except ValueError as exc:
+        # decrypt_bytes() raises ValueError when the stored bytes were
+        # encrypted under a key APP_ENCRYPTION_KEY no longer has (key was
+        # rotated without moving the old value into
+        # APP_ENCRYPTION_KEY_PREVIOUS — see encryption.py's rotate()), or
+        # were corrupted/tampered with. Surfaced as a real 500 detail
+        # instead of a bare "Internal Server Error" with nothing to go on.
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Document {doc_id} could not be decrypted: {exc} If APP_ENCRYPTION_KEY was ever "
+                "changed after this document was uploaded, the old key needs to be in "
+                "APP_ENCRYPTION_KEY_PREVIOUS (comma-separated if more than one) for existing documents "
+                "to stay readable — see encryption.py. Otherwise, re-upload this document under the "
+                "current key."
+            ),
+        ) from exc
     if content is None:
         raise HTTPException(status_code=404, detail=f"Document {doc_id} has no content on disk — likely lost to a redeploy; see the ephemeral-storage warning.")
     return Response(
