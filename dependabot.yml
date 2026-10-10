@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Backend Python dependencies (requirements.txt) — weekly PRs for
+  # outdated or vulnerable packages. This is the automated counterpart
+  # to the pip-audit step in .github/workflows/ci.yml: pip-audit catches
+  # vulnerabilities on every push; Dependabot proactively opens the PR
+  # to fix them even on a week with no pushes at all.
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # The Dockerfile's base image (python:3.11-slim) — keeps the image
+  # Render actually builds and deploys current with upstream security
+  # patches.
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+
+  # The CI workflow's own actions (actions/checkout, actions/setup-python)
+  # — so the CI pipeline itself doesn't quietly drift onto an unpatched
+  # or deprecated action version.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

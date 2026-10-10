@@ -1,0 +1,78 @@
+name: CI
+
+# Runs on every push and pull request against main. This is the first CI
+# this repo has had — previously there was no automated check at all
+# between a commit and a production deploy on Render, which is exactly
+# how the pydicom/pynetdicom dependency conflict (pip ResolutionImpossible)
+# reached production and broke the live service on 2026-10-10. The
+# "Docker build" job below builds the exact image Render builds, so that
+# specific failure mode is now caught here, before a push, not after.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-test-and-scan:
+    name: Install, import smoke test, dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Import smoke test
+        # Catches two real classes of bug before they reach Render:
+        # (1) a straight syntax/import error anywhere in the import
+        # chain, and (2) app/orchestrator construction blowing up at
+        # import time (e.g. the APP_ENCRYPTION_KEY fail-closed check in
+        # data_room/documents.py's DocumentRegistry.__init__). CI
+        # supplies throwaway values for the fail-closed env vars below —
+        # these are not real secrets and are never used outside this
+        # job; auth/db.py's SQLite fallback means no real database is
+        # needed either.
+        working-directory: backend
+        env:
+          JWT_SECRET_KEY: ci-smoke-test-only-not-a-real-secret
+          DATA_ROOM_PASSWORD: ci-smoke-test-only-not-a-real-secret
+        run: |
+          python -c "
+          import os
+          from cryptography.fernet import Fernet
+          os.environ['APP_ENCRYPTION_KEY'] = Fernet.generate_key().decode()
+          import main
+          print('main.py imports cleanly:', type(main.app).__name__)
+          "
+
+      - name: Dependency vulnerability scan (pip-audit)
+        # Scans backend/requirements.txt against the PyPI Advisory
+        # Database for known CVEs in exact pinned versions. Reports
+        # findings in the job log and as a GitHub Actions warning
+        # annotation, but does not fail the build on a finding yet —
+        # see the note in this step's output for why, and flip
+        # `continue-on-error` off once a first pass has been triaged.
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --desc
+
+  docker-build:
+    name: Docker build (same Dockerfile/context Render builds)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f backend/Dockerfile -t cardioai-pro-ci-build ./backend
