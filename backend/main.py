@@ -140,6 +140,13 @@ def _seed_legal_docs_into_data_room():
         # Terms of Use off into a different category for no functional
         # reason.
         ("Terms_of_Use.html", "terms-of-use.html", "regulatory", "Terms of Use"),
+        # Clinical Pilot Program's pre-negotiated legal/data-governance
+        # package (see the Clinical Pilot Program page) — same seeding
+        # pattern as the three legal docs above, so these also survive
+        # a restart and satisfy their own Data Room Index rows without
+        # a manual upload.
+        ("Data_Use_Agreement.html", "data-use-agreement.html", "regulatory", "Data Use Agreement"),
+        ("IT_Security_Summary.html", "it-security-summary.html", "regulatory", "IT Security Summary"),
     ]
     existing_filenames = {d.filename for d in orchestrator.document_registry.list_all()}
     for display_name, source_name, category, description in seeds:

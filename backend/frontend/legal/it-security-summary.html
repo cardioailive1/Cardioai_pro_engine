@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CardioAI Pro — IT Security Summary</title>
+<style>
+  body { max-width: 760px; margin: 40px auto; padding: 0 24px; font-family: Arial, sans-serif; color: #0A2140; line-height: 1.6; }
+  h1 { font-size: 24px; } h2 { font-size: 17px; margin-top: 28px; color: #1C7EC4; }
+  .draft-notice { background: #FDEDEA; border-left: 4px solid #C0392B; padding: 14px 16px; font-size: 14px; margin-bottom: 24px; }
+  .draft-notice strong { display: block; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<h1>IT Security Summary</h1>
+<p style="font-size: 13px; color: #6A90AB; margin-top: -8px; margin-bottom: 24px;">Last updated: October 2026.</p>
+<div class="draft-notice"><strong>Prepared for pilot-site IT/security review</strong> Written to be handed to a pilot site’s IT and security team alongside the Business Associate Agreement and Data Use Agreement at the point of LOI signing, as described in the Clinical Pilot Program’s pre-negotiated legal package. Section 10 lists every known gap in one place — nothing here is intended to read as more complete than Section 10 states.</div>
+<div style="background: #EAF5FC; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; font-size: 14px;">
+  <strong style="color: #0A2140;">Share &amp; Export:</strong>
+  <a href="/legal/exports/it-security-summary.pdf" download style="color: #1C7EC4; font-weight: 600;">Download PDF</a>
+  <a href="/legal/exports/it-security-summary.docx" download style="color: #1C7EC4; font-weight: 600;">Download Word</a>
+</div>
+
+<h2>1. Purpose</h2>
+<p>This summary answers the questions a pilot site’s IT and security review most commonly asks, so that review does not become the institutional-approval bottleneck the Clinical Pilot Program is designed to remove. It states what is actually implemented today, plainly against what is not — consistent with the rest of this data room.</p>
+
+<h2>2. Hosting and Infrastructure</h2>
+<p>The application runs as a Docker container on Render (web service, Ohio region), with a managed Postgres 16 database (standard plan) for user, organization, and role data, and a separate scheduled job (Render cron service) for daily audit-log retention purging. Infrastructure is defined in render.yaml and built in CI against the same Dockerfile Render deploys.</p>
+
+<h2>3. Data Storage and Encryption at Rest</h2>
+<p>Data Room documents are encrypted at the application layer (Fernet/AES via the cryptography library) before they reach any storage backend, independent of what that backend does on its own. The storage backend itself is Cloudflare R2 (S3-compatible, persistent across redeploys) when configured; where it is not configured, the application falls back to local container disk, which does not survive a redeploy or a free-tier spin-down and is not intended for pilot or production use — R2 must be configured before a pilot site’s documents are stored. Whether Render’s managed Postgres enables storage-level encryption at rest by default has not yet been independently confirmed against Render’s own documentation; this is an open item to close out before go-live, not an assumed yes.</p>
+
+<h2>4. Encryption in Transit</h2>
+<p>All HTTP traffic, including the application’s WebSocket stream, is served over TLS, terminated by Render’s managed routing layer.</p>
+
+<h2>5. Authentication and Access Control</h2>
+<p>Access is governed by role-based access control (RBAC) enforced server-side, with each application surface (main engine, clinician dashboard, payer portal, org admin) scoped to an explicit allowed-role set. Sessions are signed JSON Web Tokens (HS256 only — the decode path explicitly pins the algorithm, which is the documented mitigation for the one known python-jose CVE without an upstream fix), delivered via httpOnly cookies. Passwords are hashed with bcrypt via passlib, never stored in plain text.</p>
+
+<h2>6. Audit Logging</h2>
+<p>A persisted, Postgres-backed audit log (separate from the in-memory pipeline event feed used for the live dashboard) records user actions — signup, login success and failure, logout, and account approval, rejection, or disabling — and one row per completed or failed agent-pipeline run, each with the acting identity, organization, IP address, and user agent where applicable. Default retention is 400 days, purged daily by a scheduled job. <strong>Not yet implemented: record-level logging of individual PHI access events</strong> (who viewed which patient record, and when) — the same gap disclosed in Section 4 of the Business Associate Agreement.</p>
+
+<h2>7. Vulnerability and Dependency Management</h2>
+<p>Dependencies are scanned on every push and pull request via pip-audit in CI, with findings reported as build annotations; the step is currently warn-only rather than build-blocking, pending triage of the current finding set. Dependabot opens weekly update PRs for Python dependencies, the Docker base image, and the CI workflow’s own GitHub Actions. Known, deliberately untreated findings (a starlette version pinned by the current FastAPI version; one unpatched python-jose CVE with a documented mitigation in place) are tracked with their rationale directly in requirements.txt.</p>
+
+<h2>8. Monitoring and Incident Response</h2>
+<p>Error tracking and alerting (Sentry) is built into the application and activates automatically once a project DSN is supplied; no DSN is configured in this environment today, so alerting is not yet live. CI’s Docker build and import-smoke-test steps catch startup and dependency failures before a deploy reaches Render.</p>
+
+<h2>9. Subprocessors</h2>
+<p>Render (application hosting, managed Postgres, TLS termination) and, where configured, Cloudflare (R2 object storage for Data Room documents).</p>
+
+<h2>10. Known Gaps — Stated Together</h2>
+<p>For a reviewer who wants the complete list in one place rather than scattered across sections: no record-level PHI-access audit trail yet (Section 6); local-disk document storage is a non-persistent fallback only — R2 must be configured before any pilot site’s documents are stored (Section 3); Render’s default encryption-at-rest posture for its managed Postgres has not yet been independently confirmed (Section 3); Sentry alerting is not yet configured in this environment (Section 8); and a completed third-party security assessment or SOC 2 report does not yet exist — see the separate HIPAA, Security &amp; SOC 2 Packet in the Document Room for readiness detail, which is not the same as a completed audit.</p>
+
+<h2>11. Contact</h2>
+<p>Questions about this summary: invest@cardioailive.com</p>
+
+</body>
+</html>
