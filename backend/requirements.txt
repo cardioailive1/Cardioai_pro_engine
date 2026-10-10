@@ -1,7 +1,7 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
-pydicom==2.4.4
+pydicom==3.0.2   # pynetdicom 3.0.4 below requires pydicom>=3,<4 — bumped from 2.4.4 (which pynetdicom 3.x cannot install alongside) after confirming the metadata/pixel-extraction code and the PACS C-FIND/C-MOVE test harness both still pass unchanged on pydicom 3.x
 pynetdicom==3.0.4   # real live dependency — integrations/dicom.py's PACS C-FIND/C-MOVE query/retrieve SCU (DICOM network protocol, not file parsing — pydicom above handles the files themselves)
 python-multipart==0.0.9
 websockets==13.1
