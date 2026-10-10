@@ -91,6 +91,15 @@ services:
         sync: false
       - key: PACS_CALLING_AE_TITLE
         value: CARDIOAI_PRO
+      # Error monitoring/alerting (main.py's sentry_sdk.init() block,
+      # closes the "no monitoring/alerting tooling" gap). Left unset by
+      # default — there is no Sentry project to point at yet, and the
+      # app boots and runs identically either way (main.py's init is
+      # wrapped and skipped entirely when this is empty). Create a free
+      # Sentry project, put its DSN here, and error tracking/alerting is
+      # live on the next deploy with no code change.
+      - key: SENTRY_DSN
+        sync: false
 
   # --- scale-out path (uncomment when moving beyond a single-process demo) ---
   # - type: worker
