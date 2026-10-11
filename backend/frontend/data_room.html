@@ -1478,7 +1478,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <tbody>
               <tr><td>2.1</td><td>Financial Model &amp; Projections</td><td><span class="pill complete">Complete</span></td><td>3-year model (FY2027–FY2029), every figure traceable to the source workbook</td></tr>
               <tr><td>2.2</td><td>Historical Financials</td><td><span class="pill unavailable">Not available</span></td><td>Pre-revenue, pre-seed stage — not applicable yet</td></tr>
-              <tr data-doc-category="financial" data-doc-match="cap table"><td>2.3</td><td>Cap Table</td><td><span class="pill unavailable">Checking…</span></td><td>Real cap table received and reflected on the Investment Structure page — upload the file itself here to also show "Complete" via live-check</td></tr>
+              <tr data-doc-category="financial" data-doc-match="cap table|captable|capitalization"><td>2.3</td><td>Cap Table</td><td><span class="pill unavailable">Checking…</span></td><td>Real cap table received and reflected on the Investment Structure page — upload the file itself here to also show "Complete" via live-check</td></tr>
               <tr><td>2.4</td><td>Use of Funds</td><td><span class="pill complete">Complete</span></td><td>Full $1.0M pre-seed allocation — Investment Structure page</td></tr>
               <tr><td>2.7</td><td>Financing History (SAFE)</td><td><span class="pill complete">Complete</span></td><td>Mayo Clinic Platform $800K SAFE — signed &amp; completed, a separate instrument from the still-open pre-seed round</td></tr>
               <tr><td>2.5</td><td>Unit Economics</td><td><span class="pill complete">Complete</span></td><td>CAC, payback, LTV:CAC computed for Enterprise &amp; Payer, flagged as inflated by temporarily below-market Y1 comp with a fully-loaded alternative shown; Consumer explained as not cleanly derivable — Financial Model page</td></tr>
@@ -1549,17 +1549,26 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
           <div class="table-wrap"><table class="dt">
             <thead><tr><th>#</th><th>Document</th><th>Status</th><th>Description</th></tr></thead>
             <tbody id="legalChecklistBody">
-              <tr data-doc-category="corporate_legal" data-doc-match="incorporat"><td>7.1</td><td>Certificate / Articles of Incorporation</td><td><span class="pill unavailable">Checking…</span></td><td>Upload in the Document Room</td></tr>
-              <tr data-doc-category="corporate_legal" data-doc-match="bylaw"><td>7.2</td><td>Bylaws</td><td><span class="pill unavailable">Checking…</span></td><td>Upload in the Document Room</td></tr>
-              <tr data-doc-category="ip" data-doc-match=""><td>7.3</td><td>Intellectual Property</td><td><span class="pill unavailable">Checking…</span></td><td>Patents, trademarks, IP assignment agreements</td></tr>
-              <tr data-doc-category="commercial" data-doc-match=""><td>7.4</td><td>Material Contracts</td><td><span class="pill unavailable">Checking…</span></td><td>Key partnership and vendor agreements</td></tr>
-              <tr data-doc-category="hr_employment" data-doc-match=""><td>7.5</td><td>Employment Agreements</td><td><span class="pill unavailable">Checking…</span></td><td>Executive and key employee contracts</td></tr>
-              <tr data-doc-category="other" data-doc-match="nda"><td>7.6</td><td>NDAs &amp; Confidentiality</td><td><span class="pill unavailable">Checking…</span></td><td>Standard confidentiality agreements</td></tr>
+              <tr data-doc-category="corporate_legal" data-doc-match="incorporat|articles of inc|certificate of inc"><td>7.1</td><td>Certificate / Articles of Incorporation</td><td><span class="pill unavailable">Checking…</span></td><td>Upload in the Document Room</td></tr>
+              <tr data-doc-category="corporate_legal" data-doc-match="bylaw|by law"><td>7.2</td><td>Bylaws</td><td><span class="pill unavailable">Checking…</span></td><td>Upload in the Document Room</td></tr>
+              <tr data-doc-category="ip" data-doc-any-in-category="true" data-doc-match="patent|trademark|ip assignment|invention assignment|intellectual property"><td>7.3</td><td>Intellectual Property</td><td><span class="pill unavailable">Checking…</span></td><td>Patents, trademarks, IP assignment agreements</td></tr>
+              <tr data-doc-category="commercial" data-doc-any-in-category="true" data-doc-match="material contract|master service|msa|partnership agreement|vendor agreement|customer agreement|supply agreement|letter of intent|loi"><td>7.4</td><td>Material Contracts</td><td><span class="pill unavailable">Checking…</span></td><td>Key partnership and vendor agreements</td></tr>
+              <tr data-doc-category="hr_employment" data-doc-any-in-category="true" data-doc-match="employment|offer letter|employee|equity grant|stock option|consulting agreement|advisor agreement"><td>7.5</td><td>Employment Agreements</td><td><span class="pill unavailable">Checking…</span></td><td>Executive and key employee contracts</td></tr>
+              <tr data-doc-category="other" data-doc-match="nda|non disclosure|nondisclosure|confidentiality"><td>7.6</td><td>NDAs &amp; Confidentiality</td><td><span class="pill unavailable">Checking…</span></td><td>Standard confidentiality agreements</td></tr>
               <tr data-doc-category="regulatory" data-doc-match="data use"><td>7.7</td><td>Data Use Agreement — <a href="/legal/data-use-agreement.html" target="_blank" rel="noopener">view</a></td><td><span class="pill unavailable">Checking…</span></td><td>Clinical Pilot Program legal package</td></tr>
               <tr data-doc-category="regulatory" data-doc-match="security summary"><td>7.8</td><td>IT Security Summary — <a href="/legal/it-security-summary.html" target="_blank" rel="noopener">view</a></td><td><span class="pill unavailable">Checking…</span></td><td>Clinical Pilot Program legal package</td></tr>
             </tbody>
           </table></div>
-          <p class="sub" style="margin-top:8px;">Go to the Document Room to upload any of these — this table updates automatically based on what's actually there, not a static claim.</p>
+          <p class="sub" style="margin-top:8px;">Go to the Document Room to upload any of these — this table updates automatically based on what's actually there, not a static claim. Rows match on the uploaded file's name or description (underscores, hyphens and capitalization are ignored), and a matched row shows the actual uploaded file name in its Description column.</p>
+        </section>
+
+        <section class="panel" id="unmatchedDocsPanel" style="display:none;">
+          <h3 style="margin-top:0;">Uploaded documents not matched to a checklist row</h3>
+          <p class="sub">These files are in the Document Room but their names don't correspond to any live-checked row above. Nothing is wrong with them — they just aren't counted in the checklist yet.</p>
+          <div class="table-wrap"><table class="dt">
+            <thead><tr><th>File</th><th>Category</th></tr></thead>
+            <tbody id="unmatchedDocsBody"></tbody>
+          </table></div>
         </section>
 
         <section class="panel category-block">
@@ -1627,6 +1636,8 @@ async function attemptUnlock() {
     });
     if (res.ok) {
       showApp();
+      const activePage = document.querySelector(".page.active");
+      if (activePage && activePage.dataset.page === "checklist") loadChecklist();
     } else {
       let detail = "Incorrect access code. Please try again.";
       try { const body = await res.json(); if (body.detail) detail = body.detail; } catch {}
@@ -1726,30 +1737,76 @@ document.querySelectorAll(".doc-card[data-nav]").forEach(card => {
 })();
 
 // ---- Data Room Index (checklist) — live-checks the Legal & Corporate section against the real Document Room ----
+// Normalizes a file name/description for matching: lowercase, with
+// underscores, hyphens and dots read as spaces — so "CAP_TABLE_V6A.xlsx"
+// matches a "cap table" keyword the way a person would read it.
+const normDoc = s => String(s || "").toLowerCase().replace(/[_\-.]+/g, " ").replace(/\s+/g, " ").trim();
+
+// Start-of-word prefix match, so "bylaw" matches "Bylaws" and "nda" does
+// not match inside "agenda".
+function docHasKeyword(doc, keywords) {
+  const hay = ` ${normDoc(`${doc.filename} ${doc.description}`)}`;
+  return keywords.some(k => { const kw = normDoc(k); return kw && hay.includes(` ${kw}`); });
+}
+
+function checklistMatches(row, docs) {
+  const category = row.dataset.docCategory;
+  const anyInCategory = row.dataset.docAnyInCategory === "true";
+  const keywords = (row.dataset.docMatch || "").split("|").map(s => s.trim()).filter(Boolean);
+  return docs.filter(d => {
+    if (keywords.length === 0) return d.category === category;      // category alone is enough
+    if (anyInCategory && d.category === category) return true;      // anything filed under the category counts
+    return docHasKeyword(d, keywords);                              // otherwise the name must match, whichever category it was filed under
+  });
+}
+
 async function loadChecklist() {
+  const rows = document.querySelectorAll("tr[data-doc-category]");
+  rows.forEach(row => { if (row.dataset.origDesc === undefined) row.dataset.origDesc = row.lastElementChild.textContent; });
   try {
     const body = await fetchJSON(`${API}/data-room/documents`);
     const docs = body.documents || [];
+    const claimed = new Set();
 
-    document.querySelectorAll("tr[data-doc-category]").forEach(row => {
-      const category = row.dataset.docCategory;
-      const matchText = (row.dataset.docMatch || "").toLowerCase();
-      const matches = docs.filter(d => {
-        if (d.category !== category) return false;
-        if (!matchText) return true; // no specific filename/description match required — any upload in this category counts
-        const haystack = `${d.filename} ${d.description}`.toLowerCase();
-        return haystack.includes(matchText);
-      });
+    rows.forEach(row => {
+      const matches = checklistMatches(row, docs);
+      matches.forEach(m => claimed.add(m.doc_id));
       const cell = row.querySelector("td:nth-child(3)");
       if (matches.length > 0) {
         cell.innerHTML = `<span class="pill complete">Complete</span>`;
-        row.lastElementChild.textContent = `${matches[0].filename}${matches.length > 1 ? ` (+${matches.length - 1} more)` : ""}`;
+        const names = matches.map(m => m.filename);
+        row.lastElementChild.textContent = names.slice(0, 3).join(", ") + (names.length > 3 ? ` (+${names.length - 3} more)` : "");
       } else {
         cell.innerHTML = `<span class="pill unavailable">Not uploaded</span>`;
+        row.lastElementChild.textContent = row.dataset.origDesc;
       }
     });
+
+    // Anything in the Document Room that no row claimed — shown, not hidden,
+    // so a name that doesn't line up with the index is visible instead of
+    // silently ignored. The three static legal pages (4.6–4.8) are listed
+    // elsewhere in the index and excluded here.
+    const staticLegal = ["business associate", "privacy statement", "terms of use"];
+    const unmatched = docs.filter(d => !claimed.has(d.doc_id) && !docHasKeyword(d, staticLegal));
+    const panel = document.getElementById("unmatchedDocsPanel");
+    const tbody = document.getElementById("unmatchedDocsBody");
+    tbody.replaceChildren(...unmatched.map(d => {
+      const tr = document.createElement("tr");
+      const f = document.createElement("td"); f.textContent = d.filename;
+      const c = document.createElement("td"); c.textContent = d.category_label || d.category;
+      tr.append(f, c);
+      return tr;
+    }));
+    panel.style.display = unmatched.length ? "" : "none";
   } catch (e) {
-    document.querySelectorAll("tr[data-doc-category] .pill").forEach(p => { p.className = "pill unavailable"; p.textContent = "Unknown"; });
+    // "Couldn't check" is a failed lookup, not a statement about the files:
+    // an expired session (401) sends the person back to the access-code gate.
+    const expired = e && e.status === 401;
+    rows.forEach(row => {
+      row.querySelector("td:nth-child(3)").innerHTML = `<span class="pill unavailable">Couldn't check</span>`;
+      row.lastElementChild.textContent = expired ? "Session expired — enter the access code again" : `Couldn't reach the Document Room (${e.message})`;
+    });
+    if (expired) showGate();
   }
 
   // Compute header stats from whatever pills are actually rendered on the
@@ -1767,7 +1824,9 @@ async function fetchJSON(url, opts = {}) {
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try { const body = await res.json(); if (body.detail) detail = body.detail; } catch {}
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
