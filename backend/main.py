@@ -316,6 +316,19 @@ async def healthz():
     return {"status": "ok"}
 
 
+@app.get("/api/data-room/valuation-report")
+async def data_room_valuation_report():
+    # HTML version of the 409A report. Lives outside frontend/ (so the public
+    # static mount can't serve it) and under /api/data-room/ so DataRoomGate
+    # requires the data-room access code, like every other data-room document.
+    from fastapi.responses import HTMLResponse
+    path = BASE_DIR / "private" / "409a-valuation-report.html"
+    if not path.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Report not found.")
+    return HTMLResponse(path.read_text(encoding="utf-8"), headers={"Cache-Control": "private, no-store"})
+
+
 # Serve the dashboard. Mounted last so /api and /healthz take precedence.
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
