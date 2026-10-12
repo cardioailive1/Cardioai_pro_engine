@@ -329,6 +329,24 @@ async def data_room_valuation_report():
     return HTMLResponse(path.read_text(encoding="utf-8"), headers={"Cache-Control": "private, no-store"})
 
 
+_DATA_ROOM_HTML_DOCS = {"technical-architecture-packet", "hipaa-security-soc2-packet"}
+
+
+@app.get("/api/data-room/doc-html/{slug}")
+async def data_room_doc_html(slug: str):
+    # HTML renderings of the Technical Architecture and HIPAA/Security/SOC 2
+    # packets. Allowlisted slugs only; files live in private/ and are gated
+    # by the data-room access code (everything under /api/data-room/).
+    from fastapi import HTTPException
+    from fastapi.responses import HTMLResponse
+    if slug not in _DATA_ROOM_HTML_DOCS:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    path = BASE_DIR / "private" / f"{slug}.html"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return HTMLResponse(path.read_text(encoding="utf-8"), headers={"Cache-Control": "private, no-store"})
+
+
 # Serve the dashboard. Mounted last so /api and /healthz take precedence.
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 

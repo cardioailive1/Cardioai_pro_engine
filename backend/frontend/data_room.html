@@ -226,8 +226,8 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="doc-card" data-nav="roadmap"><div class="doc-num">10</div><h4>Roadmap</h4><p>Launch waves, key milestones, and the Year 1 pilot/LOI pipeline, Q4 2026 through Q4 2029.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="pilot"><div class="doc-num">14</div><h4>Clinical Pilot Program</h4><p>Warm-network recruitment, pre-negotiated legal/data-governance package, and a fractional clinical liaison — mapped onto the Roadmap's actual dates.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="valuation"><div class="doc-num">15</div><h4>Valuation (409A)</h4><p>Appraiser's 409A report and weighted valuation model: four approaches, $0.75 fair market value per common share, with the HTML version of the report and the source files in the Document Room.</p><div class="doc-open">Open →</div></div>
-            <div class="doc-card" data-nav="documents" data-open-doc="technical architecture"><div class="doc-num">11</div><h4>Technical Architecture Packet</h4><p>Full system architecture writeup — the 15-agent pipeline, integrations, deployment environment, and AI models, confirmed against the actual codebase. Opens the document directly.</p><div class="doc-open">Open →</div></div>
-            <div class="doc-card" data-nav="documents" data-open-doc="hipaa|soc2|soc 2"><div class="doc-num">12</div><h4>HIPAA, Security &amp; SOC 2 Packet</h4><p>Security architecture, encryption, audit logging, and SOC 2 readiness — what's actually implemented today, stated plainly against what's still planned. Opens the document directly.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="documents" data-open-html="technical-architecture-packet"><div class="doc-num">11</div><h4>Technical Architecture Packet</h4><p>Full system architecture writeup — the 15-agent pipeline, integrations, deployment environment, and AI models, confirmed against the actual codebase. Opens the HTML version directly; the PDF is in the Document Room.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="documents" data-open-html="hipaa-security-soc2-packet"><div class="doc-num">12</div><h4>HIPAA, Security &amp; SOC 2 Packet</h4><p>Security architecture, encryption, audit logging, and SOC 2 readiness — what's actually implemented today, stated plainly against what's still planned. Opens the HTML version directly; the PDF is in the Document Room.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="deck"><div class="doc-num">13</div><h4>Investor Deck</h4><p>14-slide presentation — same figures as this data room throughout. Viewed directly here, no separate sign-in required.</p><div class="doc-open">Open →</div></div>
           </div>
         </section>
@@ -1806,6 +1806,12 @@ document.querySelectorAll(".doc-card[data-nav]").forEach(card => {
     // Cards with data-open-doc open the matching Document Room file directly
     // (rendered in a new tab if it's a PDF); anything that can't be found or
     // opened falls back to the Document Room list, as these cards always did.
+    if (card.dataset.openHtml) {
+      // Built-in HTML rendering of the document (gated like the rest of the data room).
+      const w = window.open(`${API}/data-room/doc-html/${card.dataset.openHtml}`, "_blank");
+      if (!w) window.location.href = `${API}/data-room/doc-html/${card.dataset.openHtml}`;
+      return;
+    }
     if (!card.dataset.openDoc) { goToPage(card.dataset.nav); return; }
     const win = window.open("", "_blank");
     try {
