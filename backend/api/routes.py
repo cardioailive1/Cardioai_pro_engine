@@ -902,7 +902,7 @@ async def storage_diagnostics():
 
 
 @router.get("/data-room/documents/{doc_id}/download")
-async def download_data_room_document(doc_id: str, request: Request, db: Session = Depends(get_db)):
+async def download_data_room_document(doc_id: str, request: Request, inline: bool = False, db: Session = Depends(get_db)):
     doc = orchestrator.document_registry.get(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail=f"No document {doc_id}")
@@ -945,6 +945,15 @@ async def download_data_room_document(doc_id: str, request: Request, db: Session
         ip_address=_data_room_client_ip(request), user_agent=_data_room_user_agent(request),
         metadata={"filename": doc.filename, "category": doc.category},
     )
+    # ?inline=1 lets the Overview cards open a document straight in the
+    # browser. PDFs only: serving any other uploaded type inline from this
+    # origin (HTML especially) would run it with the page's privileges, so
+    # everything else stays a forced download as before.
+    if inline and doc.filename.lower().endswith(".pdf"):
+        return Response(
+            content=content, media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{doc.filename}"', "X-Content-Type-Options": "nosniff"},
+        )
     return Response(
         content=content, media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},

@@ -226,8 +226,8 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <div class="doc-card" data-nav="roadmap"><div class="doc-num">10</div><h4>Roadmap</h4><p>Launch waves, key milestones, and the Year 1 pilot/LOI pipeline, Q4 2026 through Q4 2029.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="pilot"><div class="doc-num">14</div><h4>Clinical Pilot Program</h4><p>Warm-network recruitment, pre-negotiated legal/data-governance package, and a fractional clinical liaison — mapped onto the Roadmap's actual dates.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="valuation"><div class="doc-num">15</div><h4>Valuation (409A)</h4><p>Appraiser's 409A report and weighted valuation model: four approaches, $0.75 fair market value per common share, with the HTML version of the report and the source files in the Document Room.</p><div class="doc-open">Open →</div></div>
-            <div class="doc-card" data-nav="documents"><div class="doc-num">11</div><h4>Technical Architecture Packet</h4><p>Full system architecture writeup — the 15-agent pipeline, integrations, deployment environment, and AI models, confirmed against the actual codebase. Download from the Document Room.</p><div class="doc-open">Open →</div></div>
-            <div class="doc-card" data-nav="documents"><div class="doc-num">12</div><h4>HIPAA, Security &amp; SOC 2 Packet</h4><p>Security architecture, encryption, audit logging, and SOC 2 readiness — what's actually implemented today, stated plainly against what's still planned. Download from the Document Room.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="documents" data-open-doc="technical architecture"><div class="doc-num">11</div><h4>Technical Architecture Packet</h4><p>Full system architecture writeup — the 15-agent pipeline, integrations, deployment environment, and AI models, confirmed against the actual codebase. Opens the document directly.</p><div class="doc-open">Open →</div></div>
+            <div class="doc-card" data-nav="documents" data-open-doc="hipaa|soc2|soc 2"><div class="doc-num">12</div><h4>HIPAA, Security &amp; SOC 2 Packet</h4><p>Security architecture, encryption, audit logging, and SOC 2 readiness — what's actually implemented today, stated plainly against what's still planned. Opens the document directly.</p><div class="doc-open">Open →</div></div>
             <div class="doc-card" data-nav="deck"><div class="doc-num">13</div><h4>Investor Deck</h4><p>14-slide presentation — same figures as this data room throughout. Viewed directly here, no separate sign-in required.</p><div class="doc-open">Open →</div></div>
           </div>
         </section>
@@ -742,7 +742,6 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <li><strong>Regulatory clearance is not complete.</strong> FDA 510(k) submissions (echo, ECG, longitudinal prediction) are now targeted for Jan 2027, with clearance of all CardioAI Pro functions targeted May–Jun 2027 — before the Nov 2027 go-live, per the company's current roadmap (see the Roadmap page). This plan's revenue does not depend on clearance being achieved by that specific date, but a material delay would push clearance past go-live and affect the Enterprise and Payer segments' sales cycles. Note: the R&amp;D &amp; Regulatory budget below, from the attached financial model (V7A), was built against an earlier, slower submission timeline and has not yet been reconciled against this accelerated roadmap — the dollar figures are real workbook figures, but their phasing may not match the dates above.</li>
             <li><strong>Sales execution risk.</strong> The Enterprise segment's revenue trajectory depends on 4 reps — paid temporarily below market rate — closing 15 contracts in Year 1 at an $800K average value; the realistic case is 8 contracts (3 signed LOIs + 5 named prospects), not a guarantee. The Scenarios sheet models Conservative (50% scale, 1-year delay) and Downside (30% scale, 2-year delay) cases.</li>
             <li><strong>Round structure open to negotiation.</strong> The $32,754,892 pre-money / $2.00-per-share structure above is internally consistent (the financial model and the cap table agree with each other), but final terms have not yet been agreed with investors. Supporting valuation/appraisal documentation, board resolutions, and stockholder approvals are available in the Document Room. See the Investment Structure page.</li>
-            <li><strong>Option pool increase pending approval.</strong> The proposed $32,754,892 pre-money valuation assumes a $2.0M option pool increase that is not yet approved by the Board and stockholders — see the Investment Structure page. Disclosed, not hidden; the headline figures reconcile either way, but this specific line item is pending.</li>
             <li><strong>Temporarily suppressed compensation.</strong> Founder/executive salaries and sales rep pay are held below market rate through FY2028, subject to Board review — a real cost-structure choice that makes near-term unit economics (CAC, EBITDA margin) look stronger than a fully-loaded, sustainable structure would; see Unit Economics on the Financial Model page.</li>
             <li><strong>Early-stage company risk</strong> applies in the ordinary sense — a pre-seed company with a $1.0M raise, dependent on executing a detailed plan against a competitive, regulated market.</li>
           </ul>
@@ -806,9 +805,6 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
             <li><strong>BAA, Privacy Statement and Terms of Use</strong> drafted; counsel review pending.</li>
             <li><strong>Clinical Pilot Program defined:</strong> warm-network recruitment, a pre-negotiated legal/data-governance package (Data Use Agreement + IT Security Summary, drafted, added to the BAA above), and a fractional clinical liaison — see the Clinical Pilot Program page for the full plan and how it maps onto the milestones below.</li>
           </ul>
-          <div class="callout info">
-            <strong>Resolved:</strong> the "Revenue Model V7" referenced in the source roadmap materials ($149.8M) has now been superseded by the actual attached workbook, <span class="mono">CardioAI_RevenueModel_V7_7.xlsx</span>, which totals <strong>$265.3M</strong> over the same three years — higher than either the $149.8M the roadmap cited or the $184.1M model it replaced, reflecting corrections made between V7 and V7A (recurring revenue from existing contracts, mid-year convention for new customers, a corrected NRR input, and a phased rather than flat Year 1 OpEx) in addition to adding MedCRM and IoMT-RPM. This is now the data room's financial record of truth — see the Financial Model page for full detail. The pre-money valuation this workbook assumes ($32,754,892) is internally confirmed against the updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) — but the round structure itself remains open to negotiation — see the Investment Structure page.
-          </div>
         </section>
 
         <section class="panel">
@@ -1292,7 +1288,6 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <li><b>$28,717,392</b> — the stale cap table's (<span class="mono">CARDIO_AI__CAP_TABLE_V5A.xlsx</span>) pre-money, built before Dr. Nahar's options and SAFE were added and before the option pool was expanded. Superseded by the updated cap table below.</li>
               <li><b>$32,754,892</b> — confirmed. The updated cap table (<span class="mono">CAP_TABLE_V6A.xlsx</span>) independently lands on the same figure V7A's Assumptions sheet computes: $2.00/share × (12,750,000 founder shares + 3,108,696 option pool + 518,750 SAFE conversion shares) = $32,754,892. Both the option pool (3,108,696) and the SAFE conversion shares (518,750, from the combined $830,000 Mayo + Nahar SAFEs) now match exactly.</li>
             </ul>
-            <b>One open item remains, not a conflict:</b> $2,000,000 of the option pool this valuation assumes is a pending increase awaiting Board and stockholder approval (cap table cell F40). The ownership table below reflects the cap table as attached, including this pending item.
           </div>
 
           <h4 style="font-size:20px; color:#0A2140; margin:20px 0 8px;">Ownership (pre-financing)</h4>
@@ -1321,7 +1316,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
               <tr><td>Pre-Money Valuation</td><td>$32,754,892</td></tr>
               <tr><td>New money (this raise)</td><td>$1,000,000</td></tr>
               <tr><td>SAFE converting in (Mayo + Dr. Nahar, combined)</td><td>$830,000</td></tr>
-              <tr><td>Option pool increase (pending Board &amp; stockholder approval)</td><td>$2,000,000</td></tr>
+              <tr><td>Option pool increase (approved)</td><td>$2,000,000</td></tr>
               <tr class="total-row"><td>Post-Money Valuation</td><td>$33,754,892</td></tr>
               <tr><td>Post-money fully diluted shares</td><td>16,877,446</td></tr>
             </tbody>
@@ -1807,7 +1802,27 @@ document.querySelectorAll(".nav-item[data-page]").forEach(btn => {
   btn.addEventListener("click", () => goToPage(btn.dataset.page));
 });
 document.querySelectorAll(".doc-card[data-nav]").forEach(card => {
-  card.addEventListener("click", () => goToPage(card.dataset.nav));
+  card.addEventListener("click", async () => {
+    // Cards with data-open-doc open the matching Document Room file directly
+    // (rendered in a new tab if it's a PDF); anything that can't be found or
+    // opened falls back to the Document Room list, as these cards always did.
+    if (!card.dataset.openDoc) { goToPage(card.dataset.nav); return; }
+    const win = window.open("", "_blank");
+    try {
+      const res = await fetch(`${API}/data-room/documents`, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(String(res.status));
+      const keywords = card.dataset.openDoc.split("|").map(k => k.trim()).filter(Boolean);
+      const matches = (await res.json()).documents
+        .filter(d => docHasKeyword(d, keywords))
+        .sort((a, b) => (/\.pdf$/i.test(b.filename) - /\.pdf$/i.test(a.filename)) || (b.uploaded_at - a.uploaded_at));
+      if (!matches.length) throw new Error("not found");
+      const url = `${API}/data-room/documents/${matches[0].doc_id}/download?inline=1`;
+      if (win) win.location.href = url; else window.location.href = url;
+    } catch (e) {
+      if (win) win.close();
+      goToPage(card.dataset.nav);
+    }
+  });
 });
 
 // ---- Investor Deck viewer: rendered slide images served from this app
