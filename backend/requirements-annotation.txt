@@ -1,0 +1,10 @@
+# Annotation tooling for the Mayo Clinic Platform Workspace (confirmed with
+# Mayo, 2026-10-14). pip installs work there; `docker pull` does NOT, so any
+# container must be fully self-contained. Install after requirements.txt and
+# requirements-training.txt:
+#   pip install -r requirements.txt -r requirements-training.txt -r requirements-annotation.txt
+#
+# Model-assisted annotation server (3D Slicer / OHIF client side)
+monailabel
+# Convert outlines/segmentations to DICOM SEG for OHIF viewing
+highdicom
