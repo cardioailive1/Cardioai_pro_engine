@@ -19,7 +19,7 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
 | Question | Answer |
 |---|---|
 | Where are cardiac MRI / echo DICOM images? | Not in a table. Inventoried in `FACT_RADIOLOGY_DICOM_INVENTORY`; files are requested from that inventory. Covered in the Radiology training session and Resource Hub slides |
-| Which column links a study to its report (FACT_RADIOLOGY, FACT_ECHO_TEST)? | Not answered yet - same training. Do not assume accession number or study UID |
+| Which column links a study to its report? | Radiology slides: `FACT_RADIOLOGY.ACCESSION_NBR` = `FACT_RADIOLOGY_DICOM_INVENTORY.DICOM_ACCESSION_NUMBER` (see `radiology_link.py`). FACT_ECHO_TEST link still unconfirmed |
 | Docker as a saved tar | Same import process as other self-contained images (yes) |
 | Annotator onboarding | Same as every data user, including the DUA form submission (Mayo smartsheet form) for each of the 5 accounts |
 | A100 booking / limits | Turn the GPU on; it attaches automatically if a machine is free. No usage limit stated; covered in Data Environment training |
@@ -42,10 +42,14 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
   the Workspace JupyterLab; `apply_reviews` merges decisions and reports the pre-labeler's measured agreement.
   Nothing needs installing for this or for the text auto-annotation (Python standard library + numpy only).
   `monailabel`/`highdicom` are needed only for image outlines.
+- Image linking = `training/mayo/radiology_link.py` (from the Radiology slides): joins reports to the DICOM
+  inventory on accession number, keeps only images with IMAGE_DEID_STATUS Ready/Available, and gives a starter
+  Spark SQL for cardiac MRI. Reports with an addendum/edit are always sent to review. Radiology reports are
+  also in OMOP `note.note_text`; the DICOM inventory is not in OMOP.
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)
-0. Image-to-report link column and the DICOM request process (Radiology training); DUA forms for the 5 annotators.
+0. Echo-note-to-image link (FACT_ECHO_TEST), the DICOM request process, and DUA forms for the 5 annotators.
 1. Confirm the ECG Base64 layout (dtype, lead count, interleaving, sampling rate) on real rows.
 2. Image outlines: no segmentations exist, so cardiac MRI/echo outlines need monailabel + outside annotators
    (3D Slicer/OHIF); GPU pre-drawing runs on the A100.
