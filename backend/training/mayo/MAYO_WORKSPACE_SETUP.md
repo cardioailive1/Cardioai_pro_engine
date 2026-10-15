@@ -50,6 +50,9 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
   `train_mobile_echo_net(dataset=...)` accepts (default synthetic behaviour unchanged). Only human-reviewed
   labels are used. Series choice and cine ordering for MRI stacks are simple defaults to refine on real data.
   Test: `python -m training.mayo.test_lvef_dataset` (needs torch + pydicom).
+- De-identification request = `write_deid_request_csv` in `radiology_link.py`: writes the CSV Mayo (TSM) asked for -
+  STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL - one row per selected study, rejecting rows with
+  missing values or a status other than Ready/Available. The real rows come from the Workspace.
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)

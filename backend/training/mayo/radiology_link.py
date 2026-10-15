@@ -68,3 +68,29 @@ def link_reports_to_images(reports: Iterable[dict], inventory: Iterable[dict]) -
                 {"series": x.get("SERIES_INSTANCE_UID"), "sop": x.get("SOP_INSTANCE_UID")})
         linked[str(acc)] = {"report": rep, "studies": studies}
     return {"linked": linked, "no_images": no_images, "not_submittable": not_sub}
+
+
+DEID_COLUMNS = ["STUDY_INSTANCE_UID", "PATIENT_DK", "MODALITY", "STMO_NAME_IN_ADL"]
+
+
+def write_deid_request_csv(rows: Iterable[dict], path: str) -> dict:
+    """Mayo (TSM) de-identification request: one row per selected imaging STUDY with exactly
+    STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL (that order). `rows` come from the
+    Workspace (inventory / FACT_IMAGINGSTUDY joined to the patient key). Rows with a missing
+    value, or whose IMAGE_DEID_STATUS (if present) is not Ready/Available, are rejected and
+    reported, never silently written. Duplicates (same study) collapse to one row."""
+    import csv
+    seen, kept, rejected = set(), [], []
+    for r in rows:
+        st = r.get("IMAGE_DEID_STATUS")
+        if any(str(r.get(c, "")).strip() == "" for c in DEID_COLUMNS):
+            rejected.append((r.get("STUDY_INSTANCE_UID"), "missing value")); continue
+        if st is not None and str(st).strip().lower() not in SUBMITTABLE:
+            rejected.append((r.get("STUDY_INSTANCE_UID"), f"IMAGE_DEID_STATUS={st}")); continue
+        key = str(r["STUDY_INSTANCE_UID"]).strip()
+        if key in seen:
+            continue
+        seen.add(key); kept.append({c: str(r[c]).strip() for c in DEID_COLUMNS})
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=DEID_COLUMNS); w.writeheader(); w.writerows(kept)
+    return {"written": len(kept), "rejected": rejected}
