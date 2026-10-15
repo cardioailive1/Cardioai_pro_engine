@@ -53,6 +53,15 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
 - De-identification request = `write_deid_request_csv` in `radiology_link.py`: writes the CSV Mayo (TSM) asked for -
   STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL - one row per selected study, rejecting rows with
   missing values or a status other than Ready/Available. The real rows come from the Workspace.
+- Two-tier label audit = `training/mayo/label_audit.py`. Tier 1: data scientists audit EVERY auto label (agree /
+  disagree + their LVEF / uncertain / exclude); the cardiologist file cannot be built until all studies are covered.
+  Tier 2: the cardiologist adjudicates only disagreements (auditor vs auto, or auditor vs auditor), uncertain cases
+  (auditor unsure or labeler-flagged) and a small blinded spot-check (default 5%, minimum 5) of agreed studies.
+  Their CSV is shuffled with random ids and shows no auto label, auditor decision or queue reason; a separate key
+  file stays with the data scientists. `finalize` gives final labels (cardiologist overrides consensus), exclusions,
+  unresolved studies and the spot-check agreement (with 95% interval); the batch passes only at >=95% agreement over
+  >=20 spot-checks with nothing unresolved. Feed `finalize(...)['labels']` to `lvef_dataset.build_lvef_examples`.
+  This replaces the single-tier `review_queue` for anything used in training. Test: `python -m training.mayo.test_label_audit`.
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)
