@@ -67,10 +67,12 @@ class SyntheticLabeledCineDataset(Dataset):
         return video, target
 
 
-def train_mobile_echo_net(n_epochs: int = 10, batch_size: int = 16, variant: str = "small", lr: float = 3e-4) -> dict:
+def train_mobile_echo_net(n_epochs: int = 10, batch_size: int = 16, variant: str = "small", lr: float = 3e-4, dataset=None, n_val: int = 8) -> dict:
+    """dataset: any torch Dataset yielding (video (T,1,H,W), target (1,)). Default is the synthetic one.
+    For real data pass training.mayo.lvef_dataset.DicomCineLVEFDataset (reviewed LVEF labels)."""
     model = MobileEchoNet(n_outputs=1, variant=variant)
-    dataset = SyntheticLabeledCineDataset(n_samples=48, n_frames=8, img_size=224)
-    n_val = 8
+    if dataset is None:
+        dataset = SyntheticLabeledCineDataset(n_samples=48, n_frames=8, img_size=224)
     train_set, val_set = torch.utils.data.random_split(dataset, [len(dataset) - n_val, n_val], generator=torch.Generator().manual_seed(0))
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)

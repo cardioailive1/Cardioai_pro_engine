@@ -46,6 +46,10 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
   inventory on accession number, keeps only images with IMAGE_DEID_STATUS Ready/Available, and gives a starter
   Spark SQL for cardiac MRI. Reports with an addendum/edit are always sent to review. Radiology reports are
   also in OMOP `note.note_text`; the DICOM inventory is not in OMOP.
+- Training hookup = `training/mayo/lvef_dataset.py`: reviewed LVEF labels + linked DICOM -> a torch dataset that
+  `train_mobile_echo_net(dataset=...)` accepts (default synthetic behaviour unchanged). Only human-reviewed
+  labels are used. Series choice and cine ordering for MRI stacks are simple defaults to refine on real data.
+  Test: `python -m training.mayo.test_lvef_dataset` (needs torch + pydicom).
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)
