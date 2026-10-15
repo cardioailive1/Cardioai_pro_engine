@@ -40,7 +40,8 @@ from .report_labels import annotate_report, ef_category
 
 TOL = 5.0  # LVEF points; two values within TOL AND in the same HF category "agree"
 
-DS_COLS = ["study_id", "kind", "auto_lvef", "auto_category", "labeler_flagged", "report_text",
+DS_COLS = ["study_id", "kind", "auto_lvef", "auto_category", "labeler_flagged",
+           "auto_audit_status", "auto_audit_notes", "auto_audit_suggested_lvef", "report_text",
            "auditor", "ds_decision", "ds_lvef", "notes"]
 CARD_COLS = ["blind_id", "kind", "report_text", "candidate_lvef_values", "cardiologist_decision",
              "cardiologist_lvef", "notes"]
@@ -68,18 +69,41 @@ def auto_label_all(records: Iterable[dict]) -> dict:
     for r in records:
         a = annotate_report(r["text"], r["kind"])
         out[r["study_id"]] = {"kind": r["kind"], "text": r["text"], "lvef": a["lvef"]["value"],
-                              "category": a["lvef"]["category"], "flagged": bool(a["needs_review"])}
+                              "category": a["lvef"]["category"], "flagged": bool(a["needs_review"]),
+                              "impression": r.get("impression"), "structured_lvef": r.get("structured_lvef")}
     return out
 
 
-def export_ds_audit(auto: dict, path: str) -> int:
-    """Every auto-labeled study, for the data-scientist auditors (give each a copy; fill `auditor`)."""
+def triage_ds_scope(auto: dict, auto_audit: dict, sample_fraction: float = 0.20, min_sample: int = 10,
+                    seed: int = 0) -> set:
+    """OPT-IN lighter tier 1: data scientists audit every study the automatic audit did not pass, plus a
+    random `sample_fraction` of the ones it passed. Pass the result as `ds_scope` to export_ds_audit and
+    route. Default behaviour (no scope) is: data scientists audit everything."""
+    rng = random.Random(seed)
+    clean = sorted(s for s in auto if auto_audit[s]["status"] == "pass")
+    n = min(len(clean), max(min_sample, math.ceil(sample_fraction * len(clean)))) if clean else 0
+    return {s for s in auto if auto_audit[s]["status"] != "pass"} | set(rng.sample(clean, n))
+
+
+def export_ds_audit(auto: dict, path: str, auto_audit: Optional[dict] = None, ds_scope: Optional[set] = None) -> int:
+    """Studies for the data-scientist auditors (give each a copy; fill `auditor`). Every study by default;
+    with `ds_scope` only those. With `auto_audit` results, adds auto_audit_status / notes / suggested LVEF
+    columns and lists fails first so the auditors see the risky ones early."""
+    ids = [s for s in auto if ds_scope is None or s in ds_scope]
+    if auto_audit:
+        order = {"fail": 0, "warn": 1, "pass": 2}
+        ids.sort(key=lambda s: order[auto_audit[s]["status"]])
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=DS_COLS); w.writeheader()
-        for sid, a in auto.items():
+        for sid in ids:
+            a, r = auto[sid], (auto_audit or {}).get(sid)
             w.writerow({"study_id": sid, "kind": a["kind"], "auto_lvef": a["lvef"], "auto_category": a["category"],
-                        "labeler_flagged": a["flagged"], "report_text": a["text"]})
-    return len(auto)
+                        "labeler_flagged": a["flagged"],
+                        "auto_audit_status": r["status"] if r else "",
+                        "auto_audit_notes": "; ".join(f"{c[0]}={c[1]}" + (f" ({c[2]})" if c[2] else "") for c in r["checks"] if c[1] != "pass") if r else "",
+                        "auto_audit_suggested_lvef": (r["suggested_lvef"] if r and r["suggested_lvef"] is not None else ""),
+                        "report_text": a["text"]})
+    return len(ids)
 
 
 def read_ds_audits(paths: Iterable[str]) -> dict:
@@ -99,14 +123,21 @@ def read_ds_audits(paths: Iterable[str]) -> dict:
 
 
 # ---------------------------------------------------------------- routing
-def route(auto: dict, audits: dict) -> dict:
-    """Decide each study's path. -> {study_id: {state, reason, value, ds_values}}
-    state: pending_ds | agreed | adjudicate | excluded"""
+def route(auto: dict, audits: dict, auto_audit: Optional[dict] = None, ds_scope: Optional[set] = None) -> dict:
+    """Decide each study's path. -> {study_id: {state, reason, value, ds_values, auto_audit_only}}
+    state: pending_ds | agreed | adjudicate | excluded
+    Opt-in triage: with ds_scope + auto_audit, a study OUTSIDE the scope that passed every automatic check
+    counts as audited by 'auto-audit' (auto_audit_only=True). Anything else still needs a human audit.
+    An automatic 'fail' always sends the study to the cardiologist, even if a data scientist agreed."""
     plan = {}
     for sid, a in auto.items():
         rows = audits.get(sid, [])
+        aa_only = False
+        if not rows and ds_scope is not None and sid not in ds_scope and auto_audit and auto_audit[sid]["status"] == "pass":
+            rows, aa_only = [{"auditor": "auto-audit", "decision": "agree", "lvef": None}], True
         if not rows:
-            plan[sid] = {"state": "pending_ds", "reason": "no data-scientist audit yet", "value": None, "ds_values": []}
+            plan[sid] = {"state": "pending_ds", "reason": "no data-scientist audit yet", "value": None, "ds_values": [],
+                         "auto_audit_only": False}
             continue
         vals = [a["lvef"] if r["decision"] == "agree" else r["lvef"] for r in rows]
         ds_vals = [v for v in vals if v is not None]
@@ -115,7 +146,8 @@ def route(auto: dict, audits: dict) -> dict:
         if "uncertain" in decisions:
             reason = "uncertain: auditor unsure"
         elif decisions == {"exclude"}:
-            plan[sid] = {"state": "excluded", "reason": "all auditors excluded", "value": None, "ds_values": []}
+            plan[sid] = {"state": "excluded", "reason": "all auditors excluded", "value": None, "ds_values": [],
+                         "auto_audit_only": aa_only}
             continue
         elif "exclude" in decisions:
             reason = "disagreement: one auditor excluded, another gave a value"
@@ -125,25 +157,35 @@ def route(auto: dict, audits: dict) -> dict:
             reason = "disagreement: auditors differ"
         elif a["flagged"] or a["lvef"] is None:
             reason = "uncertain: labeler flagged for review"
+        elif auto_audit and auto_audit[sid]["status"] == "fail":
+            reason = "disagreement: automatic audit failed (" + ", ".join(c[0] for c in auto_audit[sid]["checks"] if c[1] == "fail") + ")"
         if reason:
-            plan[sid] = {"state": "adjudicate", "reason": reason, "value": None, "ds_values": ds_vals}
+            plan[sid] = {"state": "adjudicate", "reason": reason, "value": None, "ds_values": ds_vals,
+                         "auto_audit_only": aa_only}
         else:
-            plan[sid] = {"state": "agreed", "reason": "", "value": sum(ds_vals) / len(ds_vals), "ds_values": ds_vals}
+            plan[sid] = {"state": "agreed", "reason": "", "value": sum(ds_vals) / len(ds_vals), "ds_values": ds_vals,
+                         "auto_audit_only": aa_only}
     return plan
 
 
 # ---------------------------------------------------------------- tier 2
 def export_cardiologist_queue(auto: dict, plan: dict, path: str, key_path: str,
-                              spot_fraction: float = 0.05, min_spot: int = 5, seed: int = 0) -> dict:
+                              spot_fraction: float = 0.05, min_spot: int = 5, seed: int = 0,
+                              auto_only_spot_fraction: float = 0.10) -> dict:
     """Blinded, shuffled queue: all 'adjudicate' studies + a random spot-check of 'agreed' ones.
     Refuses if any study still lacks a data-scientist audit (tier 1 must cover everything)."""
     pending = [s for s, p in plan.items() if p["state"] == "pending_ds"]
     if pending:
         raise ValueError(f"{len(pending)} studies not yet audited by data scientists (e.g. {pending[:3]})")
     rng = random.Random(seed)
-    agreed = sorted(s for s, p in plan.items() if p["state"] == "agreed")
+    agreed = sorted(s for s, p in plan.items() if p["state"] == "agreed" and not p.get("auto_audit_only"))
     n_spot = min(len(agreed), max(min_spot, math.ceil(spot_fraction * len(agreed)))) if agreed else 0
     spot = set(rng.sample(agreed, n_spot))
+    # studies that skipped the human audit (opt-in triage) are checked at a higher rate
+    aa = sorted(s for s, p in plan.items() if p["state"] == "agreed" and p.get("auto_audit_only"))
+    if aa:
+        spot |= set(rng.sample(aa, min(len(aa), max(min_spot, math.ceil(auto_only_spot_fraction * len(aa))))))
+    n_spot = len(spot)
     items = [(s, "adjudication") for s, p in plan.items() if p["state"] == "adjudicate"] + [(s, "spot_check") for s in spot]
     rng.shuffle(items)
     with open(path, "w", newline="", encoding="utf-8") as f, open(key_path, "w", newline="", encoding="utf-8") as k:
@@ -154,7 +196,7 @@ def export_cardiologist_queue(auto: dict, plan: dict, path: str, key_path: str,
             cands = sorted({round(v, 1) for v in ([auto[sid]["lvef"]] + plan[sid]["ds_values"]) if v is not None})
             w.writerow({"blind_id": bid, "kind": auto[sid]["kind"], "report_text": auto[sid]["text"],
                         "candidate_lvef_values": "; ".join(str(c) for c in cands) if qt == "adjudication" else ""})
-            kw.writerow({"blind_id": bid, "study_id": sid, "queue_type": qt, "reason": plan[sid]["reason"],
+            kw.writerow({"blind_id": bid, "study_id": sid, "queue_type": qt, "reason": plan[sid]["reason"] or ("auto-audit-only" if plan[sid].get("auto_audit_only") else ""),
                          "auto_lvef": auto[sid]["lvef"], "ds_values": ";".join(str(v) for v in plan[sid]["ds_values"])})
     return {"adjudication": sum(1 for _, q in items if q == "adjudication"), "spot_check": n_spot}
 
@@ -170,6 +212,7 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
     final, excluded, unresolved = {}, [], []
     spot_n = spot_ok = 0
     spot_errors = []
+    aa_n = aa_ok = 0
     answered = {}
     with open(cardio_path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -187,10 +230,12 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
         if k["queue_type"] == "spot_check":
             spot_n += 1
             cons = plan[sid]["value"]
-            if d == "value" and _same(cons, v):
-                spot_ok += 1
-            else:
+            good = d == "value" and _same(cons, v)
+            spot_ok += good
+            if not good:
                 spot_errors.append(sid)
+            if k["reason"] == "auto-audit-only":
+                aa_n += 1; aa_ok += good
         if d == "exclude":
             excluded.append(sid)
         else:
@@ -214,6 +259,7 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
     return {"labels": final, "excluded": sorted(set(excluded)), "unresolved": unresolved,
             "spot_check": {"n": spot_n, "agree": spot_ok, "agreement": agree, "wilson95": _wilson(spot_ok, spot_n),
                            "errors": spot_errors},
+            "spot_check_auto_audit_only": {"n": aa_n, "agree": aa_ok, "agreement": (aa_ok / aa_n) if aa_n else None},
             "passed": bool(agree is not None and spot_n >= min_spot_n and agree >= target_agreement and not unresolved),
             "note": ("spot-check too small to certify" if spot_n < min_spot_n else "")}
 

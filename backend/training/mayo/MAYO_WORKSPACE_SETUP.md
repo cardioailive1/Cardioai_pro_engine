@@ -62,6 +62,15 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
   unresolved studies and the spot-check agreement (with 95% interval); the batch passes only at >=95% agreement over
   >=20 spot-checks with nothing unresolved. Feed `finalize(...)['labels']` to `lvef_dataset.build_lvef_examples`.
   This replaces the single-tier `review_queue` for anything used in training. Test: `python -m training.mayo.test_label_audit`.
+- Optional automatic audit = `training/mayo/label_auto_audit.py`, run before the data scientists. Independent checks per
+  label: value present, plausible range, prior/comparison wording near the EF, multiple EF values, qualitative wording
+  vs number ("severely reduced" vs 58%), impression vs body, structured EF measurement, identical text labeled
+  differently. Default: it only ADDS columns to the data-scientist CSV (status, notes, suggested LVEF) and lists risky
+  studies first - they still audit everything. Opt-in (`triage_ds_scope`): they audit every non-pass study plus a random
+  20% of passes; the rest count as audited by "auto-audit", are oversampled (10%) in the blinded cardiologist
+  spot-check, and agreement for them is reported separately. An automatic fail always goes to the cardiologist, even
+  if a data scientist agreed. Qualitative LVEF ranges are heuristics for the clinical team to confirm.
+  Test: `python -m training.mayo.test_label_auto_audit`.
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)
