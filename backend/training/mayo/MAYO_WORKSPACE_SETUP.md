@@ -15,6 +15,15 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
 | Existing annotations | None. Labels come from reports/notes (below) |
 | Public datasets (EMIDEC, MyoPS, ACDC) | Keep outside the environment; request import only if essential, subject to licences |
 
+## Second reply from Mayo (2026-10-15)
+| Question | Answer |
+|---|---|
+| Where are cardiac MRI / echo DICOM images? | Not in a table. Inventoried in `FACT_RADIOLOGY_DICOM_INVENTORY`; files are requested from that inventory. Covered in the Radiology training session and Resource Hub slides |
+| Which column links a study to its report (FACT_RADIOLOGY, FACT_ECHO_TEST)? | Not answered yet - same training. Do not assume accession number or study UID |
+| Docker as a saved tar | Same import process as other self-contained images (yes) |
+| Annotator onboarding | Same as every data user, including the DUA form submission (Mayo smartsheet form) for each of the 5 accounts |
+| A100 booking / limits | Turn the GPU on; it attaches automatically if a machine is free. No usage limit stated; covered in Data Environment training |
+
 ## Where the data is
 - ECG waveforms: Base64-encoded string, must be decoded -> `training/mayo/ecg_waveform.py`
   (binary layout still to be confirmed from the ECG training / Mayo)
@@ -36,6 +45,7 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)
+0. Image-to-report link column and the DICOM request process (Radiology training); DUA forms for the 5 annotators.
 1. Confirm the ECG Base64 layout (dtype, lead count, interleaving, sampling rate) on real rows.
 2. Image outlines: no segmentations exist, so cardiac MRI/echo outlines need monailabel + outside annotators
    (3D Slicer/OHIF); GPU pre-drawing runs on the A100.
