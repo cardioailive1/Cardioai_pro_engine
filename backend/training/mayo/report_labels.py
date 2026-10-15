@@ -99,10 +99,14 @@ ECHO_FINDINGS = {
 }
 
 
+_ADDENDUM = re.compile(r"\b(addendum|amended|amendment|edited report|corrected report)\b", re.I)
+
+
 def annotate_report(text: str, kind: str) -> dict:
     """kind: 'echo' (FACT_ECHO_TEST.ECHO_NOTE) or 'mri' (FACT_RADIOLOGY)."""
     table = ECHO_FINDINGS if kind == "echo" else MRI_FINDINGS
     ef = extract_lvef(text)
     findings = [extract_finding(text, k, v) for k, v in table.items()]
-    return {"kind": kind, "lvef": asdict(ef), "findings": findings,
-            "needs_review": ef.needs_review or any(f["needs_review"] for f in findings)}
+    addendum = bool(_ADDENDUM.search(text or ""))  # Epic edits/addenda are appended in the free text
+    return {"kind": kind, "lvef": asdict(ef), "findings": findings, "has_addendum": addendum,
+            "needs_review": addendum or ef.needs_review or any(f["needs_review"] for f in findings)}

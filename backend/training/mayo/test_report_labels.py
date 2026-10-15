@@ -42,6 +42,22 @@ def t():
     out = apply_reviews(p)
     assert out["labels"]["A"]["category"] == "mildly_reduced_41_49" and out["labels"]["B"]["lvef"] == 60
     assert out["excluded"] == ["C"] and out["qa_agreement"] == 1.0 and not out["pending"]
+    assert annotate_report("LVEF 55%. ADDENDUM: corrected.", "echo")["needs_review"]
+    from training.mayo.radiology_link import link_reports_to_images, cardiac_mri_study_sql
+    out = link_reports_to_images(
+        [{"ACCESSION_NBR": "1"}, {"ACCESSION_NBR": "2"}, {"ACCESSION_NBR": "3"}],
+        [{"DICOM_ACCESSION_NUMBER": "1", "STUDY_INSTANCE_UID": "S", "SERIES_INSTANCE_UID": "x", "SOP_INSTANCE_UID": "y", "IMAGE_DEID_STATUS": "Ready"},
+         {"DICOM_ACCESSION_NUMBER": "2", "STUDY_INSTANCE_UID": "T", "IMAGE_DEID_STATUS": "Not Available"}])
+    assert list(out["linked"]) == ["1"] and out["not_submittable"] == ["2"] and out["no_images"] == ["3"]
+    assert "ACCESSION_NBR = i.DICOM_ACCESSION_NUMBER" in cardiac_mri_study_sql()
+    from training.mayo.radiology_link import write_deid_request_csv
+    rr = write_deid_request_csv([
+        {"STUDY_INSTANCE_UID": "S1", "PATIENT_DK": "7", "MODALITY": "MR", "STMO_NAME_IN_ADL": "CARD", "IMAGE_DEID_STATUS": "Ready"},
+        {"STUDY_INSTANCE_UID": "S1", "PATIENT_DK": "7", "MODALITY": "MR", "STMO_NAME_IN_ADL": "CARD", "IMAGE_DEID_STATUS": "Ready"},
+        {"STUDY_INSTANCE_UID": "S2", "PATIENT_DK": "", "MODALITY": "MR", "STMO_NAME_IN_ADL": "CARD"},
+        {"STUDY_INSTANCE_UID": "S3", "PATIENT_DK": "8", "MODALITY": "MR", "STMO_NAME_IN_ADL": "CARD", "IMAGE_DEID_STATUS": "Not Available"}],
+        os.path.join(tempfile.mkdtemp(), "d.csv"))
+    assert rr["written"] == 1 and len(rr["rejected"]) == 2
     print("all ok")
 
 if __name__ == "__main__":
