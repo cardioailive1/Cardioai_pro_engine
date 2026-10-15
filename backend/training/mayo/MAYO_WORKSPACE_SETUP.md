@@ -71,6 +71,7 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
   spot-check, and agreement for them is reported separately. An automatic fail always goes to the cardiologist, even
   if a data scientist agreed. Qualitative LVEF ranges are heuristics for the clinical team to confirm.
   Test: `python -m training.mayo.test_label_auto_audit`.
+- Step-by-step commands: `training/mayo/RUNBOOK.md`.
 - Tests: `python -m training.mayo.test_report_labels` (from `backend/`).
 
 ## Still open (not done here)
