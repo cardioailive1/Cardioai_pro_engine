@@ -113,6 +113,7 @@ class MACELabelRecord:
 
     # Prior-event context, needed for washout exclusion
     days_since_prior_mace: Optional[int] = None      # None if no prior MACE on record
+    index_date: Optional[str] = None                  # ISO date of the index observation (kept so outcome review can show the evidence)
 
     # Subgroup labels, for bias-audit compatibility
     subgroups: dict[str, str] = field(default_factory=dict)
