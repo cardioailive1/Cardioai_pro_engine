@@ -138,6 +138,13 @@ async def dicom_ingest(patient_id: str, file: UploadFile = File(...)):
         "pixel_features": pixel_features,
     }
     result = await orchestrator.dispatch("imaging", record, source="dicom upload — real pixel data")
+    # Standalone echo LVEF: reported next to the result, never fused into the risk score.
+    try:
+        frames = dicom_service.extract_frames(contents) if meta.get("modality") == "US" else None
+    except Exception:
+        frames = None
+    if frames is not None:
+        result = {**result, "echo_lvef": orchestrator.model_registry.predict_echo(frames)}
     return result
 
 

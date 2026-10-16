@@ -65,6 +65,16 @@ class DICOMService:
             "bits_allocated": getattr(ds, "BitsAllocated", None),
         }
 
+    def extract_frames(self, file_bytes: bytes) -> Optional[np.ndarray]:
+        """Cine loop as (frames, H, W) float32 from a multi-frame DICOM, or None if the file has no loop.
+        Colour (RGB) data is reduced to one channel."""
+        import pydicom
+        ds = pydicom.dcmread(io.BytesIO(file_bytes), force=True)
+        a = ds.pixel_array.astype(np.float32)
+        if a.ndim == 4:                      # (frames, H, W, channels)
+            a = a.mean(axis=-1)
+        return a if a.ndim == 3 and getattr(ds, "NumberOfFrames", 1) not in (None, 1, "1") else None
+
     def extract_pixel_features(self, file_bytes: bytes) -> dict[str, Any]:
         """
         Extracts REAL quantitative features from the actual pixel data — not
