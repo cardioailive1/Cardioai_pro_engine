@@ -139,6 +139,7 @@ class ModelRegistry:
 
     def __init__(self):
         self._trained = {m: load_trained_model(m) for m in ("ecg", "wearable", "claims", "imaging")}
+        self._echo = None   # built lazily on first predict_echo
         self._placeholders: dict[str, Callable[[dict], dict]] = {
             "ecg": _placeholder_ecg_risk,
             "wearable": _placeholder_wearable_score,
@@ -157,6 +158,20 @@ class ModelRegistry:
 
         fn = self._placeholders.get(modality)
         return fn(record) if fn else None
+
+    def predict_echo(self, frames) -> dict[str, Any]:
+        """Standalone echo LVEF. Never fused into the MACE score (see multimodal_fusion.py). Without an
+        approved checkpoint, or without torch in the live service, reports that it is awaiting a trained model."""
+        if self._echo is None:
+            try:
+                from inference.echo_runtime import build_echo_runtime
+                self._echo = build_echo_runtime() or False
+            except ImportError:
+                self._echo = False
+        if not self._echo:
+            return {"status": "awaiting_trained_model", "model": "echo_lvef", "fused_into_risk_score": False,
+                    "note": "No approved echo checkpoint in weights/."}
+        return self._echo(frames)
 
     def predict_imaging(self, dicom_meta: dict[str, Any]) -> dict[str, Any]:
         """
