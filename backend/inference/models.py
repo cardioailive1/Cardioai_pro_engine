@@ -48,6 +48,13 @@ def load_trained_model(modality: str) -> Optional[Callable]:
             #     module's docstring). CT stays on the ViT path — no
             #     equivalent edge-deployment driver exists for CT.
 
+    The ECG -> MACE network is already wired: for modality "ecg" this loads
+    inference/ecg_mace_runtime.py, but ONLY if an APPROVED checkpoint exists
+    in weights/ (ecg_models/checkpoint.py refuses to approve synthetic-trained
+    models or ones that do not beat the feature baseline). A record without a
+    waveform, or with a lead count that has no approved model, still gets the
+    placeholder. With no approved checkpoint nothing changes.
+
     Returning None (the default) means the registry falls back to the
     placeholder heuristic below.
 
@@ -59,6 +66,12 @@ def load_trained_model(modality: str) -> Optional[Callable]:
     events that are already unfolding — before "window_days" here means
     anything. See that module's docstring for why this distinction matters.
     """
+    if modality == "ecg":
+        try:   # torch is a training-side dependency; the live service may not have it
+            from inference.ecg_mace_runtime import build_runtime
+            return build_runtime()
+        except ImportError:
+            return None
     return None
 
 
@@ -138,7 +151,9 @@ class ModelRegistry:
 
         trained = self._trained.get(modality)
         if trained is not None:
-            return trained(record)
+            out = trained(record)
+            if out is not None:
+                return out
 
         fn = self._placeholders.get(modality)
         return fn(record) if fn else None
