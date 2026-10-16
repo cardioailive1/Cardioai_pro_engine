@@ -255,7 +255,7 @@ def build_mace_records(
             index_timestamp=0.0,  # LabelValidator only needs relative day offsets (days_to_event etc.), not this field
             features=features, event_type=event_type, days_to_event=days_to_event,
             follow_up_days=follow_up_days, censored=censored, days_since_prior_mace=days_since_prior_mace,
-            subgroups=_subgroups(person, mapping, index_date),
+            subgroups=_subgroups(person, mapping, index_date), index_date=index_date.isoformat(),
         ))
 
     return records

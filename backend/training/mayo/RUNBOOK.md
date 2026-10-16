@@ -119,3 +119,17 @@ Only code, aggregate metrics (spot-check agreement, correlation) and approved mo
 3. Read the printed network-vs-baseline comparison and `weights/cutoff_proposals_*.json`. Only these aggregates leave the Workspace.
 4. Clinical team picks cutoffs from the proposal table: `ecg_models.checkpoint.set_tier_cutoffs(path, moderate, high, set_by, note)`.
 5. If the network beat the baseline: `approve_checkpoint(path, approver, note)`. Approval is refused for synthetic data, no baseline win, or unset cutoffs. Only then does the live engine load it.
+
+
+## Reviewing the MACE outcome labels (same two-tier design as echo)
+
+Module: `training/mayo/mace_label_audit.py`. Run inside the Workspace; the files hold patient-level evidence.
+
+1. Rebuild records with the current `omop_adapter.build_mace_records` (they now carry `index_date`).
+2. `items = build_review_items(records, condition_rows, death_rows, mapping, visit_rows)` collects the OMOP evidence per record.
+3. `aa = auto_audit(items)`: automatic checks (death with no usable cause, event after death, window within a week of 30/90 days, single supporting code, non-inpatient setting, MI+stroke together, prior event at the washout edge, code present but labeled no event).
+4. Tier 1: `export_ds_audit(items, "ds.csv", aa)`. Each data scientist fills `ds_decision` (agree / disagree / uncertain / exclude); for disagree add `ds_event_type` (none, myocardial_infarction, stroke, cardiovascular_death) and `ds_days_to_event`. Optional lighter pass: `triage_ds_scope` (always keeps events and non-pass records).
+5. `plan = route(items, read_ds_audits(["ds.csv", ...]), aa)`.
+6. Tier 2: `export_cardiologist_queue(items, plan, "card.csv", "key.csv")`. Blinded, shuffled; spot-check drawn separately from agreed events and agreed non-events. The cardiologist fills `cardiologist_decision` (event / none / exclude), plus type and days for an event. Keep `key.csv` with the data scientists.
+7. `result = finalize(plan, "card.csv", "key.csv")`; passes at >= 95% spot-check agreement over >= 20 checks with nothing unresolved.
+8. `fixed = apply_to_records(records, result)` -> `LabelValidator` -> training.
