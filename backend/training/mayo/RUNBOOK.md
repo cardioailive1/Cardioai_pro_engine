@@ -109,3 +109,13 @@ Plumbing only until there are hundreds of reviewed studies; do not quote results
 
 ## 12. Leaving the Workspace
 Only code, aggregate metrics (spot-check agreement, correlation) and approved model exports leave, via Mayo's export process. No report text, IDs, CSVs or images.
+
+
+## ECG -> MACE network (after Mayo confirms the waveform layout)
+
+1. Build `ecg_rows.csv` in the Workspace: `patient_id, waveform_b64, label_window, age, sex_male, heart_rate_bpm, qt_interval_ms` (label_window from OMOP outcomes via `label_schema`; the last two columns feed the baseline). Confirm the layout first with `ecg_waveform.probe_waveform` on a few rows.
+2. Train both variants (12-lead and the single-lead wearable proxy):
+   `python -m training.train_ecg_mace_mayo --rows ecg_rows.csv --dtype <..> --n-leads 12 --layout <..> --sample-rate <Hz from Mayo> --out weights`
+3. Read the printed network-vs-baseline comparison and `weights/cutoff_proposals_*.json`. Only these aggregates leave the Workspace.
+4. Clinical team picks cutoffs from the proposal table: `ecg_models.checkpoint.set_tier_cutoffs(path, moderate, high, set_by, note)`.
+5. If the network beat the baseline: `approve_checkpoint(path, approver, note)`. Approval is refused for synthetic data, no baseline win, or unset cutoffs. Only then does the live engine load it.

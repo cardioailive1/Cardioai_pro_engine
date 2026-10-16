@@ -38,3 +38,24 @@ def paired_auc_delta(y, s_net, s_base, n_boot: int = 1000, seed: int = 0) -> dic
     point = roc_auc_score(y, s_net) - roc_auc_score(y, s_base)
     return {"auc_network": float(roc_auc_score(y, s_net)), "auc_baseline": float(roc_auc_score(y, s_base)),
             "delta": float(point), "ci95": [float(lo), float(hi)], "beats_baseline": bool(lo > 0)}
+
+
+def propose_tier_cutoffs(y_choose, p_choose, y_report, p_report, sens_targets=(0.90, 0.80, 0.60, 0.40)) -> list[dict]:
+    """Candidate alert cutoffs for CLINICAL SIGN-OFF. Cutoffs are chosen on validation scores for each
+    sensitivity target, then reported on the held-out test scores (sensitivity, specificity, PPV and the
+    share of patients flagged). The clinical team picks the 'moderate' and 'high' cutoffs from this table."""
+    y_choose, p_choose, y_report, p_report = map(np.asarray, (y_choose, p_choose, y_report, p_report))
+    rows = []
+    for t in sens_targets:
+        pos = np.sort(p_choose[y_choose == 1])
+        if len(pos) == 0:
+            continue
+        cut = float(np.quantile(pos, 1 - t))               # flags ~t of validation positives
+        flag = p_report >= cut
+        tp = int((flag & (y_report == 1)).sum()); fp = int((flag & (y_report == 0)).sum())
+        fn = int((~flag & (y_report == 1)).sum()); tn = int((~flag & (y_report == 0)).sum())
+        rows.append({"target_sensitivity": t, "cutoff": round(cut, 5),
+                     "test_sensitivity": round(tp / max(tp + fn, 1), 3), "test_specificity": round(tn / max(tn + fp, 1), 3),
+                     "test_ppv": round(tp / max(tp + fp, 1), 3), "share_flagged": round(float(flag.mean()), 3),
+                     "test_positives": int(y_report.sum())})
+    return rows

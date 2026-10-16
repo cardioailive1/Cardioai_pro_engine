@@ -38,6 +38,16 @@ def approve_checkpoint(path: str, approver: str, note: str):
     return meta
 
 
+def set_tier_cutoffs(path: str, moderate: float, high: float, set_by: str, note: str):
+    """Record the cutoffs the CLINICAL team chose from the proposal table (not chosen by code)."""
+    if not (0 <= moderate < high <= 1):
+        raise ValueError("need 0 <= moderate < high <= 1")
+    mp = Path(path).with_suffix(".json"); meta = json.loads(mp.read_text())
+    meta["tier_cutoffs"] = {"moderate": moderate, "high": high, "set_by": set_by, "note": note}
+    mp.write_text(json.dumps(meta, indent=2))
+    return meta
+
+
 def load_checkpoint(path: str):
     """-> (model, meta) or None if missing / not approved."""
     p = Path(path); mp = p.with_suffix(".json")

@@ -16,6 +16,9 @@ from training.label_schema import LabelWindow
 from training.mayo.ecg_waveform import decode_waveform
 
 
+FEATURE_COLUMNS = ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms")   # optional, for the baseline
+
+
 def fit_length(sig: np.ndarray, length: int) -> np.ndarray:
     """Centre-crop or zero-pad (n_leads, n) to (n_leads, length)."""
     n = sig.shape[1]
@@ -54,6 +57,7 @@ def build_examples(rows, *, length: int = 5000, leads=None, **layout):
             "patient_id": r["patient_id"],
             "x": normalize(fit_length(sig, length)),
             "y": int(w == LabelWindow.EARLY_30_90),
+            "features": {k: float(r[k]) for k in FEATURE_COLUMNS if r.get(k) not in (None, "")},
             "context": np.array([r.get("age", 65) / 65.0, float(r.get("sex_male", 0))], dtype=np.float32),
         })
     return out, skipped

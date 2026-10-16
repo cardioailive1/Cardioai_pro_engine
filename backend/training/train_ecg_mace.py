@@ -97,8 +97,10 @@ def train_ecg_mace_net(examples, n_epochs=15, batch_size=32, lr=1e-3, use_contex
     # Calibrate on VAL logits (the weighted loss distorts raw probabilities).
     v_logit = _logits(model, val, device, use_context)
     platt = fit_platt(v_logit, np.array([e["y"] for e in val]))
-    cal_te = 1 / (1 + np.exp(-(platt["a"] * _logits(model, test, device, use_context) + platt["b"])))
-    return model, {"test": metrics, "matched": matched, "n_test": len(test), "test_scores": s_te, "test_y": y_te,
+    cal_te = 1 / (1 + np.exp(-np.clip(platt["a"] * _logits(model, test, device, use_context) + platt["b"], -30, 30)))
+    cal_va = 1 / (1 + np.exp(-np.clip(platt["a"] * v_logit + platt["b"], -30, 30)))
+    return model, {"splits": (train, val, test), "val_scores_calibrated": cal_va,
+                   "val_y": np.array([e["y"] for e in val]), "test": metrics, "matched": matched, "n_test": len(test), "test_scores": s_te, "test_y": y_te,
                    "test_scores_calibrated": cal_te, "platt": platt,
                    "sufficiency": data_sufficiency(int(y_tr.sum()), model.param_count()),
                    "n_leads": n_leads, "use_context": use_context}

@@ -66,3 +66,25 @@ def test_paired_comparison_gate():
     good = y + rng.randn(400) * .6; weak = rng.randn(400)
     assert paired_auc_delta(y, good, weak)["beats_baseline"] is True
     assert paired_auc_delta(y, weak, good)["beats_baseline"] is False
+
+
+def test_mayo_driver_end_to_end(tmp_path):
+    import base64, csv
+    from ecg_models.checkpoint import set_tier_cutoffs
+    from training.train_ecg_mace_mayo import main
+    rng = np.random.RandomState(3); t = np.linspace(0, 10, 500)
+    path = tmp_path / "rows.csv"
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f); w.writerow(["patient_id", "waveform_b64", "label_window", "heart_rate_bpm", "qt_interval_ms"])
+        for i in range(160):
+            y = i % 5 == 0
+            sig = np.stack([np.sin(2 * np.pi * 1.2 * t) ** 15 * 900 + rng.randn(500) * 60 + y * 80 * np.sin(2 * np.pi * 7 * t) for _ in range(12)])
+            w.writerow([f"p{i // 2}", base64.b64encode(sig.astype("<i2").tobytes()).decode(),
+                        "early_30_90" if y else "none_observed", 60 + rng.randn() * 8 + 10 * y, 400 + rng.randn() * 20])
+    main(["--rows", str(path), "--sample-rate", "50", "--seconds", "10", "--epochs", "2", "--out", str(tmp_path / "w")])
+    for f in ("ecg_mace_v1.pt", "ecg_mace_1lead_v1.pt", "cutoff_proposals_12lead.json", "cutoff_proposals_1lead.json"):
+        assert (tmp_path / "w" / f).exists()
+    props = json.loads((tmp_path / "w" / "cutoff_proposals_12lead.json").read_text())
+    assert props and {"cutoff", "test_ppv", "share_flagged"} <= set(props[0])
+    meta = set_tier_cutoffs(str(tmp_path / "w" / "ecg_mace_v1.pt"), 0.2, 0.5, "Dr Test", "from table")
+    assert meta["tier_cutoffs"]["set_by"] == "Dr Test" and meta["approved_for_live"] is False
