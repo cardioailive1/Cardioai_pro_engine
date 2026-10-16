@@ -39,7 +39,10 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-from torchvision.models import mobilenet_v3_large, mobilenet_v3_small
+from torchvision.models import (
+    MobileNet_V3_Large_Weights, MobileNet_V3_Small_Weights,
+    mobilenet_v3_large, mobilenet_v3_small,
+)
 
 
 class MobileEchoNet(nn.Module):
@@ -55,24 +58,42 @@ class MobileEchoNet(nn.Module):
             without any other code caring which one is loaded.
     """
 
-    def __init__(self, n_outputs: int = 1, variant: str = "large", temporal_layers: int = 1, dropout: float = 0.1):
+    def __init__(self, n_outputs: int = 1, variant: str = "large", temporal_layers: int = 1, dropout: float = 0.1,
+                 pretrained: bool = False, pretrained_path: str | None = None):
+        """
+        pretrained=False (default): random init, unchanged behavior.
+        pretrained=True: start from public ImageNet weights (torchvision
+            downloads them, so this needs network access).
+        pretrained_path: ImageNet state_dict (.pt) already copied into
+            the workspace; use this where there is no internet (e.g. MCP).
+            Takes precedence over pretrained=True.
+        Either way the 3-channel first conv is collapsed to 1 channel by
+        summing its RGB filters, the standard grayscale adaptation.
+        """
         super().__init__()
+        use_hub = pretrained and pretrained_path is None
         if variant == "large":
-            backbone = mobilenet_v3_large(weights=None)
+            backbone = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.IMAGENET1K_V1 if use_hub else None)
             feature_dim = backbone.classifier[0].in_features  # 960 for Large
         elif variant == "small":
-            backbone = mobilenet_v3_small(weights=None)
+            backbone = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1 if use_hub else None)
             feature_dim = backbone.classifier[0].in_features  # 576 for Small
         else:
             raise ValueError(f"variant must be 'large' or 'small', got {variant!r}")
 
         # Swap the first conv for single-channel (grayscale ultrasound)
         # input instead of the 3-channel RGB torchvision assumes.
+        if pretrained_path is not None:
+            backbone.load_state_dict(torch.load(pretrained_path, map_location="cpu"))
         first_conv = backbone.features[0][0]
-        backbone.features[0][0] = nn.Conv2d(
+        new_conv = nn.Conv2d(
             1, first_conv.out_channels, kernel_size=first_conv.kernel_size,
             stride=first_conv.stride, padding=first_conv.padding, bias=False,
         )
+        if use_hub or pretrained_path is not None:
+            with torch.no_grad():
+                new_conv.weight.copy_(first_conv.weight.sum(dim=1, keepdim=True))
+        backbone.features[0][0] = new_conv
         backbone.classifier = nn.Identity()  # drop the ImageNet classification head — use raw pooled features
         backbone.avgpool = nn.AdaptiveAvgPool2d(1)
 
