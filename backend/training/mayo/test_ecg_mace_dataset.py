@@ -19,3 +19,10 @@ def test_build_examples_filters_windows_and_shapes():
     assert [e["y"] for e in ex] == [1, 0]
     assert ex[0]["x"].shape == (12, 1000)
     assert skipped == {"excluded_window": 1, "bad_waveform": 1}
+
+
+def test_single_lead_selection():
+    sig = np.random.RandomState(0).randn(12, 800) * 100
+    rows = [{"patient_id": "a", "waveform_b64": _b64(sig), "label_window": "none_observed"}]
+    ex, _ = build_examples(rows, length=500, leads=[0], dtype="int16", n_leads=12, layout="lead_major")
+    assert ex[0]["x"].shape == (1, 500)

@@ -34,8 +34,9 @@ def normalize(sig: np.ndarray) -> np.ndarray:
     return ((sig - mu) / np.where(sd < 1e-6, 1.0, sd)).astype(np.float32)
 
 
-def build_examples(rows, *, length: int = 5000, **layout):
-    """-> list of dicts: patient_id, x (n_leads, length), y (0/1), context (age/65, sex)."""
+def build_examples(rows, *, length: int = 5000, leads=None, **layout):
+    """-> list of dicts: patient_id, x (n_leads, length), y (0/1), context (age/65, sex).
+    leads=[0] keeps one lead (e.g. lead I) to train the single-lead variant for wearables."""
     out, skipped = [], {"excluded_window": 0, "bad_waveform": 0}
     for r in rows:
         w = LabelWindow(r["label_window"])
@@ -44,6 +45,8 @@ def build_examples(rows, *, length: int = 5000, **layout):
             continue
         try:
             sig = decode_waveform(r["waveform_b64"], **layout)
+            if leads is not None:
+                sig = sig[list(leads)]
         except ValueError:
             skipped["bad_waveform"] += 1
             continue
