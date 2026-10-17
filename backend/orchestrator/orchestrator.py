@@ -72,7 +72,7 @@ class CentralOrchestrator:
             "quality": QualityAgent(self.quality_engine),
             "fhir": FHIRAgent(self.fhir_builder),
             "dicom": DICOMAgent(self.dicom_service),
-            "inference": InferenceAgent(self.model_registry),
+            "inference": InferenceAgent(self.model_registry, self.population_aggregator),
             "intake": PatientIntakeAgent(self.patient_registry),
             "longitudinal": LongitudinalAgent(self.patient_registry, self.longitudinal_trend_engine),
             "fusion": FusionAgent(self.fusion_engine),

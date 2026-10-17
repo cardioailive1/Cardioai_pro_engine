@@ -144,11 +144,27 @@ class InferenceAgent(BaseAgent):
     """
     name = "inference"
 
-    def __init__(self, registry):
+    def __init__(self, registry, population_aggregator=None):
         self.registry = registry
+        self.population_aggregator = population_aggregator
+
+    def _with_claims_history(self, record: dict[str, Any]) -> dict[str, Any]:
+        """The trained claims-risk model needs the member's diagnosis HISTORY, not just this claim's codes.
+        Adds history_diagnosis_codes = codes on every claim the engine has stored for this member plus this one.
+        Limits: history is whatever this engine has seen (not a dated 12-month window), so a new member's history
+        is only their first claim; the placeholder is used when the record carries no diagnosis codes at all."""
+        if self.population_aggregator is None or record.get("diagnosis_codes") is None:
+            return record
+        prior = self.population_aggregator.get_member(record.get("member_id")) or {}
+        codes = set(record["diagnosis_codes"])
+        for c in prior.get("claim_history", []):
+            codes.update(c.get("diagnosis_codes") or [])
+        return {**record, "history_diagnosis_codes": sorted(codes)}
 
     async def handle(self, payload: dict[str, Any]) -> dict[str, Any]:
         normalized = payload["normalized"]
+        if normalized["modality"] == "claims":
+            normalized = {**normalized, "record": self._with_claims_history(normalized["record"])}
         if normalized["modality"] == "imaging":
             # Was silently dead before: ModelRegistry.predict() short-circuited
             # to None for imaging and predict_imaging() was never called from
