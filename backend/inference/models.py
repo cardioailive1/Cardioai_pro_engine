@@ -72,6 +72,12 @@ def load_trained_model(modality: str) -> Optional[Callable]:
             return build_runtime()
         except ImportError:
             return None
+    if modality == "claims":
+        try:
+            from inference.claims_runtime import build_claims_runtime
+            return build_claims_runtime()
+        except ImportError:
+            return None
     return None
 
 

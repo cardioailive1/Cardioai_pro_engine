@@ -20,8 +20,7 @@ def data_sufficiency(n_pos_train: int, n_params: int) -> dict:
     trained on a few dozen events will overfit. Reports events and a flag."""
     warn = n_pos_train < 200
     return {"train_positive_events": n_pos_train, "model_parameters": n_params,
-            "warning": ("Few outcome events for a neural network; expect unstable results and prefer the "
-                        "feature model unless this network clearly beats it.") if warn else None}
+            "warning": ("Few outcome events for a flexible model; expect unstable results and prefer the simpler model unless this one clearly beats it.") if warn else None}
 
 
 def paired_auc_delta(y, s_net, s_base, n_boot: int = 1000, seed: int = 0) -> dict:
