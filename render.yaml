@@ -13,7 +13,8 @@ services:
     env: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    plan: standard          # bump to `pro` for production hospital traffic
+    plan: standard          # bump to `pro` for production hospital traffic. Keep ONE instance: engine state is saved to the
+                            # database by a single process (backend/engine_state.py); two instances would overwrite each other.
     region: ohio             # co-locate with your primary hospital systems
     healthCheckPath: /healthz
     envVars:

@@ -70,7 +70,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from api.routes import router as api_router, ws_router
 from integrations.iomt_bridge import router as iomt_bridge_router
 from auth.routes import router as auth_router
-from auth.db import init_db
+from auth.db import init_db, SessionLocal
+import engine_state   # registers the engine_records table before init_db() creates tables
 from auth.security import decode_session_token
 from auth.models import Role
 from auth.deps import SESSION_COOKIE_NAME, DATA_ROOM_COOKIE_NAME
@@ -118,6 +119,38 @@ def _create_tables_on_startup():
     # for tables that already exist), so a redeploy never needs a
     # separate manual migration step for this initial schema.
     init_db()
+
+
+STATE_PERSISTER = None
+STATE_SAVER_TASK = None   # held so the background task is not garbage collected
+
+
+@app.on_event("startup")
+async def _load_and_start_engine_state_persistence():
+    # Reload patients, care stages, payer members, care tasks, contracts and enrollment from the database, then keep saving them.
+    # Needs a single web instance (see engine_state.py). A failure here must never stop the service from starting.
+    global STATE_PERSISTER, STATE_SAVER_TASK
+    if not engine_state.persistence_enabled():
+        return
+    try:
+        from orchestrator.orchestrator import orchestrator
+        STATE_PERSISTER = engine_state.StatePersister(orchestrator, SessionLocal)
+        STATE_PERSISTER.load()
+        import asyncio
+        STATE_SAVER_TASK = asyncio.create_task(STATE_PERSISTER.run_forever())
+    except Exception:
+        import logging
+        logging.getLogger("engine_state").exception("engine_state: persistence failed to start; running in memory only")
+        STATE_PERSISTER = None
+
+
+@app.on_event("shutdown")
+def _save_engine_state_on_shutdown():
+    if STATE_PERSISTER is not None:
+        try:
+            STATE_PERSISTER.save_now()
+        except Exception:
+            pass
 
 
 @app.on_event("startup")
