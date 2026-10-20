@@ -310,6 +310,66 @@ async def care_continuum_advance(patient_id: str, req: ContinuumTransitionReques
     return {"patient_id": patient_id, "moved": moved, **tracker.patient_detail(patient_id)}
 
 
+@router.get("/automation-tier/policy")
+async def automation_tier_policy():
+    """The rules the tiers follow, read from the engine itself so the dashboard never hard-codes thresholds."""
+    from inference import automation_tiers as at
+    return {"urgent_icd10_codes": at.URGENT_ICD10_CODES, "confidence_urgent_min": at.CONFIDENCE_URGENT_MIN,
+            "confidence_recommendation_min": at.CONFIDENCE_RECOMMENDATION_MIN,
+            "labels": {t.value: lbl for t, lbl in at.AutomationTierEngine.TIER_ACTION_LABEL.items()},
+            "known_diagnoses": sorted(at.AutomationTierEngine.DIAGNOSIS_ACTIONS)}
+
+
+class PatientTierRequest(BaseModel):
+    diagnosis: str
+    icd10_codes: list[str] = []
+    ecg_confidence: float
+    echo_confidence: Optional[float] = None
+    entered_by: str
+
+
+@router.post("/patients/{patient_id}/automation-tier")
+async def evaluate_patient_tier(patient_id: str, req: PatientTierRequest):
+    """A clinician enters a CONFIRMED diagnosis and its coding; the engine decides the escalation tier and the result is put on the
+    patient's chart and care-continuum stage. This is the only way a patient reaches the URGENT tier (the live stream cannot).
+    Nothing is paged: no paging system is connected, so an urgent result is shown, not sent."""
+    registry = orchestrator.patient_registry
+    if not registry.get_detail(patient_id):
+        raise HTTPException(status_code=404, detail=f"No patient record for '{patient_id}'.")
+    if not req.entered_by.strip() or not req.diagnosis.strip():
+        raise HTTPException(status_code=400, detail="A diagnosis and the name of the clinician entering it are required.")
+    for c in (req.ecg_confidence, req.echo_confidence):
+        if c is not None and not (0 <= c <= 100):
+            raise HTTPException(status_code=400, detail="Confidence must be between 0 and 100.")
+    d = orchestrator.automation_engine.evaluate(
+        req.diagnosis.strip(), [c.strip() for c in req.icd10_codes if c.strip()], {"confidence": req.ecg_confidence},
+        {"confidence": req.echo_confidence} if req.echo_confidence is not None else None)
+    auto = {"tier": d.tier.value, "confidence": d.confidence, "recommendations": d.recommendations,
+            "requires_human_signoff": d.requires_human_signoff, "auto_escalate": d.auto_escalate, "action_label": d.action_label,
+            "diagnosis": d.diagnosis, "icd10_codes": d.icd10_codes, "entered_by": req.entered_by.strip(), "source": "clinician-entered confirmed diagnosis"}
+    registry.get_or_create(patient_id).automation = auto
+    orchestrator.continuum_tracker.record_diagnostic_finding(patient_id, d.diagnosis)
+    orchestrator.continuum_tracker.record_care_decision(patient_id, d.tier.value)
+    registry.add_order(patient_id, "Automation tier evaluation", req.entered_by.strip(), status="completed",
+                       result_summary=f"{d.diagnosis}: tier {d.tier.value} ({d.confidence}% confidence). No paging system is connected.")
+    return _enrich_with_continuum(registry.get_detail(patient_id))
+
+
+@router.get("/deployment")
+async def deployment_status():
+    """What this deployment is and what it is connected to, in plain terms, for the Admin Center."""
+    from integrations.ehr_client import EHRClient
+    from inference.model_status import model_status
+    from auth.routes import locked_org_name
+    c = EHRClient.from_env()
+    return {"organization": locked_org_name() or None,
+            "ehr": {"configured": c is not None, "host": c.host if c else None},
+            "pacs_configured": bool(PACS_HOST and PACS_AE_TITLE),
+            "models": [{"label": m["label"], "state": m["state"]} for m in model_status()["models"]],
+            "paging_connected": False,
+            "data_persistence": "Patients, care stages and payer members are held in memory and clear on a restart. Accounts and the audit log are in the database."}
+
+
 # ---------------------------------------------------------------------------
 # Patient Registry — what the clinician dashboard reads from
 # ---------------------------------------------------------------------------

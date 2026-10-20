@@ -89,8 +89,8 @@ class CareContinuumTracker:
     def mark_treatment(self, patient_id: str, note: str = "") -> bool:
         return self._get_or_create(patient_id).advance_to(CareStage.TREATMENT, reason=note or "treatment actioned")
 
-    def mark_monitoring(self, patient_id: str) -> bool:
-        return self._get_or_create(patient_id).advance_to(CareStage.MONITORING, reason="returned to routine surveillance")
+    def mark_monitoring(self, patient_id: str, note: str = "") -> bool:
+        return self._get_or_create(patient_id).advance_to(CareStage.MONITORING, reason=note or "returned to routine surveillance")
 
     def mark_resolved(self, patient_id: str, note: str = "") -> bool:
         return self._get_or_create(patient_id).advance_to(CareStage.RESOLVED, reason=note or "manually resolved")

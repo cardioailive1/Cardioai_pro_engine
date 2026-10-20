@@ -215,3 +215,58 @@ def test_ingest_feed_with_waveform_lands_on_the_chart():
            "waveform": {k: np.random.randn(1250).tolist() for k in MAYO_LEADS}, "sample_rate_hz": 250}
     asyncio.run(orchestrator.dispatch("ecg", rec, "EHR feed test"))
     assert orchestrator.patient_registry.get_detail("MRN-F1")["ecg_on_file"]["n_leads"] == 12
+
+
+# ---- care continuum / automation tiers on the clinician dashboard, and the one-hospital lock ----
+def test_automation_policy_comes_from_the_engine():
+    pol = client.get("/api/automation-tier/policy").json()
+    assert "I21.19" in pol["urgent_icd10_codes"] and pol["confidence_urgent_min"] == 95.0 and "STEMI" in pol["known_diagnoses"]
+    assert set(pol["labels"]) == {"urgent", "recommendation", "informative"}
+
+
+def test_clinician_entered_diagnosis_sets_tier_stage_and_logs():
+    pid = "MRN-T9"; orchestrator.patient_registry.get_or_create(pid)
+    body = {"diagnosis": "STEMI", "icd10_codes": ["I21.19"], "ecg_confidence": 97, "echo_confidence": 96, "entered_by": "Dr Test"}
+    d = client.post(f"/api/patients/{pid}/automation-tier", json=body).json()
+    assert d["automation"]["tier"] == "urgent" and d["automation"]["auto_escalate"] and d["automation"]["entered_by"] == "Dr Test"
+    assert d["care_stage"] == "care_decision" and any("urgent" in h["reason"] for h in d["care_history"])
+    assert d["orders"][0]["order_type"] == "Automation tier evaluation" and "No paging system" in d["orders"][0]["result_summary"]
+    low = client.post(f"/api/patients/{pid}/automation-tier", json={**body, "ecg_confidence": 68, "echo_confidence": None}).json()
+    assert low["automation"]["tier"] == "informative"                       # urgent code alone is not enough
+    assert client.post("/api/patients/NOPE/automation-tier", json=body).status_code == 404
+    assert client.post(f"/api/patients/{pid}/automation-tier", json={**body, "entered_by": " "}).status_code == 400
+    assert client.post(f"/api/patients/{pid}/automation-tier", json={**body, "ecg_confidence": 150}).status_code == 400
+
+
+def test_stage_advance_records_the_signing_clinician():
+    pid = "MRN-T10"; orchestrator.patient_registry.get_or_create(pid)
+    client.post(f"/api/patients/{pid}/automation-tier", json={"diagnosis": "Atrial fibrillation", "icd10_codes": ["I48.91"], "ecg_confidence": 90, "entered_by": "Dr A"})
+    r = client.post(f"/api/care-continuum/patient/{pid}/advance", json={"action": "treatment", "note": "Signed off by Dr A"}).json()
+    assert r["stage"] == "treatment" and r["history"][-1]["reason"] == "Signed off by Dr A"
+    assert client.post(f"/api/care-continuum/patient/{pid}/advance", json={"action": "treatment"}).json()["moved"] is False   # forward only
+
+
+def test_deployment_status_is_honest(monkeypatch):
+    monkeypatch.setenv("DEPLOYMENT_ORG_NAME", "Test Hospital"); monkeypatch.delenv("EHR_FHIR_BASE_URL", raising=False)
+    d = client.get("/api/deployment").json()
+    assert d["organization"] == "Test Hospital" and d["ehr"]["configured"] is False and d["paging_connected"] is False
+    assert "memory" in d["data_persistence"]
+
+
+def test_deployment_lock_refuses_other_organizations(monkeypatch):
+    from auth.routes import router as auth_router
+    a = FastAPI(); a.include_router(auth_router, prefix="/api"); c = TestClient(a)
+    monkeypatch.delenv("DEPLOYMENT_ORG_NAME", raising=False)
+    assert c.get("/api/auth/deployment").json() == {"locked_org": None}
+    monkeypatch.setenv("DEPLOYMENT_ORG_NAME", "Test Hospital")
+    assert c.get("/api/auth/deployment").json() == {"locked_org": "Test Hospital"}
+    body = {"org_name": "Some Other Org", "email": "x@y.com", "password": "Passw0rd!Passw0rd", "full_name": "X", "requested_role": "clinician", "accepted_legal_docs": True}
+    r = c.post("/api/auth/signup", json=body)
+    assert r.status_code == 403 and "Test Hospital" in r.json()["detail"]
+
+
+def test_every_stage_action_accepts_a_signing_note():
+    pid = "MRN-T11"; orchestrator.patient_registry.get_or_create(pid)
+    for action in ("treatment", "monitoring", "resolved"):
+        r = client.post(f"/api/care-continuum/patient/{pid}/advance", json={"action": action, "note": f"Signed off by Dr B ({action})"})
+        assert r.status_code == 200 and r.json()["history"][-1]["reason"] == f"Signed off by Dr B ({action})"

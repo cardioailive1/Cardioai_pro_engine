@@ -187,7 +187,7 @@ def _surface_for_path(path: str) -> str | None:
     return None
 
 
-PUBLIC_PATHS = {"/healthz", "/login.html", "/data_room.html", "/api/auth/signup", "/api/auth/login", "/api/data-room/unlock", "/api/data-room/lock"}
+PUBLIC_PATHS = {"/healthz", "/login.html", "/data_room.html", "/api/auth/signup", "/api/auth/login", "/api/auth/deployment", "/api/data-room/unlock", "/api/data-room/lock"}
 PUBLIC_PREFIXES = ("/assets/", "/legal/")  # /assets/ = logo etc. for unauthenticated pages; /legal/ = Terms/Privacy/BAA, readable before signup and by anyone with the link
 
 # Data Room API paths — protected by DataRoomGate's separate single-password
