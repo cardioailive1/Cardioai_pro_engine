@@ -133,3 +133,24 @@ Module: `training/mayo/mace_label_audit.py`. Run inside the Workspace; the files
 6. Tier 2: `export_cardiologist_queue(items, plan, "card.csv", "key.csv")`. Blinded, shuffled; spot-check drawn separately from agreed events and agreed non-events. The cardiologist fills `cardiologist_decision` (event / none / exclude), plus type and days for an event. Keep `key.csv` with the data scientists.
 7. `result = finalize(plan, "card.csv", "key.csv")`; passes at >= 95% spot-check agreement over >= 20 checks with nothing unresolved.
 8. `fixed = apply_to_records(records, result)` -> `LabelValidator` -> training.
+
+
+## Running trained models in the dashboards (after training and approval)
+
+What exists: the clinician dashboard (Cardiologist / Physician page) has "Run MACE Prediction on an ECG", the payer portal has
+"Score Members with the Claims-Risk Model" (Population Risk page) and "Controlled Estimate" (Cost Avoidance page). Each shows
+`GET /api/models/status` so nobody mistakes a placeholder for a trained model. Until a model is live, the ECG panel scores
+nothing from the waveform and says so; the member panel labels every score a placeholder.
+
+To make a trained model live in the web service, all four must be true (the status strip shows which one is missing):
+1. **Trained and approved in the Workspace**: checkpoint plus its `.json` sidecar with `approved_for_live: true` (cutoffs set by the clinical team, gates passed).
+2. **Cleared to leave the Workspace.** Only code and aggregates may leave by default. Model weights learned from Mayo data are neither, so ask Mayo (Adam) in writing whether and how the approved weights may be exported before copying anything. Do not move them until that is answered.
+3. **Files in the weights folder** of the web service (`CARDIOAI_WEIGHTS_DIR`, default `weights/`): `ecg_mace_v1.pt`, `ecg_mace_1lead_v1.pt`, `echo_lvef_v1.pt`, `claims_risk_v1.joblib`, each with its `.json`. On Render this needs a persistent disk or a rebuild with the files baked in.
+4. **Model runtime installed**: set `WITH_MODEL_RUNTIME=1` (build arg / Render env var) so `requirements-inference.txt` (torch, scikit-learn) is installed. Without it the status strip says `runtime missing` and the placeholder keeps scoring.
+
+ECG input to the panel: a .csv with one column per lead named `I, II, V1..V6` (Mayo's 8 stored leads; III, aVR, aVL and aVF are
+calculated), or all 12, or lead I alone; .json `{"I": [...], ...}` also works. Choose 250 or 500 Hz to match the study. The
+model resamples to its training rate.
+
+The member roster for the payer panel is a .csv: `member_id, age, sex, diagnosis_codes (ICD-10, semicolon separated), inpatient_visits_12m, ed_visits_12m`.
+The controlled estimate takes `member_id, treated, pre_pmpm, post_pmpm` plus any numeric pre-program covariates (age, risk_score...).

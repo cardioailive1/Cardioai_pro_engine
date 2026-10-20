@@ -4,8 +4,8 @@ load_trained_model("ecg") ONLY when an approved checkpoint exists in weights/
 (see ecg_models/checkpoint.py). With none, load_trained_model returns None and
 the placeholder keeps running, exactly as before.
 
-Record: {"waveform": [[lead1 samples], [lead2 samples], ...], "sample_rate_hz": 500}.
-A 12-lead record is routed to the 12-lead model, a 1-lead record to the single-lead
+Record: {"waveform": [[lead1 samples], ...] or {"I": [...], "II": [...], ...}, "sample_rate_hz": 250 or 500}.
+8 leads (Mayo storage: I, II, V1-V6) are expanded to 12 first (inference/ecg_leads.py). A 12-lead record is routed to the 12-lead model, a 1-lead record to the single-lead
 (wearable) model if one is approved; otherwise the caller falls back to the placeholder.
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ import torch
 
 from ecg_models.checkpoint import load_checkpoint
 from ecg_models.explain import explain
+from inference.ecg_leads import to_lead_array
 
 WEIGHTS_DIR = os.environ.get("CARDIOAI_WEIGHTS_DIR", "weights")
 CHECKPOINTS = {12: "ecg_mace_v1.pt", 1: "ecg_mace_1lead_v1.pt"}
@@ -51,8 +52,11 @@ def build_runtime(weights_dir: Optional[str] = None) -> Optional[Callable[[dict[
         wf = record.get("waveform")
         if wf is None:
             return None                                    # no waveform -> caller uses placeholder
-        wave = np.asarray(wf, dtype=np.float32)
-        if wave.ndim != 2 or wave.shape[0] not in loaded:
+        try:
+            wave = to_lead_array(wf)                       # 8 Mayo leads -> 12; dict or list accepted
+        except ValueError:
+            return None
+        if wave.shape[0] not in loaded:
             return None                                    # no approved model for this lead count
         model, meta = loaded[wave.shape[0]]
         x = _prep(wave, float(record.get("sample_rate_hz", meta["sample_rate_hz"])), meta)

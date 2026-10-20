@@ -136,6 +136,14 @@ label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; mar
         <button class="btn ghost" id="refreshPopBtn">Refresh</button>
         <div class="grid-4" id="popKpis" style="margin-top:14px;"></div>
       </section>
+      <section class="panel" id="scoreMembersPanel">
+        <h2>Score Members with the Claims-Risk Model <span class="tag">trained model once approved &mdash; otherwise says so</span></h2>
+        <p class="sub">Upload a member roster to get a 12-month MI / stroke / cardiovascular-death risk for each member and add them to the report above. One row per member. Columns: <code>member_id, age, sex, diagnosis_codes, inpatient_visits_12m, ed_visits_12m</code>. Put the ICD-10 history in <code>diagnosis_codes</code> separated by semicolons. Visit counts and sex may be blank. Members with no diagnosis history get the placeholder even when a trained model is live.</p>
+        <div id="modelStatusStrip" style="margin:8px 0 12px;"></div>
+        <input type="file" id="scoreMembersFile" accept=".csv,text/csv" />
+        <button class="btn" id="scoreMembersBtn" style="margin-top:10px;">Score members</button>
+        <div id="scoreMembersResult"></div>
+      </section>
       <section class="panel">
         <h2>High-Risk Member Cohort</h2>
         <p class="sub">Ranked by risk score — click a member to open their full record. The list a care-management team would actually work from for outreach prioritization.</p>
@@ -183,6 +191,18 @@ label.field-label { font-size:0.72rem; color:var(--ink-soft); display:block; mar
         <button class="btn ghost" id="refreshCostBtn">Refresh</button>
         <div id="costSummary" class="grid-4" style="margin-top:14px;"></div>
         <div class="narrative-box" id="costNarrative"></div>
+      </section>
+      <section class="panel" id="controlledCostPanel">
+        <h2>Controlled Estimate (with a control group) <span class="tag">matched difference-in-differences &mdash; gives a number only if it passes its checks</span></h2>
+        <p class="sub">The estimate above has no control group, so it cannot show the program caused a change. This one compares members who were reached with similar members who were not, and reports the difference in how their cost per member per month changed. Upload one row per member. Required columns: <code>member_id, treated, pre_pmpm, post_pmpm</code> (<code>treated</code> is 1 or 0; use paid, not billed, cost). Every other numeric column (for example <code>age</code>, <code>risk_score</code>) is used to match, and must be measured before the program started. If members were chosen by a risk-score cutoff, the groups may not overlap and this will decline to give a number. A randomized holdout is the strongest design.</p>
+        <label style="font-size:0.72rem; color:var(--ink-soft);">Design</label>
+        <select id="controlDesign" style="max-width:320px; display:block; margin-bottom:8px;">
+          <option value="observational">Observational (matched controls)</option>
+          <option value="randomized">Randomized holdout</option>
+        </select>
+        <input type="file" id="controlFile" accept=".csv,text/csv" />
+        <button class="btn" id="controlRunBtn" style="margin-top:10px;">Run controlled estimate</button>
+        <div id="controlResult"></div>
       </section>
       <section class="panel">
         <h2>Per-Member Trend Detail</h2>
@@ -688,6 +708,94 @@ loadCostAvoidance();
 loadCareTasks();
 loadEnrollment();
 setInterval(loadPopulationReport, 8000);
+
+// ---- Trained-model execution: model status, member scoring, controlled cost avoidance ----
+function escHtml(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) throw new Error("the file needs a header row and at least one data row");
+  const heads = lines[0].split(",").map(h => h.trim().toLowerCase());
+  return { heads, rows: lines.slice(1).map(l => l.split(",").map(v => v.trim())) };
+}
+
+async function loadModelStatus() {
+  const el = document.getElementById("modelStatusStrip");
+  if (!el) return;
+  try {
+    const st = await fetchJSON(`${API}/models/status`);
+    const color = { live: "approved", placeholder: "pending", trained_not_approved: "pending", runtime_missing: "denied" };
+    el.innerHTML = st.models.filter(m => m.surface === "payer").map(m =>
+      `<div style="font-size:0.74rem; margin:3px 0;"><span class="pill ${color[m.state] || "pending"}">${escHtml(m.state.replace(/_/g, " "))}</span> <strong>${escHtml(m.label)}</strong> &mdash; ${escHtml(m.detail)}</div>`).join("");
+  } catch (err) {
+    el.innerHTML = `<div style="font-size:0.74rem; color:var(--ink-soft);">Model status unavailable (${escHtml(err.message)}).</div>`;
+  }
+}
+
+document.getElementById("scoreMembersBtn").addEventListener("click", async () => {
+  const out = document.getElementById("scoreMembersResult");
+  const btn = document.getElementById("scoreMembersBtn");
+  const file = document.getElementById("scoreMembersFile").files[0];
+  if (!file) { out.innerHTML = `<div class="form-result error">Choose a CSV file first.</div>`; return; }
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "Scoring\u2026";
+  try {
+    const { heads, rows } = parseCsv(await file.text());
+    const col = n => heads.indexOf(n);
+    for (const need of ["member_id", "age"]) if (col(need) < 0) throw new Error(`missing column: ${need}`);
+    const opt = (r, n) => { const i = col(n); return i >= 0 && r[i] !== "" ? r[i] : null; };
+    const members = rows.map(r => ({
+      member_id: r[col("member_id")], member_age: parseFloat(r[col("age")]),
+      sex: opt(r, "sex"), diagnosis_codes: (opt(r, "diagnosis_codes") || "").split(/[;\s]+/).filter(Boolean),
+      inpatient_visits_12m: opt(r, "inpatient_visits_12m") === null ? null : parseInt(opt(r, "inpatient_visits_12m"), 10),
+      ed_visits_12m: opt(r, "ed_visits_12m") === null ? null : parseInt(opt(r, "ed_visits_12m"), 10),
+    }));
+    if (members.some(m => !m.member_id || !Number.isFinite(m.member_age))) throw new Error("every row needs a member_id and a numeric age");
+    const res = await fetchJSON(`${API}/payer/members/score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ members }) });
+    out.innerHTML = `<div class="form-result ${res.placeholder_scored === res.scored ? "info" : "success"}">
+      <strong>${res.scored} member(s) scored</strong> &mdash; low ${res.tier_counts.low}, moderate ${res.tier_counts.moderate}, high ${res.tier_counts.high}.<br/>${escHtml(res.message)}</div>`;
+    await loadPopulationReport();
+  } catch (err) {
+    out.innerHTML = `<div class="form-result error">Could not score members &mdash; ${escHtml(err.message)}.</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+});
+
+document.getElementById("controlRunBtn").addEventListener("click", async () => {
+  const out = document.getElementById("controlResult");
+  const btn = document.getElementById("controlRunBtn");
+  const file = document.getElementById("controlFile").files[0];
+  if (!file) { out.innerHTML = `<div class="form-result error">Choose a CSV file first.</div>`; return; }
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "Running\u2026";
+  try {
+    const { heads, rows } = parseCsv(await file.text());
+    const fixed = ["member_id", "treated", "pre_pmpm", "post_pmpm"];
+    for (const need of fixed) if (heads.indexOf(need) < 0) throw new Error(`missing column: ${need}`);
+    const covNames = heads.filter(h => !fixed.includes(h) && h !== "post_months");
+    const members = rows.map(r => {
+      const g = n => r[heads.indexOf(n)];
+      const cov = {}; covNames.forEach(n => { cov[n] = parseFloat(g(n)); });
+      return { member_id: g("member_id"), treated: ["1", "true", "yes"].includes(String(g("treated")).toLowerCase()),
+               covariates: cov, pre_pmpm: parseFloat(g("pre_pmpm")), post_pmpm: parseFloat(g("post_pmpm")) };
+    });
+    const bad = members.some(m => !Number.isFinite(m.pre_pmpm) || !Number.isFinite(m.post_pmpm) || Object.values(m.covariates).some(v => !Number.isFinite(v)));
+    if (bad) throw new Error("all cost and matching columns must be numeric on every row");
+    const r = await fetchJSON(`${API}/payer/cost-avoidance-controlled`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ members, design: document.getElementById("controlDesign").value }) });
+    const money = v => (v < 0 ? "-$" : "$") + Math.abs(v).toFixed(2);
+    if (!r.reportable) {
+      out.innerHTML = `<div class="form-result info"><strong>No number reported.</strong> ${escHtml(r.reason || "The checks below did not pass.")}<pre style="white-space:pre-wrap; font-size:0.72rem; margin:8px 0 0;">${escHtml(JSON.stringify(r, null, 2))}</pre></div>`;
+    } else {
+      const e = r.effect_pmpm !== undefined ? r.effect_pmpm : r.did_pmpm;
+      out.innerHTML = `<div class="form-result success"><strong>Difference-in-differences: ${e !== undefined ? money(e) : "see details"} per member per month</strong> (negative means costs grew less than comparable members&rsquo;).<pre style="white-space:pre-wrap; font-size:0.72rem; margin:8px 0 0;">${escHtml(JSON.stringify(r, null, 2))}</pre></div>`;
+    }
+  } catch (err) {
+    out.innerHTML = `<div class="form-result error">Could not run the estimate &mdash; ${escHtml(err.message)}.</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+});
+
+loadModelStatus();
 </script>
 </body>
 </html>

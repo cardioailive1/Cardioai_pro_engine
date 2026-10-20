@@ -19,6 +19,11 @@ services:
     envVars:
       - key: PORT
         value: 8000
+      # Opt-in model runtime (torch + scikit-learn, ~1 GB, see backend/requirements-inference.txt). Leave "0" until a
+      # trained model has been approved AND cleared to leave the Mayo Workspace; then set "1", put the approved
+      # checkpoint files in CARDIOAI_WEIGHTS_DIR (default weights/), and check GET /api/models/status says "live".
+      - key: WITH_MODEL_RUNTIME
+        value: "0"
       - key: PYTHON_VERSION
         value: 3.11.9
       # Real Postgres connection string, auto-injected by Render from

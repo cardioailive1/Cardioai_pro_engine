@@ -1,0 +1,11 @@
+# Model runtime for the LIVE service: what it needs to run an approved trained model (ECG-to-MACE network, echo LVEF,
+# claims-risk model). Not installed by default, because torch adds roughly 1 GB to the image (see requirements.txt).
+# Without it, an approved checkpoint is ignored and the placeholder keeps scoring; /api/models/status then reports
+# "runtime_missing" so this is never silent.
+#
+# Build with it:   docker build --build-arg WITH_MODEL_RUNTIME=1 .     (Render: set the env var WITH_MODEL_RUNTIME=1)
+# Pins match requirements-training.txt, so the live service loads checkpoints with the version that wrote them.
+--extra-index-url https://download.pytorch.org/whl/cpu
+scikit-learn==1.5.2
+torch==2.5.1
+torchvision==0.20.1

@@ -562,6 +562,39 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
         <div id="orderResult" style="margin-top:12px;"></div>
       </section>
 
+      <section class="panel" id="maceScorePanel">
+        <h2>Run MACE Prediction on an ECG <span class="tag">trained ECG model once approved &mdash; otherwise says so</span></h2>
+        <p class="sub">Upload one 10-second ECG to score it with the ECG-to-MACE network (30&ndash;90 day risk). Accepts Mayo&rsquo;s stored leads (I, II, V1&ndash;V6; the other four are calculated for you), all 12 leads, or lead I alone. Until a model is trained, approved and installed, this page tells you the placeholder answered, or that nothing was scored. It never presents a placeholder as a trained result.</p>
+        <div id="modelStatusStrip" style="margin:8px 0 12px;"></div>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID (optional)</label>
+            <input type="text" id="maceScorePatientId" placeholder="existing MRN, logs to chart" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Sample rate</label>
+            <select id="maceScoreRate" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+              <option value="500">500 Hz</option>
+              <option value="250">250 Hz</option>
+            </select>
+          </div>
+          <div style="grid-column: span 2;">
+            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ECG file (.json or .csv, one column per lead named I, II, V1&hellip;V6)</label>
+            <input type="file" id="maceScoreFile" accept=".json,.csv,application/json,text/csv" style="width:100%;" />
+          </div>
+        </div>
+        <details style="margin-top:10px;">
+          <summary style="font-size:0.74rem; color:var(--ink-soft); cursor:pointer;">Placeholder inputs (used only if no trained model is live)</summary>
+          <div class="grid-4" style="gap:10px; margin-top:8px;">
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">Heart rate (bpm)</label><input type="number" id="maceScoreHr" style="width:100%;" /></div>
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">QTc (ms)</label><input type="number" id="maceScoreQt" style="width:100%;" /></div>
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">HRV SDNN (ms)</label><input type="number" id="maceScoreHrv" style="width:100%;" /></div>
+          </div>
+        </details>
+        <button class="btn" id="maceScoreBtn" style="margin-top:12px;">Run MACE prediction</button>
+        <div id="maceScoreResult" style="margin-top:12px;"></div>
+      </section>
+
       <section class="panel">
         <h2>Cardiologist Worklist <span class="tag">"reviews high-risk patient list in EHR dashboard"</span></h2>
         <p class="sub">Sorted by MACE risk score. Opening a row shows the full chart in the EHR &amp; Patients drawer.</p>
@@ -1187,6 +1220,90 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
       btn.textContent = originalLabel;
     }
   });
+
+  // ============================================================
+  // Run MACE prediction on an uploaded ECG (POST /api/mace/score) and show
+  // which models are really live (GET /api/models/status). A placeholder
+  // answer is always labelled as one.
+  // ============================================================
+  function escHtml(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  async function loadModelStatus() {
+    const el = document.getElementById("modelStatusStrip");
+    if (!el) return;
+    try {
+      const res = await fetch(`${API}/models/status`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const st = await res.json();
+      const color = { live: "approved", placeholder: "pending", trained_not_approved: "pending", runtime_missing: "denied" };
+      el.innerHTML = st.models.filter(m => m.surface === "clinician").map(m =>
+        `<div style="font-size:0.74rem; margin:3px 0;"><span class="pill ${color[m.state] || "pending"}">${escHtml(m.state.replace(/_/g, " "))}</span> <strong>${escHtml(m.label)}</strong> &mdash; ${escHtml(m.detail)}</div>`).join("");
+    } catch (err) {
+      el.innerHTML = `<div style="font-size:0.74rem; color:var(--ink-soft);">Model status unavailable (${escHtml(err.message)}).</div>`;
+    }
+  }
+
+  function parseEcgText(name, text) {
+    if (name.toLowerCase().endsWith(".json")) {
+      const j = JSON.parse(text);
+      return j.waveform ? { waveform: j.waveform, rate: j.sample_rate_hz } : { waveform: j };
+    }
+    const lines = text.trim().split(/\r?\n/).filter(Boolean);
+    const heads = lines[0].split(",").map(h => h.trim());
+    const cols = heads.map(() => []);
+    for (const ln of lines.slice(1)) ln.split(",").forEach((v, i) => { if (i < cols.length) cols[i].push(parseFloat(v)); });
+    const wf = {};
+    heads.forEach((h, i) => { wf[h] = cols[i]; });
+    return { waveform: wf };
+  }
+
+  document.getElementById("maceScoreBtn").addEventListener("click", async () => {
+    const out = document.getElementById("maceScoreResult");
+    const btn = document.getElementById("maceScoreBtn");
+    if (DATA_SOURCE !== "live") {
+      out.innerHTML = `<div class="form-result info">Running a prediction needs the live engine &mdash; this preview has no backend.</div>`;
+      return;
+    }
+    const file = document.getElementById("maceScoreFile").files[0];
+    const num = id => { const v = parseFloat(document.getElementById(id).value); return Number.isFinite(v) ? v : undefined; };
+    const body = { sample_rate_hz: parseFloat(document.getElementById("maceScoreRate").value),
+                   heart_rate_bpm: num("maceScoreHr"), qt_interval_ms: num("maceScoreQt"), hrv_sdnn_ms: num("maceScoreHrv") };
+    const pid = document.getElementById("maceScorePatientId").value.trim();
+    if (pid) body.patient_id = pid;
+    btn.disabled = true; const label = btn.textContent; btn.textContent = "Scoring\u2026";
+    try {
+      if (file) {
+        const parsed = parseEcgText(file.name, await file.text());
+        body.waveform = parsed.waveform;
+        if (parsed.rate) body.sample_rate_hz = parsed.rate;
+      }
+      if (!file && body.heart_rate_bpm === undefined && body.qt_interval_ms === undefined && body.hrv_sdnn_ms === undefined) throw new Error("choose an ECG file, or enter placeholder inputs");
+      const res = await fetch(`${API}/mace/score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      const p = data.prediction;
+      if (!p) {
+        out.innerHTML = `<div class="form-result info"><strong>Not scored.</strong> ${escHtml(data.message)}</div>`;
+      } else {
+        const ex = p.explanation;
+        const top = ex && ex.top_windows ? ex.top_windows.slice(0, 3).map(w => `${escHtml(w.start_s ?? w.start ?? "")}&ndash;${escHtml(w.end_s ?? w.end ?? "")} s`).join(", ") : "";
+        out.innerHTML = `
+          <div class="form-result ${data.status === "ok" ? "success" : "info"}">
+            <strong>MACE ${escHtml(p.score)}</strong> <span class="pill ${escHtml(p.risk_tier)}">${escHtml(p.risk_tier)}</span>
+            <span style="font-size:0.72rem; opacity:0.85;"> &middot; ${escHtml(p.window_days)}-day window &middot; ${escHtml(p.model_version)}</span><br/>
+            ${escHtml(data.message)}
+            ${data.status === "ok" ? `<div style="margin-top:6px; font-size:0.72rem;">Approved by ${escHtml(p.approved_by)}. Trained on: ${escHtml(p.trained_on)}.${top ? ` Model attended most to: ${top} (where it looked, not why).` : ""}</div>` : ""}
+            ${data.order ? `<div style="margin-top:6px; font-size:0.72rem; opacity:0.8;">Logged to ${escHtml(pid)} as ${escHtml(data.order.order_id)}.</div>` : ""}
+          </div>`;
+      }
+      if (pid) await loadAllData();
+    } catch (err) {
+      out.innerHTML = `<div class="form-result error">Could not run prediction &mdash; ${escHtml(err.message)}.</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
+  });
+  loadModelStatus();
 
   // ============================================================
   // Manual vitals entry — the intake path that was missing: a nurse or

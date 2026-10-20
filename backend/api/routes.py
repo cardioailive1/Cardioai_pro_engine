@@ -735,6 +735,145 @@ async def payer_cost_avoidance_report():
 
 
 # ---------------------------------------------------------------------------
+# Trained-model execution. These are the buttons the dashboards press once
+# models are trained in the Mayo Workspace and approved (see
+# inference/model_status.py for what "live" means). Until then each call
+# says plainly that the hand-set placeholder, not a trained model, answered.
+# ---------------------------------------------------------------------------
+@router.get("/models/status")
+async def models_status():
+    from inference.model_status import model_status
+    return model_status()
+
+
+class MACEScoreRequest(BaseModel):
+    patient_id: Optional[str] = None
+    waveform: Optional[object] = None          # {"I": [...], "II": [...], "V1": [...]...} or a list of lead rows (1, 8 or 12)
+    sample_rate_hz: float = 500
+    heart_rate_bpm: Optional[float] = None     # only used if no trained model is live (placeholder inputs)
+    qt_interval_ms: Optional[float] = None
+    hrv_sdnn_ms: Optional[float] = None
+    ordered_by: str = "clinician"
+
+
+@router.post("/mace/score")
+async def mace_score(req: MACEScoreRequest):
+    """Run the ECG -> MACE model on one ECG. Not part of the 9-agent pipeline: it answers a clinician's request for a
+    score on this ECG and, if the patient exists, logs it as an order on their chart."""
+    from inference.model_status import is_placeholder
+    from inference.ecg_leads import to_lead_array
+    if not (100 <= req.sample_rate_hz <= 1000):
+        raise HTTPException(status_code=400, detail="sample_rate_hz must be between 100 and 1000 (Mayo ECGs are 250 or 500).")
+    record: dict = {"patient_id": req.patient_id, "sample_rate_hz": req.sample_rate_hz}
+    n_leads = None
+    if req.waveform is not None:
+        try:
+            wave = to_lead_array(req.waveform)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=f"Could not read the waveform: {exc}")
+        if wave.shape[1] > 30000 or wave.shape[1] < 250:
+            raise HTTPException(status_code=400, detail=f"Each lead needs between 250 and 30,000 samples; got {wave.shape[1]}.")
+        record["waveform"] = wave.tolist()
+        n_leads = int(wave.shape[0])
+    for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms"):
+        if getattr(req, k) is not None:
+            record[k] = getattr(req, k)
+    prediction = orchestrator.model_registry.predict("ecg", record)
+    placeholder = is_placeholder(prediction)
+    if placeholder and not any(k in record for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms")):
+        result = {"status": "awaiting_trained_model", "prediction": None, "n_leads_received": n_leads,
+                  "message": "No approved ECG model is live, so the waveform was not scored. The placeholder only uses heart rate, QT and HRV; send those to see it."}
+    else:
+        result = {"status": "placeholder" if placeholder else "ok", "prediction": prediction, "n_leads_received": n_leads,
+                  "message": ("Placeholder heuristic on heart rate / QT / HRV only. The waveform was NOT used. Not a trained model, not clinically validated."
+                              if placeholder else "Scored by the approved ECG model.")}
+    if req.patient_id and orchestrator.patient_registry.get_detail(req.patient_id):
+        summary = (f"MACE {prediction.get('score')} ({prediction.get('risk_tier')}) \u2014 " + ("placeholder, not a trained model" if placeholder else f"model {prediction.get('model_version')}")
+                   if prediction else "Not scored: no approved ECG model is live")
+        result["order"] = orchestrator.patient_registry.add_order(req.patient_id, "ECG waveform MACE analysis", req.ordered_by,
+                                                                 status="completed" if prediction else "ordered", result_summary=summary)
+    return result
+
+
+class PayerMember(BaseModel):
+    member_id: str
+    member_age: float
+    sex: Optional[str] = None
+    diagnosis_codes: list[str] = []           # ICD-10 history for this member
+    inpatient_visits_12m: Optional[int] = None
+    ed_visits_12m: Optional[int] = None
+
+
+class ScoreMembersRequest(BaseModel):
+    members: list[PayerMember]
+    add_to_population_report: bool = True
+
+
+@router.post("/payer/members/score")
+async def payer_score_members(req: ScoreMembersRequest):
+    """Score a roster of members with the claims-risk model (placeholder until one is approved) and, by default,
+    add them to the Population Risk report so the portal's other pages show them."""
+    from inference.model_status import is_placeholder
+    from claims_risk.features import vectorize
+    if not req.members or len(req.members) > 5000:
+        raise HTTPException(status_code=400, detail="Send between 1 and 5,000 members per call.")
+    rows, placeholder_n = [], 0
+    for m in req.members:
+        n_groups = int(sum(vectorize(m.member_age, None, m.diagnosis_codes)[3:15]))
+        record = {"member_id": m.member_id, "member_age": m.member_age, "sex": m.sex, "risk_flags_count": min(n_groups, 20),
+                  "history_diagnosis_codes": m.diagnosis_codes if m.diagnosis_codes else None,
+                  "inpatient_visits_12m": m.inpatient_visits_12m, "ed_visits_12m": m.ed_visits_12m}
+        pred = orchestrator.model_registry.predict("claims", record)
+        ph = is_placeholder(pred); placeholder_n += ph
+        if req.add_to_population_report:
+            orchestrator.population_aggregator.record(m.member_id, int(m.member_age), record["risk_flags_count"], pred["score"], pred["risk_tier"])
+        rows.append({"member_id": m.member_id, "score": pred["score"], "risk_tier": pred["risk_tier"], "placeholder": ph})
+    tiers = {t: sum(1 for r in rows if r["risk_tier"] == t) for t in ("low", "moderate", "high")}
+    return {"scored": len(rows), "placeholder_scored": placeholder_n, "tier_counts": tiers, "members": rows,
+            "model_version": "placeholder" if placeholder_n == len(rows) else "trained claims-risk model",
+            "message": ("A trained claims-risk model is not live; every score is the hand-set placeholder (age and number of diagnosis groups)."
+                        if placeholder_n == len(rows) else
+                        "Trained model used where the member had diagnosis history; members without any codes got the placeholder." if placeholder_n else
+                        "Scored by the approved claims-risk model.")}
+
+
+class ControlMember(BaseModel):
+    member_id: str
+    treated: bool
+    covariates: dict[str, float]
+    pre_pmpm: float
+    post_pmpm: float
+    post_months: float = 12.0
+
+
+class ControlledCostRequest(BaseModel):
+    members: list[ControlMember]
+    design: str = "observational"          # or "randomized" (holdout)
+
+
+@router.post("/payer/cost-avoidance-controlled")
+async def payer_cost_avoidance_controlled(req: ControlledCostRequest):
+    """Matched difference-in-differences with a control group (reports/cost_avoidance_control.py). Gives a number
+    only when it passes the balance, overlap and sample-size checks; otherwise says why not."""
+    if len(req.members) > 50000:
+        raise HTTPException(status_code=400, detail="At most 50,000 members per call.")
+    if req.design not in ("observational", "randomized"):
+        raise HTTPException(status_code=400, detail="design must be 'observational' or 'randomized'.")
+    keys = {frozenset(m.covariates) for m in req.members}
+    if len(keys) > 1:
+        raise HTTPException(status_code=400, detail="Every member must carry the same covariate names.")
+    try:
+        from reports.cost_avoidance_control import MemberPeriods, estimate_cost_avoidance
+    except ImportError:
+        raise HTTPException(status_code=503, detail="The controlled estimate needs scikit-learn, which this service was built without (see the RUNBOOK on the model runtime).")
+    members = [MemberPeriods(m.member_id, m.treated, m.covariates, m.pre_pmpm, m.post_pmpm, m.post_months) for m in req.members]
+    try:
+        return estimate_cost_avoidance(members, design=req.design)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
 # PMPM contract & billing administration (billing/contracts.py) — a
 # distinct concern from risk stratification: a commercial/legal contract
 # record and invoice ledger, not a clinical or population-risk construct.
