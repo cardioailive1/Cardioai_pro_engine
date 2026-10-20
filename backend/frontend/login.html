@@ -191,6 +191,12 @@ async function doSignup() {
     btn.disabled = false;
   }
 }
+
+// One deployment per hospital: when the server is locked to an organization, fill it in and fix it on both forms.
+fetch('/api/auth/deployment').then(r => r.json()).then(d => {
+  if (!d.locked_org) return;
+  ['loginOrg', 'signupOrg'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = d.locked_org; el.readOnly = true; } });
+}).catch(() => {});
 </script>
 </body>
 </html>

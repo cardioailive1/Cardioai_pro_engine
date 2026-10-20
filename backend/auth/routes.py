@@ -8,6 +8,8 @@ admins use to review pending signups.
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -22,6 +24,18 @@ from auth.audit import record_event
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REQUESTABLE_ROLES = {Role.admin, Role.clinician, Role.payer_analyst}  # super_admin is never requested — only assigned automatically to an org's first user
+
+
+def locked_org_name() -> str:
+    """One deployment per hospital. When DEPLOYMENT_ORG_NAME is set, only that organization can exist on this deployment, so
+    nobody can create a second organization here. Empty means open (the previous behaviour)."""
+    return os.environ.get("DEPLOYMENT_ORG_NAME", "").strip()
+
+
+@router.get("/deployment")
+def deployment_info():
+    """Public: lets the sign-up page show which organization this deployment belongs to. Reveals nothing else."""
+    return {"locked_org": locked_org_name() or None}
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -74,11 +88,14 @@ def signup(body: SignupRequest, request: Request, response: Response, db: Sessio
         raise HTTPException(400, f"requested_role must be one of {[r.value for r in REQUESTABLE_ROLES]} — super_admin is assigned automatically, never requested")
 
     from auth.models import _now
+    locked = locked_org_name()
+    if locked and body.org_name.strip().lower() != locked.lower():
+        raise HTTPException(403, f"This deployment is set up for {locked}. Sign up under that organization name.")
     org = db.query(Organization).filter(func.lower(Organization.name) == body.org_name.strip().lower()).first()
 
     if org is None:
         # First person for this org name — becomes super_admin, active immediately, no approval needed.
-        org = Organization(name=body.org_name.strip())
+        org = Organization(name=locked or body.org_name.strip())
         db.add(org)
         db.flush()  # get org.id without committing yet
         user = User(

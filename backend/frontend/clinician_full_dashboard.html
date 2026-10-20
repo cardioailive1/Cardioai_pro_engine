@@ -210,6 +210,7 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     <button class="nav-item" data-page="physician"><span class="ic">&#9877;</span> Cardiologist / Physician</button>
     <button class="nav-item" data-page="ehr"><span class="ic">&#9636;</span> EHR &amp; Patients</button>
     <button class="nav-item" data-page="diagnostics"><span class="ic">&#9678;</span> Diagnostics &amp; Treatment</button>
+    <button class="nav-item" data-page="continuum"><span class="ic">&#8646;</span> Care Continuum &amp; Escalation</button>
     <button class="nav-item" data-page="billing"><span class="ic">&#36;</span> Billing &amp; Payer</button>
     </div>
   </nav>
@@ -248,11 +249,8 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
             <div id="staffList"></div>
           </div>
           <div>
-            <h4 style="font-size:0.8rem;color:var(--navy);margin:0 0 8px;">Integration status</h4>
-            <div class="staff-card"><div><div class="who">Epic / Cerner FHIR R4 API</div><div class="meta">Observation · RiskAssessment · DiagnosticReport</div></div><span class="pill submitted">interface ready</span></div>
-            <div class="staff-card"><div><div class="who">HL7 v2.x (MLLP)</div><div class="meta">ADT^A01 · ORU^R01</div></div><span class="pill submitted">interface ready</span></div>
-            <div class="staff-card"><div><div class="who">PACS / DICOM</div><div class="meta">Metadata extraction live</div></div><span class="pill submitted">interface ready</span></div>
-            <div class="staff-card"><div><div class="who">Payer clearinghouse (837/835)</div><div class="meta">Claims submission</div></div><span class="pill pending">scaffolded</span></div>
+            <h4 style="font-size:0.8rem;color:var(--navy);margin:0 0 8px;">This deployment</h4>
+            <div id="deploymentStatus"><div class="meta" style="font-size:0.76rem;color:var(--ink-soft);">Loading&hellip;</div></div>
             <h4 style="font-size:0.8rem;color:var(--navy);margin:16px 0 8px;">Alert thresholds</h4>
             <div class="staff-card"><div class="who">High-risk MACE cutoff</div><span class="mono">score ≥ 0.60</span></div>
             <div class="staff-card"><div class="who">Moderate-risk MACE cutoff</div><span class="mono">score ≥ 0.30</span></div>
@@ -667,6 +665,43 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     </section>
 
     <!-- ============ BILLING & PAYER ============ -->
+    <!-- ============ CARE CONTINUUM & ESCALATION ============ -->
+    <section class="page" data-page="continuum">
+      <section class="panel">
+        <h2>Care Continuum <span class="tag">where each patient stands, from screening to resolved</span></h2>
+        <p class="sub">A patient only moves forward. Stages advance when the engine flags a finding or assigns an escalation tier, and when a clinician acts below. Resolving is always a manual decision.</p>
+        <div id="continuumFunnel" class="grid-4" style="gap:10px;"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Escalation Queue <span class="tag">automation tier decides how much the engine does on its own</span></h2>
+        <p class="sub">Most urgent first. &ldquo;Sign off&rdquo; records your name against the stage change. Confidence here is the data quality of the reading and its coding, not a trained model&rsquo;s certainty, until a trained model is live.</p>
+        <div class="table-wrap"><table class="dt" id="escalationTable"></table></div>
+        <div id="escalationResult"></div>
+        <div class="disclaimer">No paging system is connected. An &ldquo;urgent&rdquo; tier is shown here and logged on the chart; the engine does not page anyone. Treat this page as a worklist, not an alarm.</div>
+      </section>
+
+      <section class="panel">
+        <h2>Evaluate a Confirmed Diagnosis <span class="tag">the only way a patient reaches the urgent tier</span></h2>
+        <p class="sub">The live stream cannot reach the urgent tier because it carries no confirmed, coded diagnosis. When you have one, enter it here: the engine applies the tier rules and puts the result on the chart and the care stage. Your name is recorded.</p>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient</label><select id="tierPatient" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);"></select></div>
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Diagnosis</label><select id="tierDx" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);"></select></div>
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ICD-10 code(s), comma separated</label><input type="text" id="tierIcd" placeholder="e.g. I21.19" style="width:100%;" /></div>
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ECG confidence (0-100)</label><input type="number" id="tierEcgConf" min="0" max="100" style="width:100%;" /></div>
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Echo confidence (optional)</label><input type="number" id="tierEchoConf" min="0" max="100" style="width:100%;" /></div>
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Entered by</label><input type="text" id="tierBy" style="width:100%;" /></div>
+          <div style="grid-column: span 2;"><button class="btn" id="tierEvalBtn" style="width:100%;">Evaluate and record on chart</button></div>
+        </div>
+        <div id="tierEvalResult"></div>
+      </section>
+
+      <section class="panel">
+        <h2>How the Tiers Work</h2>
+        <div id="tierPolicy" style="font-size:0.8rem; line-height:1.6;"></div>
+      </section>
+    </section>
+
     <section class="page" data-page="billing">
       <section class="panel">
         <h2>Billing &amp; Payer — Automated ICD-10 <span class="tag demo">suggestions, not final coding</span></h2>
@@ -843,6 +878,7 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     renderEHR(currentEhrFilter);
     renderDiagnostics();
     renderBilling();
+    renderContinuum();
   }
 
   // ============================================================
@@ -1118,6 +1154,11 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
           <div class="vital-mini"><div class="vv">${p.vitals.temp_f ?? "—"}</div><div class="vl">Temp °F</div></div>
           <div class="vital-mini"><div class="vv">${p.vitals.weight_lb ?? "—"}</div><div class="vl">Weight lb</div></div>
         </div>
+      </div>
+
+      <div class="drawer-section"><h4>Care stage &amp; escalation</h4>
+        <div style="font-size:0.82rem;">Stage: <strong>${escHtml((p.care_stage || "screening").replace(/_/g, " "))}</strong>${p.automation ? ` &middot; Tier: <span class="pill ${TIER_PILL[p.automation.tier] || "low"}">${escHtml(p.automation.tier)}</span> (${escHtml(p.automation.confidence)}% confidence)` : " &middot; no escalation tier"}</div>
+        ${p.automation ? `<div style="font-size:0.76rem;color:var(--ink-soft);margin-top:2px;">${escHtml(tierLabel(p.automation.tier, p.automation.action_label))}</div>` : ""}
       </div>
 
       <div class="drawer-section"><h4>Diagnosis &amp; care team</h4>
@@ -1451,6 +1492,104 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
   });
   loadModelStatus(); loadEhrStatus(); refreshMacePatients();
   document.querySelector('.nav-item[data-page="physician"]').addEventListener("click", () => { refreshMacePatients(); loadModelStatus(); });
+
+  // ============================================================
+  // Care Continuum & Escalation, deployment status
+  // ============================================================
+  const STAGES = ["screening", "diagnostic_review", "care_decision", "treatment", "monitoring", "resolved"];
+  const STAGE_LABEL = { screening: "Screening", diagnostic_review: "Diagnostic review", care_decision: "Care decision", treatment: "Treatment", monitoring: "Monitoring", resolved: "Resolved" };
+  // The engine's urgent label says "on-call cardiologist paged". No paging system is connected, so say what really happens.
+  const tierLabel = (tier, label) => tier === "urgent" ? "Marked urgent: the rules call for immediate escalation. No paging system is connected, so no one has been paged" : label;
+  const TIER_PILL = { urgent: "high", recommendation: "moderate", informative: "low" };
+  const TIER_RANK = { urgent: 0, recommendation: 1, informative: 2 };
+  const NEXT_ACTION = { screening: null, diagnostic_review: ["treatment", "Sign off \u0026 start treatment"], care_decision: ["treatment", "Sign off \u0026 start treatment"], treatment: ["monitoring", "Return to monitoring"], monitoring: ["resolved", "Resolve"], resolved: null };
+  let ME_NAME = "";
+  fetch(`${API}/auth/me`).then(r => r.ok ? r.json() : null).then(u => { if (u) { ME_NAME = u.full_name || u.email || ""; const el = document.getElementById("tierBy"); if (el && !el.value) el.value = ME_NAME; } }).catch(() => {});
+
+  function renderContinuum() {
+    const funnel = document.getElementById("continuumFunnel"); if (!funnel) return;
+    const counts = Object.fromEntries(STAGES.map(s => [s, 0]));
+    PATIENTS.forEach(p => { counts[p.care_stage || "screening"] = (counts[p.care_stage || "screening"] || 0) + 1; });
+    funnel.innerHTML = STAGES.map(s => `<div class="kpi"><div class="kpi-label">${STAGE_LABEL[s]}</div><div class="kpi-value">${counts[s]}</div></div>`).join("");
+
+    const rows = PATIENTS.filter(p => p.automation || (p.care_stage && p.care_stage !== "screening"))
+      .sort((a, b) => (TIER_RANK[a.automation?.tier] ?? 3) - (TIER_RANK[b.automation?.tier] ?? 3) || STAGES.indexOf(a.care_stage) - STAGES.indexOf(b.care_stage));
+    document.getElementById("escalationTable").innerHTML = rows.length ? `
+      <thead><tr><th>Patient</th><th>Diagnosis</th><th>Tier</th><th>Confidence</th><th>Stage</th><th>Engine recommends</th><th></th></tr></thead>
+      <tbody>${rows.map(p => { const a = p.automation; const na = NEXT_ACTION[p.care_stage || "screening"]; return `
+        <tr>
+          <td class="clickable" data-open="${escHtml(p.mrn)}">${escHtml(p.name)}<br/><span class="mono" style="font-size:0.7rem;">${escHtml(p.mrn)}</span></td>
+          <td>${escHtml(a?.diagnosis || p.diagnosis)}</td>
+          <td>${a ? `<span class="pill ${TIER_PILL[a.tier] || "low"}">${escHtml(a.tier.toUpperCase())}</span>` : "&mdash;"}</td>
+          <td class="mono">${a ? escHtml(a.confidence) + "%" : "&mdash;"}</td>
+          <td>${escHtml(STAGE_LABEL[p.care_stage || "screening"])}</td>
+          <td style="font-size:0.74rem;">${a ? a.recommendations.slice(0, 2).map(escHtml).join("<br/>") : ""}${a && a.entered_by ? `<br/><span style="color:var(--ink-soft);">Entered by ${escHtml(a.entered_by)}</span>` : ""}</td>
+          <td>${na ? `<button class="btn sm ghost" data-stage-mrn="${escHtml(p.mrn)}" data-stage-action="${na[0]}">${na[1]}</button>` : ""}</td>
+        </tr>`; }).join("")}</tbody>` : `<tbody><tr><td style="color:var(--ink-soft); padding:14px;">No patient has a finding or escalation tier yet. They appear here once the engine flags a finding or you evaluate a confirmed diagnosis below.</td></tr></tbody>`;
+    document.querySelectorAll("[data-stage-mrn]").forEach(btn => btn.addEventListener("click", async () => {
+      const out = document.getElementById("escalationResult");
+      if (DATA_SOURCE !== "live") { out.innerHTML = `<div class="form-result info">Needs the live engine.</div>`; return; }
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API}/care-continuum/patient/${encodeURIComponent(btn.dataset.stageMrn)}/advance`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: btn.dataset.stageAction, note: `Signed off by ${ME_NAME || "clinician"}` }) });
+        const d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.detail || `HTTP ${res.status}`);
+        out.innerHTML = `<div class="form-result success">${escHtml(btn.dataset.stageMrn)} moved to ${escHtml(STAGE_LABEL[d.stage] || d.stage)}.</div>`;
+        await loadAllData();
+      } catch (err) { out.innerHTML = `<div class="form-result error">Could not update the stage &mdash; ${escHtml(err.message)}.</div>`; btn.disabled = false; }
+    }));
+    bindOpenButtons();
+    const sel = document.getElementById("tierPatient"); const keep = sel.value;
+    sel.innerHTML = PATIENTS.length ? PATIENTS.map(p => `<option value="${escHtml(p.mrn)}">${escHtml(p.name)} (${escHtml(p.mrn)})</option>`).join("") : `<option value="">No patients tracked yet</option>`;
+    if (keep && PATIENTS.some(p => p.mrn === keep)) sel.value = keep;
+  }
+
+  async function loadTierPolicy() {
+    try {
+      const pol = await (await fetch(`${API}/automation-tier/policy`)).json();
+      document.getElementById("tierDx").innerHTML = pol.known_diagnoses.map(d => `<option>${escHtml(d)}</option>`).join("") + `<option value="__other">Other (type below as ICD-10 only)</option>`;
+      document.getElementById("tierPolicy").innerHTML = `
+        <div><span class="pill high">URGENT</span> Immediate escalation with no human gate on the alert firing (nothing is paged here). Needs an urgent-coded diagnosis (${pol.urgent_icd10_codes.map(escHtml).join(", ")}) <em>and</em> confidence of ${pol.confidence_urgent_min}% or more. Neither alone is enough.</div>
+        <div><span class="pill moderate">RECOMMENDATION</span> ${escHtml(pol.labels.recommendation)}. Confidence of ${pol.confidence_recommendation_min}% or more. A clinician signs off before anything happens.</div>
+        <div><span class="pill low">INFORMATIVE</span> ${escHtml(pol.labels.informative)}. Below ${pol.confidence_recommendation_min}% confidence.</div>
+        <div style="margin-top:6px; color:var(--ink-soft);">Confidence averages the ECG with echo or lab confidence when you give them. Today it comes from the reading&rsquo;s data quality, not from a trained diagnostic model.</div>`;
+    } catch { document.getElementById("tierPolicy").textContent = "Policy unavailable."; }
+  }
+
+  document.getElementById("tierEvalBtn").addEventListener("click", async () => {
+    const out = document.getElementById("tierEvalResult"); const btn = document.getElementById("tierEvalBtn");
+    if (DATA_SOURCE !== "live") { out.innerHTML = `<div class="form-result info">Needs the live engine.</div>`; return; }
+    const pid = document.getElementById("tierPatient").value; let dx = document.getElementById("tierDx").value;
+    if (dx === "__other") dx = "Other confirmed diagnosis";
+    const num = id => { const v = parseFloat(document.getElementById(id).value); return Number.isFinite(v) ? v : null; };
+    btn.disabled = true;
+    try {
+      if (!pid) throw new Error("choose a patient");
+      if (num("tierEcgConf") === null) throw new Error("enter the ECG confidence");
+      const res = await fetch(`${API}/patients/${encodeURIComponent(pid)}/automation-tier`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagnosis: dx, icd10_codes: document.getElementById("tierIcd").value.split(",").map(x => x.trim()).filter(Boolean), ecg_confidence: num("tierEcgConf"), echo_confidence: num("tierEchoConf"), entered_by: document.getElementById("tierBy").value }) });
+      const d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.detail || `HTTP ${res.status}`);
+      const a = d.automation;
+      out.innerHTML = `<div class="form-result ${a.tier === "urgent" ? "error" : "success"}"><strong>${escHtml(a.tier.toUpperCase())}</strong> (${escHtml(a.confidence)}% confidence) &mdash; ${escHtml(tierLabel(a.tier, a.action_label))}.<ul style="margin:6px 0 0 18px;">${a.recommendations.map(r => `<li>${escHtml(r)}</li>`).join("")}</ul><div style="font-size:0.72rem; margin-top:6px;">Recorded on ${escHtml(pid)}; care stage is now ${escHtml(STAGE_LABEL[d.care_stage] || d.care_stage)}. No paging system is connected.</div></div>`;
+      await loadAllData();
+    } catch (err) { out.innerHTML = `<div class="form-result error">Could not evaluate &mdash; ${escHtml(err.message)}.</div>`; }
+    finally { btn.disabled = false; }
+  });
+
+  async function loadDeployment() {
+    const el = document.getElementById("deploymentStatus"); if (!el) return;
+    const card = (who, meta, pill, cls) => `<div class="staff-card"><div><div class="who">${escHtml(who)}</div><div class="meta">${escHtml(meta)}</div></div><span class="pill ${cls}">${escHtml(pill)}</span></div>`;
+    try {
+      const r = await fetch(`${API}/deployment`); if (!r.ok) throw new Error(`HTTP ${r.status}`); const d = await r.json();
+      el.innerHTML = card("Organization", d.organization ? "this deployment is locked to it" : "not locked: any organization name can sign up", d.organization || "open", d.organization ? "approved" : "pending")
+        + card("EHR (FHIR R4)", d.ehr.configured ? `connected to ${d.ehr.host}; not yet validated against a live EHR` : "no connection configured", d.ehr.configured ? "configured" : "not connected", d.ehr.configured ? "submitted" : "pending")
+        + card("HL7 v2", "message building and ADT import; no network (MLLP) transport", "partial", "pending")
+        + card("PACS / DICOM", d.pacs_configured ? "image server configured" : "no PACS configured; uploads only", d.pacs_configured ? "configured" : "not connected", d.pacs_configured ? "submitted" : "pending")
+        + card("Paging / on-call alerts", "urgent tier is shown and logged, nobody is paged", "not connected", "denied")
+        + d.models.map(m => card(m.label, "trained model state", m.state.replace(/_/g, " "), m.state === "live" ? "approved" : "pending")).join("")
+        + `<div class="meta" style="font-size:0.72rem; color:var(--ink-soft); margin-top:8px;">${escHtml(d.data_persistence)}</div>`;
+    } catch (err) { el.innerHTML = `<div class="meta" style="font-size:0.76rem;color:var(--ink-soft);">Deployment status needs the live engine (${escHtml(err.message)}).</div>`; }
+  }
+  loadTierPolicy(); loadDeployment();
 
   // ============================================================
   // Manual vitals entry — the intake path that was missing: a nurse or
