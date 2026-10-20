@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from training.label_schema import LabelWindow
+from inference.ecg_leads import derive_twelve_lead
 from training.mayo.ecg_waveform import decode_waveform
 
 
@@ -48,6 +49,8 @@ def build_examples(rows, *, length: int = 5000, leads=None, **layout):
             continue
         try:
             sig = decode_waveform(r["waveform_b64"], **layout)
+            if sig.shape[0] == 8:                      # Mayo stores I, II, V1-V6 only; rebuild the standard 12
+                sig = derive_twelve_lead(sig)
             if leads is not None:
                 sig = sig[list(leads)]
         except ValueError:

@@ -5,6 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Opt-in model runtime (torch + scikit-learn, about 1 GB). Off by default: without it an approved trained model cannot
+# run in this service and the placeholder keeps scoring (GET /api/models/status says so). Turn on with
+# --build-arg WITH_MODEL_RUNTIME=1 once a model has been trained, approved and cleared to leave the Workspace.
+ARG WITH_MODEL_RUNTIME=0
+COPY requirements-inference.txt .
+RUN if [ "$WITH_MODEL_RUNTIME" = "1" ]; then pip install --no-cache-dir -r requirements-inference.txt; fi
+
 COPY . .
 
 ENV PORT=8000
