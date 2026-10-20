@@ -652,6 +652,17 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
 
     <!-- ============ DIAGNOSTICS & TREATMENT ============ -->
     <section class="page" data-page="diagnostics">
+      <section class="panel" id="echoPanel">
+        <h2>Echo LVEF from a DICOM Study <span class="tag">standalone result &mdash; not part of the MACE score</span></h2>
+        <p class="sub">Upload an echocardiogram cine loop (a multi-frame ultrasound .dcm) to estimate the left ventricular ejection fraction with the echo model, once one is trained, approved and installed. Until then this says so and nothing is estimated. The result is shown next to the chart; it is never blended into the MACE risk score.</p>
+        <div class="grid-4" style="gap:10px; align-items:end;">
+          <div><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient</label><select id="echoPatient" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);"></select></div>
+          <div style="grid-column: span 2;"><label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">DICOM file (.dcm)</label><input type="file" id="echoFile" accept=".dcm,application/dicom" style="width:100%;" /></div>
+          <div><button class="btn" id="echoRunBtn" style="width:100%;">Estimate LVEF</button></div>
+        </div>
+        <div id="echoResult" style="margin-top:12px;"></div>
+      </section>
+
       <section class="panel">
         <h2>Diagnostic Orders Queue</h2>
         <p class="sub">Orders placed from the physician worklist flow here; advance status as they're completed.</p>
@@ -1590,6 +1601,41 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     } catch (err) { el.innerHTML = `<div class="meta" style="font-size:0.76rem;color:var(--ink-soft);">Deployment status needs the live engine (${escHtml(err.message)}).</div>`; }
   }
   loadTierPolicy(); loadDeployment();
+
+  // ============================================================
+  // Echo LVEF from a DICOM upload (POST /api/dicom/ingest). Standalone: never fused into the MACE score.
+  // ============================================================
+  function refreshEchoPatients() {
+    const sel = document.getElementById("echoPatient"); if (!sel) return; const keep = sel.value;
+    sel.innerHTML = PATIENTS.length ? PATIENTS.map(p => `<option value="${escHtml(p.mrn)}">${escHtml(p.name)} (${escHtml(p.mrn)})</option>`).join("") : `<option value="">No patients tracked yet</option>`;
+    if (keep && PATIENTS.some(p => p.mrn === keep)) sel.value = keep;
+  }
+  document.getElementById("echoPatient").addEventListener("mousedown", refreshEchoPatients);
+  document.querySelector('.nav-item[data-page="diagnostics"]').addEventListener("click", refreshEchoPatients);
+  refreshEchoPatients();
+
+  document.getElementById("echoRunBtn").addEventListener("click", async () => {
+    const out = document.getElementById("echoResult"); const btn = document.getElementById("echoRunBtn");
+    if (DATA_SOURCE !== "live") { out.innerHTML = `<div class="form-result info">Needs the live engine.</div>`; return; }
+    const pid = document.getElementById("echoPatient").value; const file = document.getElementById("echoFile").files[0];
+    if (!pid || !file) { out.innerHTML = `<div class="form-result error">Choose a patient and a DICOM file.</div>`; return; }
+    btn.disabled = true; const label = btn.textContent; btn.textContent = "Reading study\u2026";
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const res = await fetch(`${API}/dicom/ingest?patient_id=${encodeURIComponent(pid)}`, { method: "POST", body: fd });
+      const d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(typeof d.detail === "string" ? d.detail : `HTTP ${res.status}`);
+      const e = d.echo_lvef;
+      if (!e) out.innerHTML = `<div class="form-result info"><strong>No echo estimate.</strong> This file is not an ultrasound (US) study, so the echo model was not run.</div>`;
+      else if (e.status === "ok") {
+        const v = e.validation || {};
+        out.innerHTML = `<div class="form-result success"><strong>LVEF ${escHtml(e.lvef_percent)}%</strong> &mdash; ${escHtml(({ reduced_le40: "reduced (40% or lower)", mildly_reduced_41_49: "mildly reduced (41-49%)", preserved_ge50: "preserved (50% or higher)" })[e.lvef_category] || e.lvef_category)} <span style="font-size:0.72rem; opacity:0.85;">&middot; ${escHtml(e.model_version)}</span><br/>
+          ${escHtml(e.note)}<div style="margin-top:6px; font-size:0.72rem;">Approved by ${escHtml(e.approved_by)}. Validated on ${escHtml(v.n_studies ?? "?")} studies against ${escHtml(v.reference ?? "?")}: r = ${escHtml(v.correlation ?? "?")}, mean error ${escHtml(v.mae_lvef_points ?? "?")} LVEF points. Not part of the MACE score. A cardiologist must confirm it.</div></div>`;
+      } else if (e.status === "awaiting_trained_model") out.innerHTML = `<div class="form-result info"><strong>Not estimated.</strong> No approved echo model is live, so no LVEF was produced. The study was read and logged on the chart. ${escHtml(e.note || "")}</div>`;
+      else out.innerHTML = `<div class="form-result info"><strong>Not estimated.</strong> ${escHtml(e.reason || e.status)}</div>`;
+      await loadAllData();
+    } catch (err) { out.innerHTML = `<div class="form-result error">Could not read the study &mdash; ${escHtml(err.message)}.</div>`; }
+    finally { btn.disabled = false; btn.textContent = label; }
+  });
 
   // ============================================================
   // Manual vitals entry — the intake path that was missing: a nurse or
