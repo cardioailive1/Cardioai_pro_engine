@@ -34,7 +34,7 @@ def build_adt_a01(patient_id: str, patient_name: str, admit_location: str) -> st
     return SEG_SEP.join([msh, pid, pv1])
 
 
-def build_oru_r01(patient_id: str, risk_score: float, risk_tier: str, window_days: int) -> str:
+def build_oru_r01(patient_id: str, risk_score: float, risk_tier: str, window_days) -> str:
     """Carries a CardioScan Pro MACE risk result back into the EHR as an ORU."""
     msh = f"MSH|^~\\&|CARDIOAI|CARDIOSCAN|EHR|HOSPITAL|{_hl7_timestamp()}||ORU^R01|{patient_id}-ORU|P|2.5"
     pid = f"PID|1||{patient_id}"

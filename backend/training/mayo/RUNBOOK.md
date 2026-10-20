@@ -154,3 +154,17 @@ model resamples to its training rate.
 
 The member roster for the payer panel is a .csv: `member_id, age, sex, diagnosis_codes (ICD-10, semicolon separated), inpatient_visits_12m, ed_visits_12m`.
 The controlled estimate takes `member_id, treated, pre_pmpm, post_pmpm` plus any numeric pre-program covariates (age, risk_score...).
+
+### Scoring from the patient chart and the live EHR; writing back
+
+The clinician panel has two sources. **From patient chart / live EHR data** scores a tracked patient from the vitals and ECG already on the chart
+(`POST /api/patients/{id}/mace-score`). Patients arrive through the EHR feeds, HL7 ADT import or the streams; an `/api/ingest` ECG record that carries a
+`waveform` (+ `sample_rate_hz`) also attaches that ECG to the chart, and `POST /api/patients/{id}/ecg` attaches one from an MUSE/EHR export. **Upload an ECG file** is the manual path.
+
+**Pull from the EHR** (checkbox) needs `EHR_FHIR_BASE_URL` and `EHR_FHIR_TOKEN` on the service. It reads Patient (age, sex) and the latest heart-rate, QTc and
+SpO2 Observations over FHIR R4. A standard FHIR vitals feed does not carry the raw ECG waveform; that has to come from MUSE or Mayo's ECG tables. This client is
+tested against a mock server only; validate scopes, token refresh and field mapping with the hospital's integration team before clinical use.
+
+**Send to EHR** (`POST /api/patients/{id}/mace-sync`) writes a FHIR RiskAssessment (and returns an HL7 ORU^R01 for interface engines) and only when
+(1) the result came from a trained, approved model (a placeholder score is refused), and (2) a named clinician typed their name and ticked the confirmation. With no EHR
+connection it returns the prepared messages and sends nothing. The write is logged on the chart.

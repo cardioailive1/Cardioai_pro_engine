@@ -139,6 +139,11 @@ class PatientRecord:
     # real pipeline, tracked with its result.
     orders: list[dict[str, Any]] = field(default_factory=list)
 
+    # Latest 10-second ECG attached to this chart (from the EHR/MUSE feed, an ingest record or a clinician upload) and the
+    # latest on-demand MACE result. The waveform is kept as an array in memory (latest only) and never put in to_detail.
+    latest_ecg: Optional[dict[str, Any]] = None
+    latest_mace: Optional[dict[str, Any]] = None
+
     # Billing
     claim_status: str = "pending"
     est_reimbursement: int = 0
@@ -203,6 +208,9 @@ class PatientRecord:
             "quality_score": self.quality_score,
             "orders": self.orders,
             "vitals_history_count": len(self.vitals_history),
+            "ecg_on_file": ({k: v for k, v in self.latest_ecg.items() if k != "wave"} | {"n_leads": int(self.latest_ecg["wave"].shape[0]),
+                             "seconds": round(self.latest_ecg["wave"].shape[1] / self.latest_ecg["sample_rate_hz"], 1)}) if self.latest_ecg else None,
+            "latest_mace": self.latest_mace,
             "longitudinal": self.longitudinal,
             "fusion": self.fusion,
         }
@@ -343,6 +351,11 @@ class PatientRegistry:
         a buildable next step rather than starting from nothing.
         """
         record = self.get_or_create(patient_id)
+        if raw_record.get("waveform") is not None:      # a feed that carries the raw ECG: keep the latest on the chart
+            try:
+                self.store_ecg(patient_id, raw_record["waveform"], float(raw_record.get("sample_rate_hz", 500)), raw_record.get("source", "ingest feed"))
+            except (ValueError, TypeError):
+                pass
         if "heart_rate_bpm" in raw_record:
             record.vitals["hr"] = raw_record["heart_rate_bpm"]
         if "qt_interval_ms" in raw_record:
@@ -373,6 +386,16 @@ class PatientRegistry:
                 record.vitals_history = record.vitals_history[-200:]
 
         record.last_updated = time.time()
+        return record
+
+    def store_ecg(self, patient_id: str, waveform: Any, sample_rate_hz: float, source: str) -> PatientRecord:
+        """Attach the latest ECG (1, 8 or 12 leads) to the chart. Raises ValueError on an unreadable waveform."""
+        from inference.ecg_leads import to_lead_array
+        wave = to_lead_array(waveform)
+        if not (100 <= sample_rate_hz <= 1000) or not (250 <= wave.shape[1] <= 30000):
+            raise ValueError("sample rate must be 100-1000 Hz and each lead 250-30,000 samples")
+        record = self.get_or_create(patient_id)
+        record.latest_ecg = {"wave": wave, "sample_rate_hz": float(sample_rate_hz), "source": source, "stored_at": time.time()}
         return record
 
     def finalize_clinical(

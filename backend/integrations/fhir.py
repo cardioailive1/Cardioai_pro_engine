@@ -95,6 +95,20 @@ class FHIRBuilder:
             "effectiveDateTime": _now(),
         }
 
+    def risk_assessment_from_mace(self, patient_id: str, prediction: dict, reviewed_by: str) -> dict:
+        """A RiskAssessment for a TRAINED, approved model's MACE result. Never build this from a placeholder score."""
+        p = float(prediction["score"])
+        tier = prediction["risk_tier"]
+        return {
+            "resourceType": "RiskAssessment", "id": _fhir_id(), "status": "final",
+            "subject": {"reference": f"Patient/{patient_id}"}, "occurrenceDateTime": _now(),
+            "method": {"text": f"CardioAI ECG-to-MACE network {prediction.get('model_version', '')}".strip()},
+            "code": {"text": "Major adverse cardiovascular event risk, 30 to 90 days after the ECG"},
+            "prediction": [{"outcome": {"text": "MI, stroke or cardiovascular death"}, "probabilityDecimal": round(p, 4),
+                            "qualitativeRisk": {"text": tier}, "whenRange": {"low": {"value": 30, "unit": "d"}, "high": {"value": 90, "unit": "d"}}}],
+            "note": [{"text": f"Decision support, not a diagnosis. Reviewed by {reviewed_by}. Model approved by {prediction.get('approved_by')}."}],
+        }
+
     def push(self, resource: dict, base_url: str) -> None:
         """
         Placeholder for a real FHIR server push, e.g.:

@@ -756,43 +756,168 @@ class MACEScoreRequest(BaseModel):
     ordered_by: str = "clinician"
 
 
-@router.post("/mace/score")
-async def mace_score(req: MACEScoreRequest):
-    """Run the ECG -> MACE model on one ECG. Not part of the 9-agent pipeline: it answers a clinician's request for a
-    score on this ECG and, if the patient exists, logs it as an order on their chart."""
+def _run_mace(patient_id, wave, rate, vitals: dict, ordered_by: str, source: dict) -> dict:
+    """Score one ECG (array or None) with whatever is live and, if the patient has a chart, record the result on it."""
     from inference.model_status import is_placeholder
-    from inference.ecg_leads import to_lead_array
-    if not (100 <= req.sample_rate_hz <= 1000):
-        raise HTTPException(status_code=400, detail="sample_rate_hz must be between 100 and 1000 (Mayo ECGs are 250 or 500).")
-    record: dict = {"patient_id": req.patient_id, "sample_rate_hz": req.sample_rate_hz}
+    record: dict = {"patient_id": patient_id, "sample_rate_hz": rate}
     n_leads = None
-    if req.waveform is not None:
-        try:
-            wave = to_lead_array(req.waveform)
-        except (ValueError, TypeError) as exc:
-            raise HTTPException(status_code=400, detail=f"Could not read the waveform: {exc}")
-        if wave.shape[1] > 30000 or wave.shape[1] < 250:
-            raise HTTPException(status_code=400, detail=f"Each lead needs between 250 and 30,000 samples; got {wave.shape[1]}.")
+    if wave is not None:
         record["waveform"] = wave.tolist()
         n_leads = int(wave.shape[0])
-    for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms"):
-        if getattr(req, k) is not None:
-            record[k] = getattr(req, k)
+    have_vitals = {k: v for k, v in vitals.items() if v is not None}
+    record.update(have_vitals)
     prediction = orchestrator.model_registry.predict("ecg", record)
     placeholder = is_placeholder(prediction)
-    if placeholder and not any(k in record for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms")):
+    if placeholder and not have_vitals:
         result = {"status": "awaiting_trained_model", "prediction": None, "n_leads_received": n_leads,
-                  "message": "No approved ECG model is live, so the waveform was not scored. The placeholder only uses heart rate, QT and HRV; send those to see it."}
+                  "message": "No approved ECG model is live, so the waveform was not scored. The placeholder only uses heart rate, QT and HRV; none were available."}
     else:
         result = {"status": "placeholder" if placeholder else "ok", "prediction": prediction, "n_leads_received": n_leads,
                   "message": ("Placeholder heuristic on heart rate / QT / HRV only. The waveform was NOT used. Not a trained model, not clinically validated."
                               if placeholder else "Scored by the approved ECG model.")}
-    if req.patient_id and orchestrator.patient_registry.get_detail(req.patient_id):
-        summary = (f"MACE {prediction.get('score')} ({prediction.get('risk_tier')}) \u2014 " + ("placeholder, not a trained model" if placeholder else f"model {prediction.get('model_version')}")
+    result["source"] = source
+    result["scored_at"] = time.time()
+    if patient_id and orchestrator.patient_registry.get_detail(patient_id):
+        summary = ((f"MACE {prediction.get('score')} ({prediction.get('risk_tier')}) - " + ("placeholder, not a trained model" if placeholder else f"model {prediction.get('model_version')}"))
                    if prediction else "Not scored: no approved ECG model is live")
-        result["order"] = orchestrator.patient_registry.add_order(req.patient_id, "ECG waveform MACE analysis", req.ordered_by,
+        result["order"] = orchestrator.patient_registry.add_order(patient_id, "ECG waveform MACE analysis", ordered_by,
                                                                  status="completed" if prediction else "ordered", result_summary=summary)
+        orchestrator.patient_registry.get_or_create(patient_id).latest_mace = {k: result[k] for k in ("status", "prediction", "message", "source", "scored_at")} | {"ordered_by": ordered_by}
     return result
+
+
+def _read_wave(waveform, rate: float):
+    from inference.ecg_leads import to_lead_array
+    if not (100 <= rate <= 1000):
+        raise HTTPException(status_code=400, detail="sample_rate_hz must be between 100 and 1000 (Mayo ECGs are 250 or 500).")
+    try:
+        wave = to_lead_array(waveform)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read the waveform: {exc}")
+    if wave.shape[1] > 30000 or wave.shape[1] < 250:
+        raise HTTPException(status_code=400, detail=f"Each lead needs between 250 and 30,000 samples; got {wave.shape[1]}.")
+    return wave
+
+
+@router.post("/mace/score")
+async def mace_score(req: MACEScoreRequest):
+    """Run the ECG -> MACE model on an uploaded ECG. Not part of the 9-agent pipeline: it answers a clinician's request for a
+    score on this ECG and, if the patient exists, attaches the ECG to the chart and logs the result as an order."""
+    wave = _read_wave(req.waveform, req.sample_rate_hz) if req.waveform is not None else None
+    if wave is not None and req.patient_id and orchestrator.patient_registry.get_detail(req.patient_id):
+        orchestrator.patient_registry.store_ecg(req.patient_id, wave, req.sample_rate_hz, "clinician upload")
+    vitals = {"heart_rate_bpm": req.heart_rate_bpm, "qt_interval_ms": req.qt_interval_ms, "hrv_sdnn_ms": req.hrv_sdnn_ms}
+    return _run_mace(req.patient_id, wave, req.sample_rate_hz, vitals, req.ordered_by,
+                     {"waveform": "uploaded file" if wave is not None else "none", "vitals": "entered by hand" if any(v is not None for v in vitals.values()) else "none"})
+
+
+# ---------------------------------------------------------------------------
+# Patient chart and live EHR: score from what the chart already holds, refresh it
+# from the EHR over FHIR, and write a TRAINED model's result back.
+# ---------------------------------------------------------------------------
+@router.get("/ehr/status")
+async def ehr_status():
+    from integrations.ehr_client import EHRClient
+    c = EHRClient.from_env()
+    return {"configured": c is not None, "host": c.host if c else None,
+            "note": ("FHIR connection configured (untested against a real EHR until validated with the hospital's integration team)." if c else
+                     "No EHR connection configured (EHR_FHIR_BASE_URL not set). Patients already in the engine from HL7 or streams can still be scored.")}
+
+
+class ChartEcgRequest(BaseModel):
+    waveform: object
+    sample_rate_hz: float = 500
+    source: str = "EHR / MUSE feed"
+
+
+@router.post("/patients/{patient_id}/ecg")
+async def attach_chart_ecg(patient_id: str, req: ChartEcgRequest):
+    """Attach the latest 10-second ECG (from the EHR / MUSE feed) to a patient's chart so MACE can be run from the chart."""
+    if not orchestrator.patient_registry.get_detail(patient_id):
+        raise HTTPException(status_code=404, detail=f"No patient record for '{patient_id}'.")
+    wave = _read_wave(req.waveform, req.sample_rate_hz)
+    orchestrator.patient_registry.store_ecg(patient_id, wave, req.sample_rate_hz, req.source[:80])
+    return orchestrator.patient_registry.get_detail(patient_id)["ecg_on_file"]
+
+
+class ChartScoreRequest(BaseModel):
+    refresh_from_ehr: bool = False
+    ordered_by: str = "clinician"
+
+
+@router.post("/patients/{patient_id}/mace-score")
+async def chart_mace_score(patient_id: str, req: ChartScoreRequest):
+    """Run MACE from the patient's chart: the ECG on file (if any) plus the chart's latest vitals. With refresh_from_ehr the
+    latest vitals and demographics are pulled from the EHR first (503 if no EHR connection is configured)."""
+    from integrations.ehr_client import EHRClient, EHRError
+    registry = orchestrator.patient_registry
+    if not registry.get_detail(patient_id):
+        raise HTTPException(status_code=404, detail=f"No patient record for '{patient_id}'.")
+    refresh = None
+    if req.refresh_from_ehr:
+        client = EHRClient.from_env()
+        if client is None:
+            raise HTTPException(status_code=503, detail="No EHR connection is configured (EHR_FHIR_BASE_URL not set), so the chart cannot be refreshed from the EHR.")
+        try:
+            snap = await asyncio.to_thread(client.fetch_patient_snapshot, patient_id)
+        except EHRError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        rec = registry.get_or_create(patient_id)
+        if snap["age"] is not None:
+            rec.age = snap["age"]
+        if snap["sex"]:
+            rec.sex = snap["sex"]
+        if snap["vitals"]:
+            await orchestrator.dispatch("ecg", {"patient_id": patient_id, **snap["vitals"]}, source="EHR FHIR pull")
+        refresh = {"vitals_found": sorted(snap["vitals"]), "observed_at": snap["observed_at"]}
+    rec = registry.get_or_create(patient_id)
+    ecg = rec.latest_ecg
+    vitals = {"heart_rate_bpm": rec.vitals.get("hr"), "qt_interval_ms": rec.vitals.get("qtc"), "hrv_sdnn_ms": rec.vitals.get("hrv")}
+    src = {"waveform": (f"ECG on file from {ecg['source']}, stored {time.strftime('%Y-%m-%d %H:%M', time.gmtime(ecg['stored_at']))} UTC" if ecg else "no ECG on this chart"),
+           "vitals": "chart vitals" + (" refreshed from the EHR" if refresh else ""), "ehr_refresh": refresh}
+    result = _run_mace(patient_id, ecg["wave"] if ecg else None, ecg["sample_rate_hz"] if ecg else 500.0, vitals, req.ordered_by, src)
+    if result["status"] == "awaiting_trained_model" and not ecg:
+        result["message"] += " Attach this patient's ECG (the EHR/MUSE feed or an upload) to score the waveform once a model is live."
+    return result
+
+
+class SyncRequest(BaseModel):
+    reviewed_by: str
+    confirm: bool = False
+
+
+@router.post("/patients/{patient_id}/mace-sync")
+async def sync_mace_to_ehr(patient_id: str, req: SyncRequest):
+    """Write the chart's latest MACE result back to the EHR as a FHIR RiskAssessment (and an HL7 ORU^R01 for interface engines).
+    Only a result from a TRAINED, approved model, and only after a named clinician confirms. A placeholder score is never
+    written into a medical record."""
+    from integrations.ehr_client import EHRClient, EHRError
+    from integrations.fhir import FHIRBuilder
+    from integrations.hl7 import build_oru_r01
+    registry = orchestrator.patient_registry
+    if not registry.get_detail(patient_id):
+        raise HTTPException(status_code=404, detail=f"No patient record for '{patient_id}'.")
+    latest = registry.get_or_create(patient_id).latest_mace
+    if not latest:
+        raise HTTPException(status_code=409, detail="Run a MACE prediction for this patient first.")
+    if latest["status"] != "ok":
+        raise HTTPException(status_code=409, detail="Only a result from a trained, approved model can be written to the EHR. This one is a placeholder or was not scored.")
+    if not req.confirm or not req.reviewed_by.strip():
+        raise HTTPException(status_code=400, detail="A named clinician must review the result and confirm before it is written to the EHR.")
+    pred = latest["prediction"]
+    fhir = FHIRBuilder().risk_assessment_from_mace(patient_id, pred, req.reviewed_by.strip())
+    oru = build_oru_r01(patient_id, pred["score"], pred["risk_tier"], "30-90")
+    client = EHRClient.from_env()
+    if client is None:
+        status, msg = "prepared_not_sent", "No EHR connection is configured, so nothing was sent. The FHIR resource and HL7 message are ready for your interface engine."
+    else:
+        try:
+            sent = await asyncio.to_thread(client.post_resource, fhir)
+        except EHRError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        status, msg = "sent", f"Written to the EHR as a RiskAssessment (HTTP {sent['http_status']})."
+    registry.add_order(patient_id, "MACE result to EHR", req.reviewed_by.strip(), status="completed" if status == "sent" else "ordered", result_summary=f"{status}: {msg}")
+    return {"status": status, "message": msg, "fhir_resource": fhir, "hl7_oru": oru}
 
 
 class PayerMember(BaseModel):
