@@ -168,3 +168,11 @@ tested against a mock server only; validate scopes, token refresh and field mapp
 **Send to EHR** (`POST /api/patients/{id}/mace-sync`) writes a FHIR RiskAssessment (and returns an HL7 ORU^R01 for interface engines) and only when
 (1) the result came from a trained, approved model (a placeholder score is refused), and (2) a named clinician typed their name and ticked the confirmation. With no EHR
 connection it returns the prepared messages and sends nothing. The write is logged on the chart.
+
+### Engine data survives restarts (single instance)
+
+Patients, care stages, care tasks, payer members, contracts, invoices, enrollment and each patient's latest ECG are saved to the database every
+10 seconds (changed records only, encrypted with `APP_ENCRYPTION_KEY`) and reloaded at startup (`backend/engine_state.py`). On by default when `DATABASE_URL`
+points at a real database; `ENGINE_STATE_PERSISTENCE=0/1` overrides, `ENGINE_STATE_SAVE_SECONDS` sets the interval. A crash can lose up to one interval of changes.
+Run exactly one web instance. The Admin Center shows the last save time. This is PHI at rest: it needs the same BAA, access and retention review as the rest of the
+deployment, and the encryption key must be backed up (without it the saved data cannot be read).

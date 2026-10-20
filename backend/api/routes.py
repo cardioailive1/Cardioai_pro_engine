@@ -355,6 +355,16 @@ async def evaluate_patient_tier(patient_id: str, req: PatientTierRequest):
     return _enrich_with_continuum(registry.get_detail(patient_id))
 
 
+def _persistence_status() -> dict:
+    import sys
+    p = getattr(sys.modules.get("main"), "STATE_PERSISTER", None)
+    if p is None:
+        return {"enabled": False, "message": "Patients, care stages, care tasks, contracts and payer members are held in memory and clear on a restart (saving to the database is off: no database configured, or ENGINE_STATE_PERSISTENCE=0). Accounts and the audit log are always in the database."}
+    st = p.status()
+    when = time.strftime("%H:%M:%S UTC", time.gmtime(st["last_saved_at"])) if st["last_saved_at"] else "not yet"
+    return {**st, "message": f"Saved to the database every {int(st['save_interval_s'])} s (last save {when}); reloaded after a restart. Single web instance only." + (f" Last save failed: {st['last_error']}." if st["last_error"] else "")}
+
+
 @router.get("/deployment")
 async def deployment_status():
     """What this deployment is and what it is connected to, in plain terms, for the Admin Center."""
@@ -367,7 +377,8 @@ async def deployment_status():
             "pacs_configured": bool(PACS_HOST and PACS_AE_TITLE),
             "models": [{"label": m["label"], "state": m["state"]} for m in model_status()["models"]],
             "paging_connected": False,
-            "data_persistence": "Patients, care stages and payer members are held in memory and clear on a restart. Accounts and the audit log are in the database."}
+            "persistence": _persistence_status(),
+            "data_persistence": _persistence_status()["message"]}
 
 
 # ---------------------------------------------------------------------------
