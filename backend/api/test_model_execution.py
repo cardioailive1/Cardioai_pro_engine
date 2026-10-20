@@ -116,3 +116,102 @@ def test_controlled_cost_avoidance_endpoint():
     assert client.post("/api/payer/cost-avoidance-controlled", json={"members": bad}).status_code == 400
     small = client.post("/api/payer/cost-avoidance-controlled", json={"members": rows[:10]}).json()
     assert small["reportable"] is False and "need at least" in small["reason"]
+
+
+# ---- chart scoring, live EHR pull, and write-back ----
+import httpx
+
+
+def _mock_ehr(monkeypatch, recorded):
+    """A mock FHIR server: one Patient, latest HR / QTc observations; records any POST."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "POST":
+            recorded.append((path, json.loads(request.content)))
+            return httpx.Response(201, headers={"Location": f"{path}/1"}, json={})
+        if path.endswith("/Patient/MRN-E1"):
+            return httpx.Response(200, json={"resourceType": "Patient", "birthDate": "1960-05-01", "gender": "female"})
+        if path.endswith("/Observation"):
+            code = request.url.params["code"]
+            val = {"8867-4": 112, "8634-8": 470}.get(code.split("|")[1])
+            entries = [{"resource": {"valueQuantity": {"value": val}, "effectiveDateTime": "2026-10-20T09:00:00Z"}}] if val else []
+            return httpx.Response(200, json={"resourceType": "Bundle", "entry": entries})
+        return httpx.Response(404)
+    from integrations import ehr_client
+    real = ehr_client.EHRClient.__init__
+    monkeypatch.setenv("EHR_FHIR_BASE_URL", "https://ehr.example/fhir/R4")
+    monkeypatch.setenv("EHR_FHIR_TOKEN", "secret-token")
+    monkeypatch.setattr(ehr_client.EHRClient, "__init__", lambda self, base_url, token=None, timeout=10.0, transport=None: real(self, base_url, token, timeout, httpx.MockTransport(handler)))
+
+
+def test_ehr_status_never_leaks_the_token(monkeypatch):
+    monkeypatch.delenv("EHR_FHIR_BASE_URL", raising=False)
+    assert client.get("/api/ehr/status").json()["configured"] is False
+    _mock_ehr(monkeypatch, [])
+    body = client.get("/api/ehr/status").json()
+    assert body["configured"] is True and body["host"] == "ehr.example" and "secret" not in json.dumps(body)
+
+
+def test_chart_scoring_without_model_and_with_ecg_attached(monkeypatch):
+    monkeypatch.delenv("EHR_FHIR_BASE_URL", raising=False)
+    orchestrator.patient_registry.get_or_create("MRN-C1")
+    r = client.post("/api/patients/MRN-C1/mace-score", json={}).json()
+    assert r["status"] in ("placeholder", "awaiting_trained_model") and r["source"]["waveform"] == "no ECG on this chart"
+    wf = {k: np.random.randn(1250).tolist() for k in MAYO_LEADS}
+    a = client.post("/api/patients/MRN-C1/ecg", json={"waveform": wf, "sample_rate_hz": 250, "source": "MUSE feed"}).json()
+    assert a["n_leads"] == 12 and a["seconds"] == 5.0 and a["source"] == "MUSE feed"
+    detail = client.get("/api/patients/MRN-C1").json()
+    assert detail["ecg_on_file"]["n_leads"] == 12 and "wave" not in json.dumps(detail["ecg_on_file"])
+    r2 = client.post("/api/patients/MRN-C1/mace-score", json={}).json()
+    assert "MUSE feed" in r2["source"]["waveform"]
+    assert client.post("/api/patients/NOPE/mace-score", json={}).status_code == 404
+    assert client.post("/api/patients/MRN-C1/ecg", json={"waveform": [[1.0] * 10] * 3}).status_code == 400
+
+
+def test_chart_refresh_from_ehr_pulls_vitals_and_demographics(monkeypatch):
+    orchestrator.patient_registry.get_or_create("MRN-E1")
+    monkeypatch.delenv("EHR_FHIR_BASE_URL", raising=False)
+    assert client.post("/api/patients/MRN-E1/mace-score", json={"refresh_from_ehr": True}).status_code == 503
+    _mock_ehr(monkeypatch, [])
+    r = client.post("/api/patients/MRN-E1/mace-score", json={"refresh_from_ehr": True}).json()
+    assert r["source"]["ehr_refresh"]["vitals_found"] == ["heart_rate_bpm", "qt_interval_ms"]
+    assert r["status"] == "placeholder" and r["prediction"]["inputs_used"][0] == "heart_rate_bpm"
+    rec = orchestrator.patient_registry.get_or_create("MRN-E1")
+    assert rec.sex == "F" and rec.age >= 65 and rec.vitals["hr"] == 112
+
+
+def test_ehr_errors_become_502(monkeypatch):
+    orchestrator.patient_registry.get_or_create("MRN-E2")
+    _mock_ehr(monkeypatch, [])                       # mock has no MRN-E2 -> 404 from the EHR
+    assert client.post("/api/patients/MRN-E2/mace-score", json={"refresh_from_ehr": True}).status_code == 502
+
+
+def test_sync_refuses_placeholder_and_unconfirmed_and_sends_trained_result(tmp_path, monkeypatch):
+    monkeypatch.delenv("EHR_FHIR_BASE_URL", raising=False)
+    pid = "MRN-S1"
+    orchestrator.patient_registry.get_or_create(pid)
+    assert client.post(f"/api/patients/{pid}/mace-sync", json={"reviewed_by": "Dr A", "confirm": True}).status_code == 409   # nothing scored yet
+    client.post(f"/api/patients/{pid}/mace-score", json={})
+    rec = orchestrator.patient_registry.get_or_create(pid)
+    rec.latest_mace = {"status": "placeholder", "prediction": {"score": .5, "risk_tier": "moderate"}, "message": "", "source": {}, "scored_at": 0}
+    assert client.post(f"/api/patients/{pid}/mace-sync", json={"reviewed_by": "Dr A", "confirm": True}).status_code == 409   # placeholder never goes to the EHR
+    rec.latest_mace = {"status": "ok", "prediction": {"score": .42, "risk_tier": "moderate", "model_version": "ecg-mace-12lead-x", "approved_by": "Dr B"},
+                       "message": "", "source": {}, "scored_at": 0}
+    assert client.post(f"/api/patients/{pid}/mace-sync", json={"reviewed_by": "", "confirm": True}).status_code == 400
+    assert client.post(f"/api/patients/{pid}/mace-sync", json={"reviewed_by": "Dr A", "confirm": False}).status_code == 400
+    prep = client.post(f"/api/patients/{pid}/mace-sync", json={"reviewed_by": "Dr A", "confirm": True}).json()
+    assert prep["status"] == "prepared_not_sent" and "ORU^R01" in prep["hl7_oru"] and prep["fhir_resource"]["resourceType"] == "RiskAssessment"
+    sent = []
+    _mock_ehr(monkeypatch, sent)
+    out = client.post(f"/api/patients/{pid}/mace-sync", json={"reviewed_by": "Dr A", "confirm": True}).json()
+    assert out["status"] == "sent" and sent[0][0].endswith("/RiskAssessment")
+    ra = sent[0][1]
+    assert ra["prediction"][0]["probabilityDecimal"] == 0.42 and ra["subject"]["reference"] == f"Patient/{pid}" and "Dr A" in ra["note"][0]["text"]
+
+
+def test_ingest_feed_with_waveform_lands_on_the_chart():
+    import asyncio
+    rec = {"patient_id": "MRN-F1", "heart_rate_bpm": 80, "qt_interval_ms": 420, "hrv_sdnn_ms": 45,
+           "waveform": {k: np.random.randn(1250).tolist() for k in MAYO_LEADS}, "sample_rate_hz": 250}
+    asyncio.run(orchestrator.dispatch("ecg", rec, "EHR feed test"))
+    assert orchestrator.patient_registry.get_detail("MRN-F1")["ecg_on_file"]["n_leads"] == 12

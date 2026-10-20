@@ -563,36 +563,71 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
       </section>
 
       <section class="panel" id="maceScorePanel">
-        <h2>Run MACE Prediction on an ECG <span class="tag">trained ECG model once approved &mdash; otherwise says so</span></h2>
-        <p class="sub">Upload one 10-second ECG to score it with the ECG-to-MACE network (30&ndash;90 day risk). Accepts Mayo&rsquo;s stored leads (I, II, V1&ndash;V6; the other four are calculated for you), all 12 leads, or lead I alone. Until a model is trained, approved and installed, this page tells you the placeholder answered, or that nothing was scored. It never presents a placeholder as a trained result.</p>
+        <h2>Run MACE Prediction <span class="tag">from the patient chart / live EHR data, or from an uploaded ECG</span></h2>
+        <p class="sub">Score from what the chart already holds (patients that arrived through the EHR feeds, HL7 import or the data streams), optionally refreshing the chart from the EHR first, or upload an ECG file. Mayo&rsquo;s stored leads (I, II, V1&ndash;V6) are accepted; the other four are calculated. Until a model is trained, approved and installed, this panel says the placeholder answered, or that nothing was scored, and it never writes a placeholder to the EHR.</p>
         <div id="modelStatusStrip" style="margin:8px 0 12px;"></div>
-        <div class="grid-4" style="gap:10px; align-items:end;">
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID (optional)</label>
-            <input type="text" id="maceScorePatientId" placeholder="existing MRN, logs to chart" style="width:100%;" />
-          </div>
-          <div>
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Sample rate</label>
-            <select id="maceScoreRate" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
-              <option value="500">500 Hz</option>
-              <option value="250">250 Hz</option>
-            </select>
-          </div>
-          <div style="grid-column: span 2;">
-            <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ECG file (.json or .csv, one column per lead named I, II, V1&hellip;V6)</label>
-            <input type="file" id="maceScoreFile" accept=".json,.csv,application/json,text/csv" style="width:100%;" />
-          </div>
+        <div style="display:flex; gap:18px; margin-bottom:10px; font-size:0.8rem;">
+          <label><input type="radio" name="maceSource" value="chart" checked /> From patient chart / live EHR data</label>
+          <label><input type="radio" name="maceSource" value="upload" /> Upload an ECG file</label>
         </div>
-        <details style="margin-top:10px;">
-          <summary style="font-size:0.74rem; color:var(--ink-soft); cursor:pointer;">Placeholder inputs (used only if no trained model is live)</summary>
-          <div class="grid-4" style="gap:10px; margin-top:8px;">
-            <div><label style="font-size:0.72rem; color:var(--ink-soft);">Heart rate (bpm)</label><input type="number" id="maceScoreHr" style="width:100%;" /></div>
-            <div><label style="font-size:0.72rem; color:var(--ink-soft);">QTc (ms)</label><input type="number" id="maceScoreQt" style="width:100%;" /></div>
-            <div><label style="font-size:0.72rem; color:var(--ink-soft);">HRV SDNN (ms)</label><input type="number" id="maceScoreHrv" style="width:100%;" /></div>
+
+        <div id="maceChartMode">
+          <div class="grid-4" style="gap:10px; align-items:end;">
+            <div style="grid-column: span 2;">
+              <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient</label>
+              <select id="maceChartPatient" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);"></select>
+            </div>
+            <div style="grid-column: span 2;">
+              <label style="font-size:0.8rem;"><input type="checkbox" id="maceRefreshEhr" /> Pull latest vitals from the EHR first</label>
+              <div id="ehrStatusLine" style="font-size:0.7rem; color:var(--ink-soft); margin-top:3px;"></div>
+            </div>
           </div>
-        </details>
+          <div id="maceEcgOnFile" style="font-size:0.74rem; color:var(--ink-soft); margin:8px 0 4px;"></div>
+          <details>
+            <summary style="font-size:0.74rem; color:var(--ink-soft); cursor:pointer;">Attach or replace this patient&rsquo;s ECG (from the EHR / MUSE export)</summary>
+            <div class="grid-4" style="gap:10px; align-items:end; margin-top:8px;">
+              <div>
+                <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Sample rate</label>
+                <select id="maceAttachRate" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);"><option value="500">500 Hz</option><option value="250">250 Hz</option></select>
+              </div>
+              <div style="grid-column: span 2;"><input type="file" id="maceAttachFile" accept=".json,.csv,application/json,text/csv" style="width:100%;" /></div>
+              <div><button class="btn ghost" id="maceAttachBtn" style="width:100%;">Attach to chart</button></div>
+            </div>
+            <div id="maceAttachResult"></div>
+          </details>
+        </div>
+
+        <div id="maceUploadMode" style="display:none;">
+          <div class="grid-4" style="gap:10px; align-items:end;">
+            <div>
+              <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Patient ID (optional)</label>
+              <input type="text" id="maceScorePatientId" placeholder="existing MRN, logs to chart" style="width:100%;" />
+            </div>
+            <div>
+              <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Sample rate</label>
+              <select id="maceScoreRate" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);">
+                <option value="500">500 Hz</option>
+                <option value="250">250 Hz</option>
+              </select>
+            </div>
+            <div style="grid-column: span 2;">
+              <label style="font-size:0.72rem; color:var(--ink-soft); display:block; margin-bottom:4px;">ECG file (.json or .csv, one column per lead named I, II, V1&hellip;V6)</label>
+              <input type="file" id="maceScoreFile" accept=".json,.csv,application/json,text/csv" style="width:100%;" />
+            </div>
+          </div>
+          <details style="margin-top:10px;">
+            <summary style="font-size:0.74rem; color:var(--ink-soft); cursor:pointer;">Placeholder inputs (used only if no trained model is live)</summary>
+            <div class="grid-4" style="gap:10px; margin-top:8px;">
+              <div><label style="font-size:0.72rem; color:var(--ink-soft);">Heart rate (bpm)</label><input type="number" id="maceScoreHr" style="width:100%;" /></div>
+              <div><label style="font-size:0.72rem; color:var(--ink-soft);">QTc (ms)</label><input type="number" id="maceScoreQt" style="width:100%;" /></div>
+              <div><label style="font-size:0.72rem; color:var(--ink-soft);">HRV SDNN (ms)</label><input type="number" id="maceScoreHrv" style="width:100%;" /></div>
+            </div>
+          </details>
+        </div>
+
         <button class="btn" id="maceScoreBtn" style="margin-top:12px;">Run MACE prediction</button>
         <div id="maceScoreResult" style="margin-top:12px;"></div>
+        <div id="maceSyncBox" style="margin-top:10px;"></div>
       </section>
 
       <section class="panel">
@@ -1222,11 +1257,13 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
   });
 
   // ============================================================
-  // Run MACE prediction on an uploaded ECG (POST /api/mace/score) and show
-  // which models are really live (GET /api/models/status). A placeholder
-  // answer is always labelled as one.
+  // Run MACE prediction: from the patient chart / live EHR data, or from an
+  // uploaded ECG. Shows which models are really live (GET /api/models/status).
+  // A placeholder answer is always labelled as one, and is never sent to the EHR.
   // ============================================================
   function escHtml(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  let EHR_CONFIGURED = false;
+  let LAST_MACE = null;   // { patientId, data } for the Send-to-EHR and report buttons
 
   async function loadModelStatus() {
     const el = document.getElementById("modelStatusStrip");
@@ -1243,6 +1280,36 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     }
   }
 
+  async function loadEhrStatus() {
+    const el = document.getElementById("ehrStatusLine"); const box = document.getElementById("maceRefreshEhr");
+    try {
+      const res = await fetch(`${API}/ehr/status`); const st = await res.json();
+      EHR_CONFIGURED = !!st.configured;
+      box.disabled = !EHR_CONFIGURED; if (!EHR_CONFIGURED) box.checked = false;
+      el.textContent = EHR_CONFIGURED ? `EHR connection: ${st.host} (not yet validated against a live EHR).` : "No EHR connection configured. Scoring uses the vitals and ECG already on the chart.";
+    } catch { el.textContent = "EHR status unavailable."; }
+  }
+
+  function refreshMacePatients() {
+    const sel = document.getElementById("maceChartPatient"); if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = (PATIENTS.length ? "" : `<option value="">No patients tracked yet</option>`) +
+      PATIENTS.map(p => `<option value="${escHtml(p.mrn)}">${escHtml(p.name || p.mrn)} (${escHtml(p.mrn)})</option>`).join("");
+    if (keep && PATIENTS.some(p => p.mrn === keep)) sel.value = keep;
+    showEcgOnFile();
+  }
+
+  async function showEcgOnFile() {
+    const el = document.getElementById("maceEcgOnFile"); const pid = document.getElementById("maceChartPatient").value;
+    if (!pid || DATA_SOURCE !== "live") { el.textContent = ""; return; }
+    try {
+      const res = await fetch(`${API}/patients/${encodeURIComponent(pid)}`); const d = await res.json();
+      const e = d.ecg_on_file;
+      el.innerHTML = e ? `ECG on this chart: ${escHtml(e.n_leads)} lead(s), ${escHtml(e.seconds)} s at ${escHtml(e.sample_rate_hz)} Hz, from ${escHtml(e.source)}.`
+                       : `No ECG on this chart yet. Without one, a trained model cannot score the waveform; attach it below.`;
+    } catch { el.textContent = ""; }
+  }
+
   function parseEcgText(name, text) {
     if (name.toLowerCase().endsWith(".json")) {
       const j = JSON.parse(text);
@@ -1257,45 +1324,124 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
     return { waveform: wf };
   }
 
+  function macePostJson(url, body) {
+    return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      return data;
+    });
+  }
+
+  document.querySelectorAll("input[name=maceSource]").forEach(r => r.addEventListener("change", () => {
+    const chart = document.querySelector("input[name=maceSource]:checked").value === "chart";
+    document.getElementById("maceChartMode").style.display = chart ? "" : "none";
+    document.getElementById("maceUploadMode").style.display = chart ? "none" : "";
+  }));
+  document.getElementById("maceChartPatient").addEventListener("mousedown", refreshMacePatients);
+  document.getElementById("maceChartPatient").addEventListener("change", showEcgOnFile);
+
+  document.getElementById("maceAttachBtn").addEventListener("click", async () => {
+    const out = document.getElementById("maceAttachResult");
+    const pid = document.getElementById("maceChartPatient").value; const file = document.getElementById("maceAttachFile").files[0];
+    if (!pid || !file) { out.innerHTML = `<div class="form-result error">Pick a patient and an ECG file.</div>`; return; }
+    try {
+      const parsed = parseEcgText(file.name, await file.text());
+      await macePostJson(`${API}/patients/${encodeURIComponent(pid)}/ecg`, { waveform: parsed.waveform, sample_rate_hz: parsed.rate || parseFloat(document.getElementById("maceAttachRate").value), source: "clinician attach" });
+      out.innerHTML = `<div class="form-result success">ECG attached to the chart.</div>`;
+      showEcgOnFile();
+    } catch (err) { out.innerHTML = `<div class="form-result error">Could not attach &mdash; ${escHtml(err.message)}.</div>`; }
+  });
+
+  function renderMaceResult(patientId, data) {
+    const out = document.getElementById("maceScoreResult"); const p = data.prediction;
+    const src = data.source ? `<div style="margin-top:6px; font-size:0.72rem; opacity:0.85;">Waveform: ${escHtml(data.source.waveform)}. Vitals: ${escHtml(data.source.vitals)}.${data.source.ehr_refresh ? ` EHR returned: ${escHtml((data.source.ehr_refresh.vitals_found || []).join(", ") || "no vitals")}.` : ""}</div>` : "";
+    if (!p) { out.innerHTML = `<div class="form-result info"><strong>Not scored.</strong> ${escHtml(data.message)}${src}</div>`; return; }
+    const ex = p.explanation;
+    const top = ex && ex.top_windows ? ex.top_windows.slice(0, 3).map(w => `${escHtml(w.start_s ?? "")}&ndash;${escHtml(w.end_s ?? "")} s`).join(", ") : "";
+    out.innerHTML = `
+      <div class="form-result ${data.status === "ok" ? "success" : "info"}">
+        <strong>MACE ${escHtml(p.score)}</strong> <span class="pill ${escHtml(p.risk_tier)}">${escHtml(p.risk_tier)}</span>
+        <span style="font-size:0.72rem; opacity:0.85;"> &middot; ${escHtml(p.window_days)}-day window &middot; ${escHtml(p.model_version)}</span><br/>
+        ${escHtml(data.message)}
+        ${data.status === "ok" ? `<div style="margin-top:6px; font-size:0.72rem;">Approved by ${escHtml(p.approved_by)}. Trained on: ${escHtml(p.trained_on)}.${top ? ` Model attended most to: ${top} (where it looked, not why).` : ""}</div>` : ""}
+        ${src}
+        ${data.order ? `<div style="margin-top:6px; font-size:0.72rem; opacity:0.8;">Logged to ${escHtml(patientId)} as ${escHtml(data.order.order_id)}.</div>` : ""}
+        <div style="margin-top:8px;"><button class="btn ghost sm" id="maceReportBtn">Download report</button></div>
+      </div>`;
+    document.getElementById("maceReportBtn").addEventListener("click", downloadMaceReport);
+  }
+
+  function renderSyncBox(patientId, data) {
+    const box = document.getElementById("maceSyncBox");
+    if (!patientId || !data.order) { box.innerHTML = ""; return; }
+    if (data.status !== "ok") {
+      box.innerHTML = `<div style="font-size:0.74rem; color:var(--ink-soft);"><button class="btn ghost sm" disabled>Send to EHR</button> Only a result from a trained, approved model can be written to the EHR. This one is a placeholder or was not scored.</div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div class="grid-4" style="gap:10px; align-items:end;">
+        <div><label style="font-size:0.72rem; color:var(--ink-soft);">Reviewed by (clinician)</label><input type="text" id="maceReviewer" style="width:100%;" /></div>
+        <div style="grid-column: span 2;"><label style="font-size:0.78rem;"><input type="checkbox" id="maceConfirm" /> I reviewed this result and approve writing it to the EHR${EHR_CONFIGURED ? "" : " (no EHR connection: the message is prepared, not sent)"}</label></div>
+        <div><button class="btn" id="maceSyncBtn" style="width:100%;">Send to EHR</button></div>
+      </div>
+      <div id="maceSyncResult"></div>`;
+    document.getElementById("maceSyncBtn").addEventListener("click", async () => {
+      const res = document.getElementById("maceSyncResult");
+      try {
+        const d = await macePostJson(`${API}/patients/${encodeURIComponent(patientId)}/mace-sync`, { reviewed_by: document.getElementById("maceReviewer").value, confirm: document.getElementById("maceConfirm").checked });
+        res.innerHTML = `<div class="form-result ${d.status === "sent" ? "success" : "info"}">${escHtml(d.message)}${d.status !== "sent" ? `<pre style="white-space:pre-wrap; font-size:0.7rem; margin:6px 0 0;">${escHtml(d.hl7_oru)}</pre>` : ""}</div>`;
+      } catch (err) { res.innerHTML = `<div class="form-result error">Not sent &mdash; ${escHtml(err.message)}.</div>`; }
+    });
+  }
+
+  function downloadMaceReport() {
+    if (!LAST_MACE || !LAST_MACE.data.prediction) return;
+    const { patientId, data } = LAST_MACE; const p = data.prediction;
+    const html = `<!doctype html><meta charset="utf-8"><title>MACE report</title><body style="font-family:system-ui;max-width:640px;margin:32px auto;line-height:1.5">
+      <h1>CardioAI MACE report</h1><p><strong>Patient:</strong> ${escHtml(patientId || "not linked to a chart")}<br/><strong>Scored:</strong> ${escHtml(new Date((data.scored_at || Date.now() / 1000) * 1000).toISOString())}</p>
+      <p><strong>Risk score:</strong> ${escHtml(p.score)} (${escHtml(p.risk_tier)}), ${escHtml(p.window_days)}-day window<br/><strong>Model:</strong> ${escHtml(p.model_version)}<br/><strong>Inputs:</strong> ${escHtml((p.inputs_used || []).join(", "))}</p>
+      <p><strong>Waveform:</strong> ${escHtml(data.source ? data.source.waveform : "")}<br/><strong>Vitals:</strong> ${escHtml(data.source ? data.source.vitals : "")}</p>
+      <p style="border:1px solid #c33;padding:8px;border-radius:6px">${data.status === "ok" ? "Decision support from an approved model. Not a diagnosis. A clinician must review it." : "<strong>PLACEHOLDER SCORE.</strong> A hand-set heuristic, not a trained model, not clinically validated. Do not use for care."}</p>
+      <p style="font-size:12px;color:#555">${escHtml(data.message)}${data.status === "ok" ? ` Approved by ${escHtml(p.approved_by)}. Trained on ${escHtml(p.trained_on)}.` : ""}</p></body>`;
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    a.download = `mace-report-${patientId || "ecg"}.html`; a.click(); URL.revokeObjectURL(a.href);
+  }
+
   document.getElementById("maceScoreBtn").addEventListener("click", async () => {
     const out = document.getElementById("maceScoreResult");
     const btn = document.getElementById("maceScoreBtn");
+    document.getElementById("maceSyncBox").innerHTML = "";
     if (DATA_SOURCE !== "live") {
       out.innerHTML = `<div class="form-result info">Running a prediction needs the live engine &mdash; this preview has no backend.</div>`;
       return;
     }
-    const file = document.getElementById("maceScoreFile").files[0];
-    const num = id => { const v = parseFloat(document.getElementById(id).value); return Number.isFinite(v) ? v : undefined; };
-    const body = { sample_rate_hz: parseFloat(document.getElementById("maceScoreRate").value),
-                   heart_rate_bpm: num("maceScoreHr"), qt_interval_ms: num("maceScoreQt"), hrv_sdnn_ms: num("maceScoreHrv") };
-    const pid = document.getElementById("maceScorePatientId").value.trim();
-    if (pid) body.patient_id = pid;
+    const chartMode = document.querySelector("input[name=maceSource]:checked").value === "chart";
     btn.disabled = true; const label = btn.textContent; btn.textContent = "Scoring\u2026";
     try {
-      if (file) {
-        const parsed = parseEcgText(file.name, await file.text());
-        body.waveform = parsed.waveform;
-        if (parsed.rate) body.sample_rate_hz = parsed.rate;
-      }
-      if (!file && body.heart_rate_bpm === undefined && body.qt_interval_ms === undefined && body.hrv_sdnn_ms === undefined) throw new Error("choose an ECG file, or enter placeholder inputs");
-      const res = await fetch(`${API}/mace/score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
-      const p = data.prediction;
-      if (!p) {
-        out.innerHTML = `<div class="form-result info"><strong>Not scored.</strong> ${escHtml(data.message)}</div>`;
+      let pid, data;
+      if (chartMode) {
+        pid = document.getElementById("maceChartPatient").value;
+        if (!pid) throw new Error("choose a patient");
+        data = await macePostJson(`${API}/patients/${encodeURIComponent(pid)}/mace-score`, { refresh_from_ehr: document.getElementById("maceRefreshEhr").checked });
+        showEcgOnFile();
       } else {
-        const ex = p.explanation;
-        const top = ex && ex.top_windows ? ex.top_windows.slice(0, 3).map(w => `${escHtml(w.start_s ?? w.start ?? "")}&ndash;${escHtml(w.end_s ?? w.end ?? "")} s`).join(", ") : "";
-        out.innerHTML = `
-          <div class="form-result ${data.status === "ok" ? "success" : "info"}">
-            <strong>MACE ${escHtml(p.score)}</strong> <span class="pill ${escHtml(p.risk_tier)}">${escHtml(p.risk_tier)}</span>
-            <span style="font-size:0.72rem; opacity:0.85;"> &middot; ${escHtml(p.window_days)}-day window &middot; ${escHtml(p.model_version)}</span><br/>
-            ${escHtml(data.message)}
-            ${data.status === "ok" ? `<div style="margin-top:6px; font-size:0.72rem;">Approved by ${escHtml(p.approved_by)}. Trained on: ${escHtml(p.trained_on)}.${top ? ` Model attended most to: ${top} (where it looked, not why).` : ""}</div>` : ""}
-            ${data.order ? `<div style="margin-top:6px; font-size:0.72rem; opacity:0.8;">Logged to ${escHtml(pid)} as ${escHtml(data.order.order_id)}.</div>` : ""}
-          </div>`;
+        const file = document.getElementById("maceScoreFile").files[0];
+        const num = id => { const v = parseFloat(document.getElementById(id).value); return Number.isFinite(v) ? v : undefined; };
+        const body = { sample_rate_hz: parseFloat(document.getElementById("maceScoreRate").value),
+                       heart_rate_bpm: num("maceScoreHr"), qt_interval_ms: num("maceScoreQt"), hrv_sdnn_ms: num("maceScoreHrv") };
+        pid = document.getElementById("maceScorePatientId").value.trim();
+        if (pid) body.patient_id = pid;
+        if (file) {
+          const parsed = parseEcgText(file.name, await file.text());
+          body.waveform = parsed.waveform;
+          if (parsed.rate) body.sample_rate_hz = parsed.rate;
+        }
+        if (!file && body.heart_rate_bpm === undefined && body.qt_interval_ms === undefined && body.hrv_sdnn_ms === undefined) throw new Error("choose an ECG file, or enter placeholder inputs");
+        data = await macePostJson(`${API}/mace/score`, body);
       }
+      LAST_MACE = { patientId: pid, data };
+      renderMaceResult(pid, data);
+      renderSyncBox(pid, data);
       if (pid) await loadAllData();
     } catch (err) {
       out.innerHTML = `<div class="form-result error">Could not run prediction &mdash; ${escHtml(err.message)}.</div>`;
@@ -1303,7 +1449,8 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
       btn.disabled = false; btn.textContent = label;
     }
   });
-  loadModelStatus();
+  loadModelStatus(); loadEhrStatus(); refreshMacePatients();
+  document.querySelector('.nav-item[data-page="physician"]').addEventListener("click", () => { refreshMacePatients(); loadModelStatus(); });
 
   // ============================================================
   // Manual vitals entry — the intake path that was missing: a nurse or
