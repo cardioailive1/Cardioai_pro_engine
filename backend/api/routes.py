@@ -124,6 +124,8 @@ async def dicom_ingest(patient_id: str, file: UploadFile = File(...)):
     the orchestrator at all; this is what closes that gap.
     """
     contents = await file.read()
+    if len(contents) > 250 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="DICOM file is larger than 250 MB.")
     try:
         meta = dicom_service.extract_metadata_from_bytes(contents)
         pixel_features = dicom_service.extract_pixel_features(contents)
@@ -139,12 +141,19 @@ async def dicom_ingest(patient_id: str, file: UploadFile = File(...)):
     }
     result = await orchestrator.dispatch("imaging", record, source="dicom upload — real pixel data")
     # Standalone echo LVEF: reported next to the result, never fused into the risk score.
-    try:
-        frames = dicom_service.extract_frames(contents) if meta.get("modality") == "US" else None
-    except Exception:
-        frames = None
-    if frames is not None:
-        result = {**result, "echo_lvef": orchestrator.model_registry.predict_echo(frames)}
+    if meta.get("modality") == "US":
+        try:
+            frames = dicom_service.extract_frames(contents)
+        except Exception:
+            frames = None
+        echo = (orchestrator.model_registry.predict_echo(frames) if frames is not None else
+                {"status": "not_run", "fused_into_risk_score": False,
+                 "reason": "This ultrasound file has no cine loop (it needs a multi-frame clip, not a single still image), so LVEF was not run."})
+        result = {**result, "echo_lvef": echo}
+        if orchestrator.patient_registry.get_detail(patient_id):
+            summary = (f"LVEF {echo['lvef_percent']}% ({echo['lvef_category']}), model {echo['model_version']}; not part of the MACE score" if echo.get("status") == "ok"
+                       else f"Echo LVEF not produced: {echo.get('reason') or echo.get('note') or echo.get('status')}")
+            orchestrator.patient_registry.add_order(patient_id, "Echo LVEF (DICOM upload)", "clinician", status="completed" if echo.get("status") == "ok" else "ordered", result_summary=summary)
     return result
 
 

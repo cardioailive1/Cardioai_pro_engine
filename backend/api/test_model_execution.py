@@ -270,3 +270,42 @@ def test_every_stage_action_accepts_a_signing_note():
     for action in ("treatment", "monitoring", "resolved"):
         r = client.post(f"/api/care-continuum/patient/{pid}/advance", json={"action": action, "note": f"Signed off by Dr B ({action})"})
         assert r.status_code == 200 and r.json()["history"][-1]["reason"] == f"Signed off by Dr B ({action})"
+
+
+# ---- echo LVEF from a DICOM upload on the clinician dashboard ----
+def _us_dcm(frames, modality="US"):
+    import io
+    from pydicom.dataset import Dataset, FileMetaDataset
+    from pydicom.uid import ExplicitVRLittleEndian, generate_uid
+    m = FileMetaDataset(); m.TransferSyntaxUID = ExplicitVRLittleEndian
+    d = Dataset(); d.file_meta = m; d.Modality = modality; d.SOPInstanceUID = generate_uid(); d.StudyInstanceUID = generate_uid()
+    d.Rows, d.Columns = frames.shape[1:]; d.NumberOfFrames = str(frames.shape[0]) if frames.shape[0] > 1 else "1"
+    d.BitsAllocated = 16; d.BitsStored = 16; d.HighBit = 15; d.PixelRepresentation = 0
+    d.SamplesPerPixel = 1; d.PhotometricInterpretation = "MONOCHROME2"; d.PixelData = frames.astype("<u2").tobytes()
+    buf = io.BytesIO(); d.save_as(buf, enforce_file_format=False)
+    return buf.getvalue()
+
+
+def test_dicom_upload_echo_paths(tmp_path, monkeypatch):
+    pid = "MRN-ECHO1"; orchestrator.patient_registry.get_or_create(pid)
+    cine = (np.random.rand(12, 32, 32) * 1000)
+    up = lambda b: client.post(f"/api/dicom/ingest?patient_id={pid}", files={"file": ("e.dcm", b, "application/dicom")})
+    monkeypatch.setattr(orchestrator.model_registry, "_echo", None)
+    monkeypatch.setattr("inference.echo_runtime.WEIGHTS_DIR", str(tmp_path))
+    r = up(_us_dcm(cine))
+    assert r.status_code == 200 and r.json()["echo_lvef"]["status"] == "awaiting_trained_model" and r.json()["echo_lvef"]["fused_into_risk_score"] is False
+    assert up(_us_dcm(cine[:1])).json()["echo_lvef"]["status"] == "not_run"                           # a still image has no cine loop
+    assert "echo_lvef" not in up(_us_dcm(cine, modality="CT")).json()                                   # not an ultrasound
+    orders = client.get(f"/api/patients/{pid}").json()["orders"]
+    assert sum(o["order_type"] == "Echo LVEF (DICOM upload)" for o in orders) == 2 and "not produced" in orders[0]["result_summary"]
+    # an approved (test) model produces a number, still not fused
+    from imaging_models.echo_checkpoint import save_echo_checkpoint
+    from imaging_models.mobilenet_echo_model import MobileEchoNet
+    save_echo_checkpoint(MobileEchoNet(variant="small").eval(), str(tmp_path / "echo_lvef_v1.pt"), n_frames=8, img_size=64, trained_on="synthetic smoke test",
+                         validation={"n_studies": 150, "correlation": 0.93, "mae_lvef_points": 4.1, "reference": "cardiologist"})
+    j = tmp_path / "echo_lvef_v1.json"; m = json.loads(j.read_text()); m.update(approved_for_live=True, approved_by="test"); j.write_text(json.dumps(m))
+    monkeypatch.setattr(orchestrator.model_registry, "_echo", None)
+    e = up(_us_dcm(cine)).json()["echo_lvef"]
+    assert e["status"] == "ok" and 5 <= e["lvef_percent"] <= 85 and e["fused_into_risk_score"] is False and e["approved_by"] == "test"
+    assert client.get(f"/api/patients/{pid}").json()["orders"][0]["result_summary"].startswith("LVEF")
+    assert client.post("/api/dicom/ingest?patient_id=x", files={"file": ("e.dcm", b"not dicom", "application/dicom")}).status_code == 422
