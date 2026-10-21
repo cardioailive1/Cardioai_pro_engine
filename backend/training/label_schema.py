@@ -53,6 +53,7 @@ class MACEEventType(str, Enum):
     choice, not an accident of this file's defaults.
     """
     CARDIOVASCULAR_DEATH = "cardiovascular_death"
+    ALL_CAUSE_DEATH = "all_cause_death"   # used instead of CARDIOVASCULAR_DEATH where cause of death is not recorded (Mayo)
     MYOCARDIAL_INFARCTION = "myocardial_infarction"
     STROKE = "stroke"
     REVASCULARIZATION = "revascularization"
@@ -61,6 +62,7 @@ class MACEEventType(str, Enum):
 
 MACE_QUALIFYING: frozenset[MACEEventType] = frozenset({
     MACEEventType.CARDIOVASCULAR_DEATH,
+    MACEEventType.ALL_CAUSE_DEATH,
     MACEEventType.MYOCARDIAL_INFARCTION,
     MACEEventType.STROKE,
 })

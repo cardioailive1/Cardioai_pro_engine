@@ -6,6 +6,10 @@ Train the ECG -> MACE networks on real Mayo data, inside the Mayo Workspace.
 
 Input CSV (one row per ECG, built in the Workspace from the ECG table + OMOP outcomes):
     patient_id, waveform_b64, label_window, [age, sex_male], [heart_rate_bpm, qt_interval_ms, hrv_sdnn_ms]
+For Mayo's FACT_ECG_WAVEFORM use --mayo-leads: replace waveform_b64 with
+    leads_json (a JSON object {"I": <WAVEFORM>, "II": ..., "V6": ...} for the 'Rhythm' recording)
+    and sample_rate_hz (ECGSAMPLEBASE). --sample-rate is then the common rate every ECG is resampled to
+    (500 keeps the 5,000-sample input). patient_id should be PATIENT_CLINIC_NUMBER.
 label_window is one of early_30_90 / none_observed / (imminent_0_30, late_90_365 are dropped).
 The waveform layout flags must match what Mayo confirmed (see ecg_waveform.probe_waveform).
 
@@ -46,7 +50,7 @@ def _baseline_scores(train, test, cols):
 
 
 def run_variant(name, rows, out, *, length, rate, leads, layout, epochs, baseline_cols, wearable_aug):
-    ex, skipped = build_examples(rows, length=length, leads=leads, **layout)
+    ex, skipped = build_examples(rows, length=length, leads=leads, target_rate_hz=rate, **layout)
     print(f"[{name}] {len(ex)} usable ECGs, {sum(e['y'] for e in ex)} events; skipped {skipped}")
     model, r = train_ecg_mace_net(ex, n_epochs=epochs, wearable_aug=wearable_aug)
     train, val, test = r["splits"]
@@ -79,6 +83,7 @@ def main(argv=None):
     ap.add_argument("--dtype", default="int16"); ap.add_argument("--n-leads", type=int, default=12)
     ap.add_argument("--byteorder", default="little"); ap.add_argument("--layout", default="lead_major")
     ap.add_argument("--gain", type=float, default=None)
+    ap.add_argument("--mayo-leads", action="store_true", help="rows carry leads_json + sample_rate_hz (Mayo FACT_ECG_WAVEFORM)")
     ap.add_argument("--sample-rate", type=float, required=True, help="Hz, as confirmed by Mayo")
     ap.add_argument("--seconds", type=float, default=10.0); ap.add_argument("--epochs", type=int, default=15)
     ap.add_argument("--single-lead-index", type=int, default=0, help="lead for the wearable proxy model; -1 to skip")
@@ -90,6 +95,9 @@ def main(argv=None):
     for r in rows:
         r["age"] = float(r["age"]) if r.get("age") else 65.0
         r["sex_male"] = float(r["sex_male"]) if r.get("sex_male") else 0.0
+        if a.mayo_leads:
+            r["leads"] = json.loads(r["leads_json"])
+            r["sample_rate_hz"] = float(r["sample_rate_hz"]) if r.get("sample_rate_hz") else None
     layout = dict(dtype=a.dtype, n_leads=a.n_leads, byteorder=a.byteorder, layout=a.layout, gain=a.gain)
     cols = [c for c in a.baseline_features.split(",") if c]
     assert all(c in FEATURE_COLUMNS for c in cols), f"baseline features must be in {FEATURE_COLUMNS}"

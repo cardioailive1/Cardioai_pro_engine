@@ -21,15 +21,28 @@ python -m training.mayo.test_lvef_dataset      # needs torch + pydicom
 All four must print `all ok`. 3D Slicer and ITK-SNAP are pre-installed (desktop session).
 
 ## 2. Look up what is still unconfirmed
-- [ ] Which table holds `PATIENT_DK` (try `FACT_IMAGINGSTUDY`)
-- [ ] How `FACT_ECHO_TEST` links to echo images
-- [ ] ECG Base64 layout: take 3-5 rows and run
-```python
-from training.mayo.ecg_waveform import probe_waveform, decode_waveform
-print(probe_waveform(b64_string))     # candidate dtype / lead count / byte order; confirm with ECG training, check a trace by eye
-x = decode_waveform(b64_string, dtype="int16", n_leads=12, layout="lead_major")   # use the confirmed layout
-```
+Answered by Mayo (Adam Resnick and Tommy Stretch, 2026-10-21):
+- ECG waveform (`FACT_ECG_WAVEFORM`): one URL-encoded Base64 record per lead; decode each on its own (URL-decode, Base64-decode, signed 16-bit little-endian, x 4.88 = microvolts). There is **no chunk order**: the slide's `STRING_AGG` does not define a sequence, so records are never joined. Eight `LEAD_ID` values (I, II, V1-V6). Use `WAVEFORM_TYPE = 'Rhythm'` for the full 10-second ECG (the median type is one synthesized beat).
+- Sample rate: `ECGSAMPLEBASE` in `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (250 or 500 Hz).
+- Join to `FACT_ECG`: `ECG_WAVEFORM_FPK` does not join to `ECG_FPK`. Use `PATIENT_CLINIC_NUMBER` through `DIM_PATIENT` to get `PATIENT_DK`, then match `ACQUISITION_TS` to `ECG_DTM`. `ENCOUNTER_NUMBER` comes from the matched `FACT_ECG` row.
+- One person across record systems: `PATIENT_CLINIC_NUMBER`. For one row per patient in `DIM_PATIENT`, set `PATIENT_MERGED_FLAG = 'N'`. Use it as `patient_id` so the patient-level split cannot put one person on both sides.
+- Cause of death is not populated. Mayo recommends **all-cause death** in place of cardiovascular death. The code now defaults to `death_definition="all_cause"` (event type `all_cause_death`); the clinical lead still has to approve the definition.
+- Death and follow-up: `FACT_MORTALITY_STATUS` combines the Mayo record with third-party mortality data (Veritas Data Research). A last live interaction is a completed appointment, performed immunization, lab collection or surgical case.
+- MI and stroke: use `condition_occurrence` (SNOMED, OMOP) or `FACT_DIAGNOSIS` (ICD). `FACT_DIAGNOSIS.PRIMARY_DIAGNOSIS_FLAG` gives primary or secondary; `ENCOUNTER_NUMBER` links to `FACT_ENCOUNTERS.ENCOUNTER_TYPE`. Billing diagnoses are in `FACT_CLAIMS_ITEM_DIAGNOSIS`, linked to `FACT_CLAIMS` (`CLAIM_CLASS_NAME` is inpatient or outpatient).
+- Dates are shifted by the same amount across a patient's whole record.
+- Echo images: link `FACT_ECHO_TEST` to the DICOM images by study date and `PATIENT_CLINIC_NUMBER` (Mayo will explore other ways if this is not enough).
+
+Still to find out:
+- [ ] How `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (the sample rate) joins to the waveform rows
+- [ ] Which `FACT_ECHO_RESULTS` column holds LVEF, and whether one study can have more than one value (not answered)
 - [ ] OMOP concept IDs for `training/omop_adapter.py` (CONCEPT table / Schema Visualizer)
+- [ ] Check one decoded Rhythm trace by eye against the signed ECG report, and confirm there is exactly one Rhythm record per lead (the loader refuses any lead that has several)
+
+```python
+from training.mayo.ecg_waveform import assemble_mayo_ecg, resample
+sig = assemble_mayo_ecg(rows_for_one_acquisition)   # dicts with LEAD_ID, WAVEFORM_TYPE, WAVEFORM -> (8, n) microvolts
+sig = resample(sig, sample_rate_hz, 500)            # 250 Hz ECGs are brought to 500 Hz
+```
 
 ## 3. Select studies and link reports to images
 ```python
@@ -111,11 +124,11 @@ Plumbing only until there are hundreds of reviewed studies; do not quote results
 Only code, aggregate metrics (spot-check agreement, correlation) and approved model exports leave, via Mayo's export process. No report text, IDs, CSVs or images.
 
 
-## ECG -> MACE network (after Mayo confirms the waveform layout)
+## ECG -> MACE network
 
-1. Build `ecg_rows.csv` in the Workspace: `patient_id, waveform_b64, label_window, age, sex_male, heart_rate_bpm, qt_interval_ms` (label_window from OMOP outcomes via `label_schema`; the last two columns feed the baseline). Confirm the layout first with `ecg_waveform.probe_waveform` on a few rows.
-2. Train both variants (12-lead and the single-lead wearable proxy):
-   `python -m training.train_ecg_mace_mayo --rows ecg_rows.csv --dtype <..> --n-leads 12 --layout <..> --sample-rate <Hz from Mayo> --out weights`
+1. Build `ecg_rows.csv` in the Workspace, one row per ECG: `patient_id` (PATIENT_CLINIC_NUMBER), `leads_json` (a JSON object `{"I": <WAVEFORM>, "II": ..., "V6": ...}` for the Rhythm recording, values exactly as stored), `sample_rate_hz` (ECGSAMPLEBASE), `label_window`, `age`, `sex_male`, `heart_rate_bpm`, `qt_interval_ms` (label_window from OMOP outcomes via `label_schema`; the last two columns feed the baseline). Skip any ECG that has more than one Rhythm record for a lead, and keep a count of them.
+2. Train both variants (12-lead and the single-lead wearable proxy). `--sample-rate` is the common rate every ECG is resampled to:
+   `python -m training.train_ecg_mace_mayo --rows ecg_rows.csv --mayo-leads --sample-rate 500 --out weights`
 3. Read the printed network-vs-baseline comparison and `weights/cutoff_proposals_*.json`. Only these aggregates leave the Workspace.
 4. Clinical team picks cutoffs from the proposal table: `ecg_models.checkpoint.set_tier_cutoffs(path, moderate, high, set_by, note)`.
 5. If the network beat the baseline: `approve_checkpoint(path, approver, note)`. Approval is refused for synthetic data, no baseline win, or unset cutoffs. Only then does the live engine load it.
@@ -128,7 +141,7 @@ Module: `training/mayo/mace_label_audit.py`. Run inside the Workspace; the files
 1. Rebuild records with the current `omop_adapter.build_mace_records` (they now carry `index_date`).
 2. `items = build_review_items(records, condition_rows, death_rows, mapping, visit_rows)` collects the OMOP evidence per record.
 3. `aa = auto_audit(items)`: automatic checks (death with no usable cause, event after death, window within a week of 30/90 days, single supporting code, non-inpatient setting, MI+stroke together, prior event at the washout edge, code present but labeled no event).
-4. Tier 1: `export_ds_audit(items, "ds.csv", aa)`. Each data scientist fills `ds_decision` (agree / disagree / uncertain / exclude); for disagree add `ds_event_type` (none, myocardial_infarction, stroke, cardiovascular_death) and `ds_days_to_event`. Optional lighter pass: `triage_ds_scope` (always keeps events and non-pass records).
+4. Tier 1: `export_ds_audit(items, "ds.csv", aa)`. Each data scientist fills `ds_decision` (agree / disagree / uncertain / exclude); for disagree add `ds_event_type` (none, myocardial_infarction, stroke, all_cause_death, or cardiovascular_death if the batch uses that definition) and `ds_days_to_event`. Optional lighter pass: `triage_ds_scope` (always keeps events and non-pass records).
 5. `plan = route(items, read_ds_audits(["ds.csv", ...]), aa)`.
 6. Tier 2: `export_cardiologist_queue(items, plan, "card.csv", "key.csv")`. Blinded, shuffled; spot-check drawn separately from agreed events and agreed non-events. The cardiologist fills `cardiologist_decision` (event / none / exclude), plus type and days for an event. Keep `key.csv` with the data scientists.
 7. `result = finalize(plan, "card.csv", "key.csv")`; passes at >= 95% spot-check agreement over >= 20 checks with nothing unresolved.

@@ -65,6 +65,18 @@ class OMOPConceptMapping:
     mi_condition_concept_ids: set[int] = field(default_factory=set)
     stroke_condition_concept_ids: set[int] = field(default_factory=set)
     cv_death_cause_concept_ids: set[int] = field(default_factory=set)  # matched against the Death table's cause_concept_id
+    # "all_cause": any death after the index counts (Mayo's cause of death is not populated, and Mayo recommended this).
+    # "cardiovascular": only deaths whose cause_concept_id is in cv_death_cause_concept_ids count.
+    death_definition: str = "all_cause"
+
+    def death_counts(self, death_row: dict) -> bool:
+        """Does this Death-table row count as an outcome event under the chosen definition?"""
+        if self.death_definition == "all_cause":
+            return True
+        return death_row.get("cause_concept_id") in self.cv_death_cause_concept_ids
+
+    def death_event_type(self):
+        return MACEEventType.ALL_CAUSE_DEATH if self.death_definition == "all_cause" else MACEEventType.CARDIOVASCULAR_DEATH
 
     male_gender_concept_id: int = 8507
     female_gender_concept_id: int = 8532
@@ -74,7 +86,11 @@ class OMOPConceptMapping:
     def validate(self) -> list[str]:
         """Catches an incompletely-filled-in mapping before it silently produces wrong labels — call this before build_mace_records."""
         issues = []
-        if not self.mi_condition_concept_ids and not self.stroke_condition_concept_ids and not self.cv_death_cause_concept_ids:
+        if self.death_definition not in ("all_cause", "cardiovascular"):
+            issues.append(f"death_definition must be 'all_cause' or 'cardiovascular', got {self.death_definition!r}.")
+        if self.death_definition == "cardiovascular" and not self.cv_death_cause_concept_ids:
+            issues.append("death_definition is 'cardiovascular' but no cause concept_ids were supplied: no death will count as an event. Mayo does not populate cause of death; use 'all_cause' unless that changes.")
+        if not self.mi_condition_concept_ids and not self.stroke_condition_concept_ids and not (self.death_definition == "all_cause" or self.cv_death_cause_concept_ids):
             issues.append("No MACE-qualifying concept_ids supplied at all (MI, stroke, or CV death) — every record would be labeled as having no event, which is almost certainly wrong.")
         if self.hrv_concept_id is None:
             issues.append("hrv_concept_id is None — expected at most institutions (see module docstring); hrv_sdnn_ms will be absent from every record's features.")
@@ -195,8 +211,8 @@ def _find_outcome(
         d_date = _to_date(d.get("death_date"))
         if d_date is None or d_date < index_date:
             continue
-        if d.get("cause_concept_id") in mapping.cv_death_cause_concept_ids:
-            candidates.append(((d_date - index_date).days, MACEEventType.CARDIOVASCULAR_DEATH))
+        if mapping.death_counts(d):
+            candidates.append(((d_date - index_date).days, mapping.death_event_type()))
 
     if candidates:
         days_to_event, event_type = min(candidates, key=lambda c: c[0])

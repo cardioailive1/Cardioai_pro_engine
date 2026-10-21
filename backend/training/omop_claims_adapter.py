@@ -63,7 +63,7 @@ def build_claims_risk_records(person_rows, condition_rows, visit_rows, observati
             male = True if gender == mapping.male_gender_concept_id else False if gender == mapping.female_gender_concept_id else None
             event = any(c["condition_concept_id"] in outcome_ids and as_of < _to_date(c["condition_start_date"]) <= hi for c in conds.get(pid, []))
             event = event or any(_to_date(d.get("death_date")) is not None and as_of < _to_date(d["death_date"]) <= hi
-                                 and d.get("cause_concept_id") in mapping.cv_death_cause_concept_ids for d in deaths.get(pid, []))
+                                 and mapping.death_counts(d) for d in deaths.get(pid, []))
             out.append(ClaimsRiskRecord(str(pid), as_of.isoformat(), vectorize(as_of.year - int(yob), male, codes, n_ip if visit_rows is not None else None, n_ed if visit_rows is not None else None),
                                         int(event), _subgroups(p, mapping, as_of)))
     return out
