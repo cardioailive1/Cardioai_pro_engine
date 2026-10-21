@@ -8,7 +8,7 @@ from training.omop_adapter import OMOPConceptMapping, build_mace_records
 
 D0 = date(2024, 1, 1)
 MAP = OMOPConceptMapping(heart_rate_concept_id=100, qtc_concept_id=101, mi_condition_concept_ids={1},
-                         stroke_condition_concept_ids={2}, cv_death_cause_concept_ids={9},
+                         stroke_condition_concept_ids={2}, cv_death_cause_concept_ids={9}, death_definition="cardiovascular",
                          race_concept_id_map={5: "White"})
 
 
@@ -109,3 +109,21 @@ def test_pending_ds_blocks_cardiologist_queue(tmp_path):
         assert False
     except ValueError as e:
         assert "not yet audited" in str(e)
+
+
+def test_death_definition_all_cause_counts_death_without_cause():
+    from datetime import date
+    from training.omop_adapter import OMOPConceptMapping, _find_outcome
+    from training.label_schema import MACEEventType
+    idx = date(2026, 1, 1)
+    deaths = [{"person_id": 1, "death_date": "2026-02-15", "cause_concept_id": None}]
+    allc = OMOPConceptMapping(heart_rate_concept_id=1, qtc_concept_id=2, mi_condition_concept_ids={5}, cv_death_cause_concept_ids={9})
+    assert allc.death_definition == "all_cause"
+    et, days, censored, *_ = _find_outcome(1, idx, [], deaths, allc, 365)
+    assert et == MACEEventType.ALL_CAUSE_DEATH and days == 45 and not censored
+    cv = OMOPConceptMapping(heart_rate_concept_id=1, qtc_concept_id=2, mi_condition_concept_ids={5}, cv_death_cause_concept_ids={9},
+                            death_definition="cardiovascular")
+    et, _, censored, *_ = _find_outcome(1, idx, [], deaths, cv, 365)
+    assert et is None and censored
+    bad = OMOPConceptMapping(heart_rate_concept_id=1, qtc_concept_id=2, mi_condition_concept_ids={5}, death_definition="cardiovascular")
+    assert any("no death will count" in i for i in bad.validate())

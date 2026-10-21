@@ -100,11 +100,11 @@ def build_review_items(records: Iterable[MACELabelRecord], condition_rows: list[
             dd = _to_date(d.get("death_date"))
             if dd is not None and 0 <= (dd - idx).days <= lookahead_days:
                 off = (dd - idx).days
-                cv = d.get("cause_concept_id") in mapping.cv_death_cause_concept_ids
+                cv = mapping.death_counts(d)   # True when this death counts as an outcome event under the chosen definition
                 has_cause = d.get("cause_concept_id") not in (None, 0)
                 ev.append({"type": "death", "offset": off, "cv": cv, "has_cause": has_cause})
                 lines.append(f"day {off:+d}: DEATH, cause {d.get('cause_concept_id') or 'not recorded'}"
-                             + (" (cardiovascular)" if cv else ""))
+                             + (" (counts as an event)" if cv else ""))
         items[r.record_id] = {"record": r, "auto": _auto(r), "evidence": ev,
                               "evidence_text": f"Index ECG date {r.index_date}. " + ("; ".join(lines) if lines else "No MI/stroke code or death near the index date."),
                               "window": r.label_window.value if r.label_window else _win(_auto(r))}
