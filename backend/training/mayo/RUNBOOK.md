@@ -134,6 +134,17 @@ Only code, aggregate metrics (spot-check agreement, correlation) and approved mo
 5. If the network beat the baseline: `approve_checkpoint(path, approver, note)`. Approval is refused for synthetic data, no baseline win, or unset cutoffs. Only then does the live engine load it.
 
 
+## ECG + echo: second-stage MACE model (LVEF as an input)
+
+Heart failure changes MACE risk, so the most recent EARLIER echo LVEF is added to the ECG network's score. Mayo: more than 100,000 patients have both; link on `PATIENT_CLINIC_NUMBER` and date (dates are shifted equally within a patient); LVEF is in `FACT_ECHO_RESULTS`.
+
+1. Pull echo rows from `FACT_ECHO_TEST` / `FACT_ECHO_RESULTS`: `patient_id` (PATIENT_CLINIC_NUMBER), `echo_date`, and the LVEF column (name to confirm with Mayo; Mayo has not said whether one study can hold several values).
+2. `studies, st = echo_study_lvef(echo_rows, lvef_column="<LVEF column>", study_column=None)` then `rows, ls = link_ecg_to_echo(ecg_rows, studies, max_days_before=365)` (from `training.mayo.ecg_echo_link`). Add `ecg_date` to each ECG row first. Only an echo ON OR BEFORE the ECG is used; an echo after it would leak the outcome. ECGs with no echo are kept (`has_echo` false). Read `ls["share_with_echo"]` and `ls["echo_only_after_the_ecg_not_used"]`.
+3. Build examples as usual (`build_examples` carries `echo` through), train the ECG network, then
+   `r = fit_stage2(val, val_ecg_scores, test, test_ecg_scores)` (from `training.ecg_echo_stage2`), where the scores are the network's calibrated probabilities.
+4. Read `r["vs_ecg_only_all_test_patients"]` and `r["vs_ecg_only_patients_with_echo"]`. Keep the second stage only if `r["beats_ecg_only"]` (whole 95% interval above zero). Only aggregates leave the Workspace.
+5. Not wired into the live engine: live scoring would need a current LVEF on the patient's record. That is a separate step after this beats the ECG-only model on real data and the clinical lead approves.
+
 ## Reviewing the MACE outcome labels (same two-tier design as echo)
 
 Module: `training/mayo/mace_label_audit.py`. Run inside the Workspace; the files hold patient-level evidence.
