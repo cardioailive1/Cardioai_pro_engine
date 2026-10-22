@@ -73,6 +73,7 @@ def build_examples(rows, *, length: int = 5000, leads=None, target_rate_hz: floa
             "patient_id": r["patient_id"],
             "x": normalize(fit_length(sig, length)),
             "y": int(w == LabelWindow.EARLY_30_90),
+            "echo": r.get("echo"),   # set by ecg_echo_link.link_ecg_to_echo; None when not linked
             "features": {k: float(r[k]) for k in FEATURE_COLUMNS if r.get(k) not in (None, "")},
             "context": np.array([r.get("age", 65) / 65.0, float(r.get("sex_male", 0))], dtype=np.float32),
         })

@@ -753,6 +753,11 @@ class MACEScoreRequest(BaseModel):
     heart_rate_bpm: Optional[float] = None     # only used if no trained model is live (placeholder inputs)
     qt_interval_ms: Optional[float] = None
     hrv_sdnn_ms: Optional[float] = None
+    # Used only by the approved ECG + echo second-stage model. Echo = the most recent one ON OR BEFORE this ECG.
+    echo_lvef: Optional[float] = None          # percent
+    days_since_echo: Optional[int] = None      # days from that echo to this ECG (0 = same day)
+    age: Optional[float] = None
+    sex_male: Optional[bool] = None
     ordered_by: str = "clinician"
 
 
@@ -778,6 +783,18 @@ async def mace_score(req: MACEScoreRequest):
     for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms"):
         if getattr(req, k) is not None:
             record[k] = getattr(req, k)
+    if (req.echo_lvef is None) != (req.days_since_echo is None):
+        raise HTTPException(status_code=400, detail="Send both echo_lvef and days_since_echo, or neither.")
+    if req.echo_lvef is not None:
+        if not (10 <= req.echo_lvef <= 80):
+            raise HTTPException(status_code=400, detail="echo_lvef must be between 10 and 80 percent.")
+        if req.days_since_echo < 0:
+            raise HTTPException(status_code=400, detail="The echo must be on or before the ECG (days_since_echo >= 0); a later echo would leak the outcome.")
+        record["echo_lvef"] = {"lvef": req.echo_lvef, "days_since_echo": req.days_since_echo}
+    if req.age is not None:
+        record["age"] = req.age
+    if req.sex_male is not None:
+        record["sex_male"] = req.sex_male
     prediction = orchestrator.model_registry.predict("ecg", record)
     placeholder = is_placeholder(prediction)
     if placeholder and not any(k in record for k in ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms")):

@@ -46,11 +46,11 @@ def test_status_distinguishes_unapproved_and_runtime_missing(tmp_path, monkeypat
     (tmp_path / "claims_risk_v1.joblib").write_bytes(b"x")
     side = tmp_path / "claims_risk_v1.json"
     side.write_text(json.dumps({"approved_for_live": False, "trained_on": "x"}))
-    assert ms.model_status(str(tmp_path))["models"][3]["state"] == "trained_not_approved"
+    assert {m["key"]: m for m in ms.model_status(str(tmp_path))["models"]}["claims_risk"]["state"] == "trained_not_approved"
     side.write_text(json.dumps({"approved_for_live": True, "approved_by": "Dr X", "trained_on": "x", "tier_cutoffs": {"moderate": .1, "high": .2}}))
-    assert ms.model_status(str(tmp_path))["models"][3]["state"] == "live"
+    assert {m["key"]: m for m in ms.model_status(str(tmp_path))["models"]}["claims_risk"]["state"] == "live"
     monkeypatch.setattr(ms, "_have", lambda pkgs: ["sklearn"])
-    assert ms.model_status(str(tmp_path))["models"][3]["state"] == "runtime_missing"
+    assert {m["key"]: m for m in ms.model_status(str(tmp_path))["models"]}["claims_risk"]["state"] == "runtime_missing"
 
 
 def test_mace_score_without_model_does_not_pretend_to_use_the_waveform():
@@ -116,3 +116,48 @@ def test_controlled_cost_avoidance_endpoint():
     assert client.post("/api/payer/cost-avoidance-controlled", json={"members": bad}).status_code == 400
     small = client.post("/api/payer/cost-avoidance-controlled", json={"members": rows[:10]}).json()
     assert small["reportable"] is False and "need at least" in small["reason"]
+
+
+def test_second_stage_uses_earlier_echo_only_when_approved_and_matched(tmp_path, monkeypatch):
+    import pytest
+    from ecg_models.checkpoint import save_checkpoint
+    from ecg_models.stage2_checkpoint import approve_stage2, set_stage2_cutoffs
+    from training.ecg_echo_stage2 import export_stage2, fit_stage2
+    from training.test_ecg_echo import _cohort
+    from training.train_ecg_mace import synthetic_examples, train_ecg_mace_net
+    from inference.ecg_mace_runtime import build_runtime
+    ex = synthetic_examples(n=200, length=500, n_leads=12)
+    m, r = train_ecg_mace_net(ex, n_epochs=2)
+    ck = str(tmp_path / "ecg_mace_v1.pt")
+    save_checkpoint(m, ck, sample_rate_hz=250, length=500, platt=r["platt"], trained_on="synthetic smoke test",
+                    metrics=r["test"], tier_cutoffs={"moderate": .3, "high": .6})
+    j = tmp_path / "ecg_mace_v1.json"; meta = json.loads(j.read_text()); meta.update(approved_for_live=True, approved_by="test"); j.write_text(json.dumps(meta))
+    v, sv = _cohort(4000, True, 1); t, st = _cohort(4000, True, 2)
+    fit = fit_stage2(v, sv, t, st); assert fit["beats_ecg_only"]
+    s2 = str(tmp_path / "ecg_echo_stage2_v1.json")
+    export_stage2(fit, s2, ecg_checkpoint_path=ck, trained_on="synthetic smoke test")
+    set_stage2_cutoffs(s2, 0.3, 0.6, "test", "test")
+    with pytest.raises(ValueError, match="synthetic"):
+        approve_stage2(s2, "me", "x")                                    # synthetic-trained never qualifies
+    sj = json.loads(open(s2).read()); sj.update(approved_for_live=True, approved_by="test"); open(s2, "w").write(json.dumps(sj))
+
+    monkeypatch.setitem(orchestrator.model_registry._trained, "ecg", build_runtime(str(tmp_path)))
+    wf = {k: np.random.RandomState(7).randn(1000).tolist() for k in MAYO_LEADS}
+    base = {"waveform": wf, "sample_rate_hz": 500, "age": 70, "sex_male": True}
+    low = client.post("/api/mace/score", json={**base, "echo_lvef": 25, "days_since_echo": 30}).json()["prediction"]
+    high = client.post("/api/mace/score", json={**base, "echo_lvef": 65, "days_since_echo": 30}).json()["prediction"]
+    assert low["model"] == "ecg_echo_mace_risk" and low["echo_used"] and "echo_lvef" in low["inputs_used"]
+    assert low["ecg_only_score"] == high["ecg_only_score"] and low["score"] > high["score"]          # low LVEF raises risk
+    old = client.post("/api/mace/score", json={**base, "echo_lvef": 25, "days_since_echo": 900}).json()["prediction"]
+    assert old["echo_used"] is False and "only 0-365" in old["echo_note"]                         # too old: not used
+    no_age = client.post("/api/mace/score", json={"waveform": wf, "sample_rate_hz": 500, "echo_lvef": 25, "days_since_echo": 3}).json()["prediction"]
+    assert no_age["model"] == "ecg_mace_risk" and "needs age and sex" in no_age["second_stage"]    # falls back to the ECG alone
+    assert client.post("/api/mace/score", json={**base, "echo_lvef": 25, "days_since_echo": -5}).status_code == 400   # echo AFTER the ECG
+    assert client.post("/api/mace/score", json={**base, "echo_lvef": 25}).status_code == 400
+    from inference.model_status import model_status
+    st = {x["key"]: x for x in model_status(str(tmp_path))["models"]}["ecg_echo_stage2"]
+    assert st["state"] == "live"
+    sj["ecg_checkpoint_sha256"] = "0" * 64; open(s2, "w").write(json.dumps(sj))                  # fitted on a different ECG network
+    monkeypatch.setitem(orchestrator.model_registry._trained, "ecg", build_runtime(str(tmp_path)))
+    other = client.post("/api/mace/score", json={**base, "echo_lvef": 25, "days_since_echo": 30}).json()["prediction"]
+    assert other["model"] == "ecg_mace_risk" and "second_stage" not in other
