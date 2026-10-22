@@ -21,25 +21,17 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 
 from ecg_models.compare import paired_auc_delta
-
-FEATURES = ["ecg_logit", "has_echo", "lvef_centered", "lvef_le_40", "age_65", "sex_male"]
+from ecg_models.stage2_checkpoint import FEATURES, features as _features, save_stage2
 MIN_EVENTS_FOR_COMPARISON = 10
-
-
-def _logit(p):
-    p = np.clip(np.asarray(p, dtype=float), 1e-6, 1 - 1e-6)
-    return np.log(p / (1 - p))
 
 
 def stage2_matrix(examples, ecg_scores) -> np.ndarray:
     rows = []
     for e, s in zip(examples, ecg_scores):
         echo = e.get("echo") or {}
-        has = bool(echo.get("has_echo"))
-        lv = echo.get("lvef")
         ctx = e.get("context")
-        rows.append([float(_logit(s)), float(has), ((lv - 55.0) / 10.0) if has else 0.0, float(has and lv <= 40.0),
-                     float(ctx[0]) if ctx is not None else 1.0, float(ctx[1]) if ctx is not None else 0.0])
+        rows.append(_features(float(s), bool(echo.get("has_echo")), echo.get("lvef"),
+                              float(ctx[0]) if ctx is not None else 1.0, float(ctx[1]) if ctx is not None else 0.0))
     return np.array(rows, dtype=float)
 
 
@@ -63,3 +55,14 @@ def fit_stage2(val_examples, val_ecg_scores, test_examples, test_ecg_scores, *, 
             "share_with_echo": float(has.mean()), "vs_ecg_only_all_test_patients": overall,
             "vs_ecg_only_patients_with_echo": sub, "beats_ecg_only": bool(overall["beats_baseline"]),
             "test_scores": p_test, "model": lr}
+
+
+def export_stage2(result: dict, path: str, *, ecg_checkpoint_path: str, trained_on: str, max_days_before: int = 365) -> dict:
+    """Write the (NOT approved) second-stage file next to the ECG checkpoint it was fitted on. Humans then set the
+    cutoffs (ecg_models.stage2_checkpoint.set_stage2_cutoffs) and approve (approve_stage2)."""
+    if not result.get("ok"):
+        raise ValueError(result.get("reason", "second stage was not fitted"))
+    return save_stage2(path, coefficients=result["coefficients"], intercept=result["intercept"], trained_on=trained_on,
+                       comparison=result["vs_ecg_only_all_test_patients"], ecg_checkpoint_path=ecg_checkpoint_path,
+                       max_days_before=max_days_before,
+                       metrics={"n_test": result["n_test"], "n_test_with_echo": result["n_test_with_echo"]})

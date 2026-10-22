@@ -15,14 +15,17 @@ Rules built in here, so they cannot be forgotten later:
   * An ECG with no usable earlier echo is kept, with has_echo = False. It is NOT dropped: most patients have no echo,
     and the model must work for them.
 
-Not decided here, and to confirm with Mayo / the clinical lead: the name of the LVEF column in FACT_ECHO_RESULTS (the
-caller passes it), and the `max_days_before` window (default 365).
+Not decided here, and to confirm with Mayo / the clinical lead: the exact name of the LVEF column in FACT_ECHO_RESULTS
+(`find_lvef_columns` lists the likely columns from the table's column names so a person can pick; the caller passes the
+chosen one, or several, and the first that holds a number is used), whether one study can hold several values
+(`multi_value` says what to do if it does: median, or mean), and the `max_days_before` window (default 365).
 """
 from __future__ import annotations
 
 from datetime import date, datetime
-from statistics import median
-from typing import Any, Iterable, Optional
+import re
+from statistics import mean, median
+from typing import Any, Iterable, Optional, Sequence, Union
 
 LVEF_MIN, LVEF_MAX = 10.0, 80.0
 
@@ -45,9 +48,21 @@ def _num(x: Any) -> Optional[float]:
     return v * 100 if 0 < v <= 1 else v        # 0.55 -> 55
 
 
-def echo_study_lvef(echo_rows: Iterable[dict], *, lvef_column: str, study_column: Optional[str] = None) -> tuple[list[dict], dict]:
-    """echo_rows: dicts with patient_id, echo_date and the LVEF column from FACT_ECHO_RESULTS (one row per value).
+def find_lvef_columns(column_names: Iterable[str]) -> list[str]:
+    """Likely LVEF columns among a table's column names (for a person to confirm; never chosen silently)."""
+    return [c for c in column_names if re.search(r"lvef|ejection|(^|_)ef(_|$)", str(c), re.I)]
+
+
+def echo_study_lvef(echo_rows: Iterable[dict], *, lvef_column: Union[str, Sequence[str]], study_column: Optional[str] = None,
+                    multi_value: str = "median") -> tuple[list[dict], dict]:
+    """echo_rows: dicts with patient_id, echo_date and the LVEF column(s) from FACT_ECHO_RESULTS (one row per value).
+    lvef_column: one name or a list of names; the first one holding a number is used for each row.
+    multi_value: 'median' (default) or 'mean' of the plausible values when a study has several.
     -> ([{patient_id, echo_date, lvef, n_values}], stats). One entry per study (study_column, else per patient and date)."""
+    if multi_value not in ("median", "mean"):
+        raise ValueError("multi_value must be 'median' or 'mean'")
+    agg = median if multi_value == "median" else mean
+    cols = [lvef_column] if isinstance(lvef_column, str) else list(lvef_column)
     groups: dict = {}
     n_rows = n_bad_date = n_not_number = n_implausible = 0
     for r in echo_rows:
@@ -56,7 +71,7 @@ def echo_study_lvef(echo_rows: Iterable[dict], *, lvef_column: str, study_column
         if d is None:
             n_bad_date += 1
             continue
-        v = _num(r.get(lvef_column))
+        v = next((x for x in (_num(r.get(c)) for c in cols) if x is not None), None)
         if v is None:
             n_not_number += 1
             continue
@@ -65,7 +80,7 @@ def echo_study_lvef(echo_rows: Iterable[dict], *, lvef_column: str, study_column
             continue
         key = (str(r["patient_id"]), d, str(r.get(study_column)) if study_column else None)
         groups.setdefault(key, []).append(v)
-    studies = [{"patient_id": k[0], "echo_date": k[1], "lvef": float(median(v)), "n_values": len(v)} for k, v in groups.items()]
+    studies = [{"patient_id": k[0], "echo_date": k[1], "lvef": float(agg(v)), "n_values": len(v)} for k, v in groups.items()]
     return studies, {"result_rows": n_rows, "studies": len(studies), "dropped_no_date": n_bad_date,
                      "dropped_not_a_number": n_not_number, "dropped_implausible": n_implausible,
                      "studies_with_several_values": sum(1 for g in groups.values() if len(g) > 1)}

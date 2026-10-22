@@ -23,6 +23,7 @@ MODELS = {
     "ecg_12lead": ("ECG to MACE, 12-lead", "ecg_mace_v1.pt", ("torch",), "clinician"),
     "ecg_1lead": ("ECG to MACE, single-lead (wearable proxy)", "ecg_mace_1lead_v1.pt", ("torch",), "clinician"),
     "echo_lvef": ("Echo LVEF (standalone, not in the MACE score)", "echo_lvef_v1.pt", ("torch",), "clinician"),
+    "ecg_echo_stage2": ("ECG + echo LVEF second stage (adds the earlier echo to the ECG score)", "ecg_echo_stage2_v1.json", (), "clinician"),
     "claims_risk": ("Payer claims risk", "claims_risk_v1.joblib", ("sklearn", "joblib"), "payer"),
 }
 

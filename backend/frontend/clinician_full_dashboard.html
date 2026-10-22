@@ -584,6 +584,16 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
           </div>
         </div>
         <details style="margin-top:10px;">
+          <summary style="font-size:0.74rem; color:var(--ink-soft); cursor:pointer;">Echo LVEF, age and sex (used only if the approved ECG + echo model is live)</summary>
+          <p class="sub" style="margin:6px 0;">Enter the most recent echo done on or before this ECG. Leave the echo blank if there is none; the model still scores. Age and sex are needed for this model.</p>
+          <div class="grid-4" style="gap:10px; margin-top:8px;">
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">Echo LVEF (%)</label><input type="number" id="maceScoreLvef" min="10" max="80" style="width:100%;" /></div>
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">Days from echo to this ECG</label><input type="number" id="maceScoreEchoDays" min="0" style="width:100%;" /></div>
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">Age (years)</label><input type="number" id="maceScoreAge" min="0" max="120" style="width:100%;" /></div>
+            <div><label style="font-size:0.72rem; color:var(--ink-soft);">Sex</label><select id="maceScoreSex" style="width:100%; font-size:0.79rem; padding:7px 10px; border-radius:6px; border:1px solid var(--line);"><option value="">not given</option><option value="male">Male</option><option value="female">Female</option></select></div>
+          </div>
+        </details>
+        <details style="margin-top:10px;">
           <summary style="font-size:0.74rem; color:var(--ink-soft); cursor:pointer;">Placeholder inputs (used only if no trained model is live)</summary>
           <div class="grid-4" style="gap:10px; margin-top:8px;">
             <div><label style="font-size:0.72rem; color:var(--ink-soft);">Heart rate (bpm)</label><input type="number" id="maceScoreHr" style="width:100%;" /></div>
@@ -1270,6 +1280,11 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
                    heart_rate_bpm: num("maceScoreHr"), qt_interval_ms: num("maceScoreQt"), hrv_sdnn_ms: num("maceScoreHrv") };
     const pid = document.getElementById("maceScorePatientId").value.trim();
     if (pid) body.patient_id = pid;
+    const lv = num("maceScoreLvef"), ed = num("maceScoreEchoDays"), ag = num("maceScoreAge"), sx = document.getElementById("maceScoreSex").value;
+    if (lv !== undefined && ed !== undefined) { body.echo_lvef = lv; body.days_since_echo = Math.round(ed); }
+    else if (lv !== undefined || ed !== undefined) { out.innerHTML = `<div class="form-result error">Enter both the echo LVEF and the days from the echo to this ECG, or neither.</div>`; return; }
+    if (ag !== undefined) body.age = ag;
+    if (sx) body.sex_male = sx === "male";
     btn.disabled = true; const label = btn.textContent; btn.textContent = "Scoring\u2026";
     try {
       if (file) {
@@ -1292,6 +1307,7 @@ footer.foot { text-align:center; font-size:0.73rem; color:var(--ink-soft); paddi
             <strong>MACE ${escHtml(p.score)}</strong> <span class="pill ${escHtml(p.risk_tier)}">${escHtml(p.risk_tier)}</span>
             <span style="font-size:0.72rem; opacity:0.85;"> &middot; ${escHtml(p.window_days)}-day window &middot; ${escHtml(p.model_version)}</span><br/>
             ${escHtml(data.message)}
+            ${p.second_stage ? `<div style="margin-top:6px; font-size:0.72rem;">${escHtml(p.second_stage)}${p.ecg_only_score !== undefined ? `; ECG-only score ${escHtml(p.ecg_only_score)}` : ""}${p.echo_note ? `. ${escHtml(p.echo_note)}` : ""}</div>` : ""}
             ${data.status === "ok" ? `<div style="margin-top:6px; font-size:0.72rem;">Approved by ${escHtml(p.approved_by)}. Trained on: ${escHtml(p.trained_on)}.${top ? ` Model attended most to: ${top} (where it looked, not why).` : ""}</div>` : ""}
             ${data.order ? `<div style="margin-top:6px; font-size:0.72rem; opacity:0.8;">Logged to ${escHtml(pid)} as ${escHtml(data.order.order_id)}.</div>` : ""}
           </div>`;

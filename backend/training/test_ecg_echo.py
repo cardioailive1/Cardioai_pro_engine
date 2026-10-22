@@ -66,3 +66,17 @@ def test_refuses_with_too_few_events():
     v, sv = _cohort(40, True, 3)
     r = fit_stage2(v, sv, v, sv)
     assert r["ok"] is False and "events" in r["reason"]
+
+
+def test_column_candidates_several_columns_and_several_values():
+    import pytest
+    from training.mayo.ecg_echo_link import find_lvef_columns
+    assert find_lvef_columns(["PATIENT_DK", "LVEF_BIPLANE", "EJECTION_FRACTION", "EF_VISUAL", "REFERENCE", "ECHO_DTM"]) == ["LVEF_BIPLANE", "EJECTION_FRACTION", "EF_VISUAL"]
+    rows = [{"patient_id": "a", "echo_date": date(2024, 1, 1), "BIPLANE": None, "VISUAL": 40},
+            {"patient_id": "a", "echo_date": date(2024, 1, 1), "BIPLANE": 50, "VISUAL": 45},
+            {"patient_id": "a", "echo_date": date(2024, 1, 1), "BIPLANE": 60, "VISUAL": None}]
+    med, _ = echo_study_lvef(rows, lvef_column=["BIPLANE", "VISUAL"])
+    avg, _ = echo_study_lvef(rows, lvef_column=["BIPLANE", "VISUAL"], multi_value="mean")
+    assert med[0]["lvef"] == 50.0 and med[0]["n_values"] == 3 and abs(avg[0]["lvef"] - 50.0) < 1e-9
+    with pytest.raises(ValueError):
+        echo_study_lvef(rows, lvef_column="BIPLANE", multi_value="max")

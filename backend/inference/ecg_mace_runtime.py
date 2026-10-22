@@ -18,6 +18,7 @@ import torch
 
 from ecg_models.checkpoint import load_checkpoint
 from ecg_models.explain import explain
+from ecg_models.stage2_checkpoint import FILE_NAME as STAGE2_FILE, file_sha256, load_stage2, predict_stage2, valid_echo
 from inference.ecg_leads import to_lead_array
 
 WEIGHTS_DIR = os.environ.get("CARDIOAI_WEIGHTS_DIR", "weights")
@@ -47,6 +48,10 @@ def build_runtime(weights_dir: Optional[str] = None) -> Optional[Callable[[dict[
     loaded = {n: v for n, v in loaded.items() if v}
     if not loaded:
         return None
+    # Optional second stage (ECG score + earlier echo LVEF). Used only if approved AND fitted on THIS 12-lead checkpoint.
+    stage2 = load_stage2(os.path.join(weights_dir, STAGE2_FILE))
+    if stage2 and (12 not in loaded or stage2.get("ecg_checkpoint_sha256") != file_sha256(os.path.join(weights_dir, CHECKPOINTS[12]))):
+        stage2 = None
 
     def run(record: dict[str, Any]) -> Optional[dict[str, Any]]:
         wf = record.get("waveform")
@@ -63,9 +68,26 @@ def build_runtime(weights_dir: Optional[str] = None) -> Optional[Callable[[dict[
         with torch.no_grad():
             logit = model(torch.tensor(x).unsqueeze(0)).item()
         p = float(1 / (1 + np.exp(-(meta["platt"]["a"] * logit + meta["platt"]["b"]))))
-        return {"model": "ecg_mace_risk", "model_version": f"ecg-mace-{meta['n_leads']}lead-{meta['created']}",
+        extra: dict = {}
+        if stage2 and wave.shape[0] == 12:
+            echo = record.get("echo_lvef") or {}
+            age, sex = record.get("age"), record.get("sex_male")
+            if age is None or sex is None:
+                extra = {"second_stage": "not used: the ECG + echo model needs age and sex on the record; scored by the ECG alone"}
+            else:
+                ok, why = valid_echo(echo.get("lvef"), echo.get("days_since_echo"), stage2["max_days_before"])
+                ecg_only = p
+                p = predict_stage2(stage2, ecg_only, ok, echo.get("lvef") if ok else None, float(age), bool(sex))
+                meta = {**meta, "tier_cutoffs": stage2["tier_cutoffs"], "approved_by": stage2["approved_by"],
+                        "trained_on": stage2["trained_on"], "created": stage2["created"]}
+                extra = {"second_stage": "ECG + echo LVEF model", "ecg_only_score": round(ecg_only, 4), "echo_used": ok,
+                         "echo_note": "" if ok else f"echo not used ({why}); scored as a patient with no earlier echo",
+                         "inputs_used_extra": ["echo_lvef", "age", "sex"] if ok else ["age", "sex"]}
+        inputs = [f"raw_ecg_{meta['n_leads']}_lead"] + extra.pop("inputs_used_extra", [])
+        return {**extra, "model": "ecg_echo_mace_risk" if extra.get("echo_used") is not None else "ecg_mace_risk",
+                "model_version": (f"ecg-echo-mace-{meta['created']}" if extra.get("echo_used") is not None else f"ecg-mace-{meta['n_leads']}lead-{meta['created']}"),
                 "score": round(p, 4), "risk_tier": _tier(p, meta["tier_cutoffs"]), "window_days": "30-90",
-                "inputs_used": [f"raw_ecg_{meta['n_leads']}_lead"],
+                "inputs_used": inputs,
                 "explanation": explain(model, x, meta["sample_rate_hz"]),
                 "approved_by": meta["approved_by"], "trained_on": meta["trained_on"],
                 "note": "Approved checkpoint; see its metadata file for validation results."}
