@@ -38,8 +38,10 @@ def flags(t: CapTable, today: date, facts: dict | None = None) -> list[dict]:
     out = [{"severity": c["status"], "area": c["id"], "message": f"{c['title']}: {c['detail']}", "rule": c["rule"]}
            for c in compliance.run(t, today, facts) if c["status"] != "ok"]
     pct = t.granted_total / t.pool_reserve
-    if pct > 0.6:
-        out.append({"severity": "warn", "area": "Plan", "message": f"{pct:.0%} of the option pool is granted; {t.pool_available:,} shares remain for future hires.", "rule": "Pool > 60% granted"})
+    vested = sum(plans.vested_shares(g, today) for g in t.grants)
+    out.append({"severity": "ok", "area": "Plan",
+                "message": f"{pct:.0%} of the option pool is granted ({t.granted_total:,} options): {vested:,} vested and {t.granted_total - vested:,} unvested, following each grant's vesting schedule. {t.pool_available:,} shares remain available for future hires.",
+                "rule": "Informational"})
     sc = scenarios.compare(t)[0]
     out.append({"severity": "ok", "area": "Round", "message": f"At $2.00 the founder keeps {sc['founder_pct']:.1%} after a proposed $1.0M round, still under negotiation (today {sc['founder_pct_today']:.1%} of the fully diluted table).", "rule": "Informational"})
     out.sort(key=lambda x: SEVERITY[x["severity"]])
