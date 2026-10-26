@@ -69,6 +69,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api.routes import router as api_router, ws_router
 from integrations.iomt_bridge import router as iomt_bridge_router
+from equity.api import router as equity_router
 from auth.routes import router as auth_router
 from auth.db import init_db
 from auth.security import decode_session_token
@@ -306,6 +307,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
+app.include_router(equity_router, prefix="/api")  # /api/data-room/equity/* — equity & valuation suite, behind the data-room access code
 app.include_router(iomt_bridge_router, prefix="/api")  # /api/iomt-bridge/ingest — the seam with the external cardioailiverpm.com system
 app.include_router(auth_router, prefix="/api")  # /api/auth/* — signup, login, approval workflow, AND /api/auth/data-room/unlock+lock (see auth/routes.py)
 app.include_router(ws_router)  # /ws/stream — kept off the /api prefix so it isn't shadowed by the static mount
