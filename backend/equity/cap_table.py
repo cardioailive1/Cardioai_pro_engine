@@ -138,9 +138,19 @@ class CapTable:
             r["pct"] = r["shares"] / post_shares
         return {"price": round(price, 6), "investment": investment, "pre_money": round(price * pre_shares, 2),
                 "post_money": round(price * post_shares, 2), "pre_money_shares": pre_shares, "post_money_shares": post_shares,
-                "new_shares": new_shares, "safes": conv, "rows": rows,
+                "new_shares": new_shares, "pool_increase": pool_increase, "investor": investor, "safes": conv, "rows": rows,
                 "authorized_remaining": self.authorized_common - post_shares,
                 "authorized_remaining_pre_round": self.authorized_common - pre_shares}
+
+    def after_round(self, r: dict) -> "CapTable":
+        """The cap table once a modelled round (the dict from model_round) has closed: SAFEs converted to preferred, new
+        investors added, pool increased. Used to stack a later round on an earlier one."""
+        new = CapTable(company=self.company, authorized_common=self.authorized_common, par=self.par, common=dict(self.common),
+                       grants=list(self.grants), safes=[], pool_reserve=self.pool_reserve + r["pool_increase"], preferred=dict(self.preferred))
+        for c in r["safes"]:
+            new.preferred[f"{c['holder']} (converted SAFE)"] = c["shares"]
+        new.preferred[r["investor"]] = new.preferred.get(r["investor"], 0) + r["new_shares"]
+        return new
 
     def current_ownership(self) -> list[dict]:
         """Today's fully diluted table, SAFEs not yet converted."""

@@ -113,3 +113,12 @@ def test_endpoints_ok_and_validated():
     assert c.get(f"{B}/portfolio?mark_price=-1").status_code == 422
     r = c.post(f"{B}/shareholder-rep/allocate", json={"equity_value": 30e6, "escrow_pct": 0.1}).json()
     assert abs(r["totals"]["gross"] - 30e6) < 1
+
+
+def test_seed_endpoint():
+    r = c.get(f"{B}/scenarios/seed").json()
+    assert len(r["scenarios"]) == 3 and r["context"]["target_close"] == "2027-10-01"
+    r = c.post(f"{B}/scenarios/seed", json={"pre_moneys": [60_000_000], "seed_amount": 5_000_000}).json()
+    assert r["scenarios"][0]["pre_money"] == 60_000_000 or abs(r["scenarios"][0]["pre_money"] - 60_000_000) < 100
+    assert c.post(f"{B}/scenarios/seed", json={"pre_moneys": []}).status_code == 422
+    assert c.post(f"{B}/scenarios/seed", json={"pre_moneys": [-1]}).status_code == 422
