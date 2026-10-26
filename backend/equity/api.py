@@ -36,6 +36,14 @@ class ScenariosIn(BaseModel):
     scenarios: list[RoundIn] = Field(min_length=1, max_length=12)
 
 
+class SeedIn(BaseModel):
+    seed_amount: float = Field(default=7_000_000, gt=0, le=1e10)
+    pre_moneys: list[float] = Field(min_length=1, max_length=6)
+    pool_increase: int = Field(default=0, ge=0, le=100_000_000)
+    pre_seed_investment: float = Field(default=1_000_000, gt=0, le=1e10)
+    pre_seed_price: float = Field(default=2.0, gt=0, le=1e6)
+
+
 class WaterfallIn(BaseModel):
     equity_value: float = Field(gt=0, le=1e12)
     deductions_pct: float = Field(default=0.0, ge=0, lt=1)
@@ -135,6 +143,23 @@ def funding_scenarios(body: ScenariosIn):
 @router.get("/scenarios/default")
 def default_scenarios():
     return _wrap(scenarios=scenarios.compare(seed_cap_table()))
+
+
+@router.get("/scenarios/seed")
+def seed_default():
+    return _wrap(**scenarios.seed(seed_cap_table()))
+
+
+@router.post("/scenarios/seed")
+def seed_run(body: SeedIn):
+    if any(p <= 0 or p > 1e12 for p in body.pre_moneys):
+        raise HTTPException(status_code=422, detail="pre-money values must be positive")
+    try:
+        pms = [(f"${p / 1e6:,.1f}M pre-money", p) for p in body.pre_moneys]
+        return _wrap(**scenarios.seed(seed_cap_table(), seed_amount=body.seed_amount, pre_moneys=pms, pool_increase=body.pool_increase,
+                                      pre_seed_investment=body.pre_seed_investment, pre_seed_price=body.pre_seed_price))
+    except ValueError as e:
+        _bad(e)
 
 
 @router.post("/waterfall")
