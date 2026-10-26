@@ -48,9 +48,8 @@ def run(t: CapTable, today: date, facts: Optional[dict] = None) -> list[dict]:
     dl = plans.PLAN["stockholder_deadline"]
     if f["stockholder_consent_on_file"]:
         add("422-1", "Stockholder approval of the plan increase (ISO status)", "ok", "The Board consent is also the stockholder consent: the founder is the sole stockholder and Board chair, and it is in the Document Room.", "IRC 422(b)(1): within 12 months of adoption", dl)
-        add("422-2", "Signed consent: date fixed, stockholder capacity", "verify",
-            "The corrected consent (V2) is dated 10/05/2026 and signed. Its signature block has only a Director line for Sampson Kontomah, while Section 3 submits the increase to the stockholders. "
-            "Ask counsel whether a stockholder signature line (same person, as sole stockholder) should be added so ISO approval is unambiguous.", "IRC 422(b)(1)")
+        add("422-2", "Signed consent: date and stockholder capacity", "ok",
+            "The corrected consent (V2) is dated 10/05/2026 and signed by Sampson Kontomah, the sole stockholder and Board chair. Company position: no separate stockholder signature line is needed.", "IRC 422(b)(1)")
     else:
         add("422-1", "Stockholder approval of the plan increase (ISO status)", "warn" if today <= dl else "fail",
             f"The Board approved the increase effective {plans.PLAN['board_effective'].isoformat()}, but no stockholder approval is recorded. "
