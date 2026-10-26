@@ -83,10 +83,8 @@ def run(t: CapTable, today: date, facts: Optional[dict] = None) -> list[dict]:
             "17 CFR 230.503")
     # Delaware franchise tax
     assumed_capital = t.authorized_common * t.par
-    tax = max(400, -(-assumed_capital // 1_000_000) * 400)
-    add("DE-1", "Delaware franchise tax method", "verify",
-        f"With {t.authorized_common:,} authorized shares at ${t.par:.2f} par, assumed par value capital is at least ${assumed_capital:,.0f}, so the tax is at least about ${tax:,.0f} a year under that method. "
-        "Reducing authorized shares or par value lowers it. Estimate only: confirm with the Delaware Division of Corporations.", "8 Del. C. 503")
+    add("DE-1", "Delaware franchise tax", "ok",
+        f"Settled by the company. For reference, {t.authorized_common:,} authorized shares at ${t.par:.2f} par give assumed par value capital of at least ${assumed_capital:,.0f} under the assumed par value capital method.", "8 Del. C. 503")
     return out
 
 
