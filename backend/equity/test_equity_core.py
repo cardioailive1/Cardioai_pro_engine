@@ -78,3 +78,27 @@ def test_helpers():
     assert abs(bs_call(0.75, 1.0, 6.25, 0.039, 0.70) - 0.46) < 0.01
     assert add_months(date(2026, 1, 31), 1) == date(2026, 2, 28)
     assert abs(xirr([(date(2024, 1, 1), -100), (date(2025, 1, 1), 200)]) - 1.0) < 0.01
+
+
+def test_seed_stacks_on_proposed_pre_seed():
+    t = seed_cap_table()
+    s = scenarios.seed(t)
+    assert s["context"]["seed_amount"] == 7_000_000 and s["pre_seed"]["post_money_shares"] == 16_877_446
+    flat, p50, p75 = s["scenarios"]
+    assert abs(flat["price"] - 2.00) < 1e-3 and abs(flat["step_up_vs_pre_seed"] - 1) < 1e-3     # flat to pre-seed post-money = same price
+    assert abs(flat["post_money"] - (33_754_892 + 7_000_000)) < 50
+    assert p75["price"] > p50["price"] > flat["price"]
+    for r in s["scenarios"]:
+        assert abs(r["founder_pct"] + r["seed_investor_pct"] + r["pre_seed_investor_pct"] + r["converted_safes_pct"] + r["options_and_pool_pct"] - 1) < 1e-9
+        assert r["founder_pct"] < s["pre_seed"]["founder_pct"]
+    # the SAFEs convert once, in the pre-seed (518,750 shares), not again in the seed
+    assert round(flat["converted_safes_pct"] * flat["post_money_shares"]) == 518_750
+
+
+def test_seed_flags_down_round_and_pool_increase():
+    t = seed_cap_table()
+    d = scenarios.seed(t, pre_moneys=[("low", 20_000_000)])["scenarios"][0]
+    assert d["price"] < 2.0 and any("Down round" in f for f in d["flags"])
+    base = scenarios.seed(t, pre_moneys=[("x", 50_000_000)])["scenarios"][0]
+    bigger = scenarios.seed(t, pre_moneys=[("x", 50_000_000)], pool_increase=1_000_000)["scenarios"][0]
+    assert bigger["options_and_pool_pct"] > base["options_and_pool_pct"]

@@ -139,7 +139,8 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
 .eq-tab:hover { border-color:var(--cyan); color:var(--navy); }
 .eq-tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
 .eq-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
-@media (max-width:900px) { .eq-grid { grid-template-columns:repeat(2,1fr); } .eq-scroll { overflow-x:auto; } }
+.eq-scroll { overflow-x:auto; max-width:100%; }
+@media (max-width:900px) { .eq-grid { grid-template-columns:repeat(2,1fr); } }
 .eq-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin:8px 0 14px; }
 .eq-form label { display:flex; flex-direction:column; font-size:0.68rem; color:var(--ink-soft); gap:3px; font-weight:600; }
 .eq-form input { font-size:0.82rem; padding:6px 8px; border:1px solid var(--line); border-radius:7px; width:130px; }
@@ -2143,6 +2144,17 @@ document.getElementById("docUploadBtn").addEventListener("click", async () => {
   const holders = rows => table([["Holder"], ["Class"], ["Shares", 1], ["% fully diluted", 1]], rows.map(r => [esc(r.holder), esc(r.class), n0(r.shares), pct(r.pct, 2)]));
   const disc = j => { document.getElementById("eqDisc").textContent = j && j.disclaimer ? j.disclaimer + " Calculated " + j.as_of + "." : ""; };
 
+  async function seedBlock() {
+    let s; try { s = await get("/scenarios/seed"); } catch (e) { return err(e); }
+    const c = s.context, p = s.pre_seed;
+    return `<h3>Proposed seed round (stacked on the proposed pre-seed)</h3>
+      <p class="sub">From the revenue model (${esc(c.source)}): seed ${usd(c.seed_amount)}, target close ${esc(c.target_close)}. ${esc(c.amount_status)}. The model gives no seed valuation, so the pre-money values below are illustrative inputs to test, not terms. Neither round has closed; the SAFEs convert in the pre-seed (founder ${pct(p.founder_pct)} after it, ${usd(p.post_money)} post-money).
+      Runway context from the model: pre-seed funds about ${c.pre_seed_runway_months} months from ${esc(c.pre_seed_funds_from)}; about ${c.seed_runway_at_fy2028_opex_months} months of the seed at FY2028 operating cost before revenue. ${esc(c.runway_note)}</p>
+      ${table([["Seed scenario"], ["Pre-money", 1], ["Seed price", 1], ["vs pre-seed price", 1], ["Post-money", 1], ["Seed investors", 1], ["Pre-seed investors", 1], ["Converted SAFEs", 1], ["Founder", 1], ["Founder change (pts)", 1], ["Options + pool", 1], ["Shares left", 1], ["Flags"]],
+        s.scenarios.map(x => [esc(x.name), usd(x.pre_money), "$" + x.price.toFixed(2), x.step_up_vs_pre_seed.toFixed(2) + "x", usd(x.post_money), pct(x.seed_investor_pct), pct(x.pre_seed_investor_pct), pct(x.converted_safes_pct), pct(x.founder_pct), (-x.founder_dilution_from_seed_pts * 100).toFixed(1), pct(x.options_and_pool_pct), n0(x.authorized_remaining), esc(x.flags.join("; ") || "–")]))}
+      <p class="sub">Try your own seed terms</p>${form("eqSeed", [["seed_amount", "Seed amount ($)", c.seed_amount], ["pre_money", "Pre-money ($)", 60000000], ["pool_increase", "Pool increase (shares)", 0]], "Model seed")}<div id="eqSeedOut"></div>`;
+  }
+
   const tabs = {
     async overview() {
       const j = await get("/overview"); disc(j);
@@ -2164,9 +2176,10 @@ document.getElementById("docUploadBtn").addEventListener("click", async () => {
     },
     async scen() {
       const j = await get("/scenarios/default"); disc(j);
-      return `<p class="sub">Compare raises side by side. Edit the first row to test your own.</p>
+      return `<p class="sub">Compare raises side by side; the form below tests your own terms. The pre-seed is proposed and still under negotiation, so these are projections.</p>
         ${table([["Scenario"], ["Raise", 1], ["Price", 1], ["Post-money", 1], ["New investors", 1], ["Founder", 1], ["Founder change (pts)", 1], ["SAFEs", 1], ["Options + pool", 1], ["Shares left", 1], ["Flags"]],
         j.scenarios.map(s => [esc(s.name), usd(s.investment), "$" + s.price.toFixed(2), usd(s.post_money), pct(s.new_investor_pct), pct(s.founder_pct), (-s.founder_dilution_pts * 100).toFixed(1), pct(s.safes_pct), pct(s.options_and_pool_pct), n0(s.authorized_remaining), esc(s.flags.join("; ") || "–")]))}
+        ${await seedBlock()}
         <h3>Test a scenario</h3>${form("eqScen", [["investment", "Raise ($)", 3000000], ["pre_money", "Pre-money ($)", 20000000], ["price", "or Price ($)", ""], ["pool_increase", "Pool increase (shares)", 1000000]], "Compare")}<div id="eqScenOut"></div>`;
     },
     async wf() {
@@ -2221,6 +2234,8 @@ document.getElementById("docUploadBtn").addEventListener("click", async () => {
       return `<p class="sub">Price $${r.price.toFixed(4)} &middot; pre-money ${usd(r.pre_money)} &middot; post-money ${usd(r.post_money)} &middot; ${n0(r.authorized_remaining)} authorized shares left</p>` + holders(r.rows); },
     eqScen: async (v) => { const b = { investment: v.investment, pool_increase: v.pool_increase || 0, name: "Your scenario" }; if (v.price) b.price = v.price; else b.pre_money = v.pre_money; const r = await post("/scenarios", { scenarios: [b] }); const s = r.scenarios[0];
       return `<p class="sub">Price $${s.price.toFixed(4)} &middot; post-money ${usd(s.post_money)} &middot; new investors ${pct(s.new_investor_pct)} &middot; founder ${pct(s.founder_pct)} (${(-s.founder_dilution_pts * 100).toFixed(1)} pts) &middot; ${esc(s.flags.join("; ") || "no flags")}</p>`; },
+    eqSeed: async (v) => { const r = await post("/scenarios/seed", { seed_amount: v.seed_amount, pre_moneys: [v.pre_money], pool_increase: v.pool_increase || 0 }); const x = r.scenarios[0];
+      return `<p class="sub">Seed price $${x.price.toFixed(4)} (${x.step_up_vs_pre_seed.toFixed(2)}x the pre-seed price) &middot; post-money ${usd(x.post_money)} &middot; seed investors ${pct(x.seed_investor_pct)} &middot; founder ${pct(x.founder_pct)} (${(-x.founder_dilution_from_seed_pts * 100).toFixed(1)} pts) &middot; ${esc(x.flags.join("; ") || "no flags")}</p>`; },
     eqWf: async (v) => { const r = await post("/waterfall", { equity_value: v.equity_value, deductions_pct: v.deductions_pct || 0, round_price: v.round_price || 2 }); const d = r.distribution;
       return `<p class="sub">Value per common share <strong>$${d.price_per_common_share.toFixed(4)}</strong> &middot; net proceeds ${usd(d.net_proceeds)}</p>` + table([["Holder"], ["Proceeds", 1], ["Share", 1]], d.payouts.map(p => [esc(p.holder), usd(p.amount), pct(p.pct)])) +
         `<h3>Breakpoints</h3>` + table([["Equity value", 1], ["Per share", 1], ["What happens"]], r.breakpoints.map(b => [usd(b.equity_value), "$" + b.price_per_share.toFixed(4), esc(b.event)])); },
