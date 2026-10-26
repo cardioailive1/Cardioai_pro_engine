@@ -78,10 +78,11 @@ class Safe820In(BaseModel):
 
 
 class FactsIn(BaseModel):
-    stockholder_consent_on_file: bool = False
+    stockholder_consent_on_file: bool = True
     form_d_filed: Optional[bool] = None
     total_assets: Optional[float] = Field(default=None, ge=0)
-    planned_round_closing: bool = True
+    round_closed: bool = False
+    rule_701_confirmed_by_counsel: bool = True
     rep_named: bool = False
 
 
@@ -105,14 +106,14 @@ def overview():
     ck = insights.checklist(t, today)
     return _wrap(company=t.company, fmv_common=valuation.REPORT["fmv_common"], equity_value=valuation.REPORT["equity_value"],
                  fully_diluted_today=t.common_total + t.pool_reserve, pool={"reserve": t.pool_reserve, "granted": t.granted_total, "available": t.pool_available},
-                 planned_round=sc, asc718_total=asc718.run(t)["total_expense"], readiness=ck, flags=insights.flags(t, today))
+                 proposed_round=sc, asc718_total=asc718.run(t)["total_expense"], readiness=ck, flags=insights.flags(t, today))
 
 
 @router.get("/cap-table")
 def cap_table():
     t = seed_cap_table()
     return _wrap(table=t.to_dict(), ownership_today=t.current_ownership(), safe_conversion=t.convert_safes(2.00),
-                 planned_round=t.model_round(investment=1_000_000, price=2.00))
+                 proposed_round=t.model_round(investment=1_000_000, price=2.00))
 
 
 @router.post("/cap-table/round")
@@ -167,7 +168,7 @@ def valuation_get():
     return _wrap(report={"valuation_date": valuation.REPORT["valuation_date"].isoformat(), "fmv_common": valuation.REPORT["fmv_common"],
                          "dlom": valuation.REPORT["dlom"], **valuation.blend(valuation.REPORT["approaches"])},
                  opm=valuation.opm_common_value(t),
-                 refresh=valuation.refresh_needed(today=today, material_events=["priced pre-seed round at $2.00 per share is planned"]))
+                 refresh=valuation.refresh_needed(today=today), refresh_trigger="The 409A is refreshed after the proposed $2.00 pre-seed round closes (still under negotiation); the report indicates about $0.66 per common share at that price.")
 
 
 @router.post("/valuation/opm")

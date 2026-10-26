@@ -2146,19 +2146,19 @@ document.getElementById("docUploadBtn").addEventListener("click", async () => {
   const tabs = {
     async overview() {
       const j = await get("/overview"); disc(j);
-      const r = j.readiness, s = j.planned_round;
+      const r = j.readiness, s = j.proposed_round;
       return `<div class="eq-grid">${kpi("$" + j.fmv_common.toFixed(2), "Common FMV (appraiser, 18 Sep 2026)")}${kpi(usd(j.equity_value), "Weighted equity value")}${kpi(n0(j.fully_diluted_today), "Fully diluted shares today")}${kpi(usd(j.asc718_total), "Total ASC 718 expense")}</div>
-        <div class="eq-grid">${kpi(pct(s.founder_pct, 1), "Founder after planned round")}${kpi(usd(s.post_money), "Post-money at $" + s.price.toFixed(2))}${kpi(n0(j.pool.available), "Pool shares still available")}${kpi(r.score_pct + "%", "Investor-readiness checklist (" + r.done + " of " + r.total + ")")}</div>
+        <div class="eq-grid">${kpi(pct(s.founder_pct, 1), "Founder after proposed round (projection)")}${kpi(usd(s.post_money), "Projected post-money at $" + s.price.toFixed(2))}${kpi(n0(j.pool.available), "Pool shares still available")}${kpi(r.score_pct + "%", "Investor-readiness checklist (" + r.done + " of " + r.total + ")")}</div>
         <h3>What needs attention</h3>${j.flags.map(f => flag(f.severity, f.area, f.message, f.rule)).join("")}
         <h3>Investor-readiness checklist</h3>${table([["Item"], ["Area"], ["Status"]], r.items.map(i => [esc(i.item), esc(i.area), `<span class="pill ${i.done ? "ok" : "warn"}">${i.done ? "Done" : "Open"}</span>`]))}
         <p class="sub">The score is the share of checklist items done. It is not a probability of raising or closing.</p>`;
     },
     async cap() {
-      const j = await get("/cap-table"); disc(j); const t = j.table, p = j.planned_round;
+      const j = await get("/cap-table"); disc(j); const t = j.table, p = j.proposed_round;
       return `<div class="eq-grid">${kpi(n0(t.authorized_common), "Authorized common (par $" + t.par.toFixed(2) + ")")}${kpi(n0(t.issued), "Issued")}${kpi(n0(t.granted), "Options granted")}${kpi(n0(t.pool_available), "Pool available of " + n0(t.pool_reserve))}</div>
         <h3>Today (SAFEs not yet converted)</h3>${holders(j.ownership_today)}
-        <h3>SAFE conversion at the planned $${p.price.toFixed(2)} round</h3>${table([["Holder"], ["Paid", 1], ["Conversion price", 1], ["Basis"], ["Shares", 1]], j.safe_conversion.map(c => [esc(c.holder), usd(c.purchase), "$" + c.price.toFixed(4), esc(c.basis), n0(c.shares)]))}
-        <h3>After the planned $${n0(p.investment)} round</h3><p class="sub">Pre-money ${usd(p.pre_money)} &middot; post-money ${usd(p.post_money)} &middot; ${n0(p.post_money_shares)} fully diluted shares &middot; ${n0(p.authorized_remaining)} authorized shares left.</p>${holders(p.rows)}
+        <h3>SAFE conversion if the proposed $${p.price.toFixed(2)} round closes</h3>${table([["Holder"], ["Paid", 1], ["Conversion price", 1], ["Basis"], ["Shares", 1]], j.safe_conversion.map(c => [esc(c.holder), usd(c.purchase), "$" + c.price.toFixed(4), esc(c.basis), n0(c.shares)]))}
+        <h3>Projection: proposed $${n0(p.investment)} round (under negotiation, not closed)</h3><p class="sub">Pre-money ${usd(p.pre_money)} &middot; post-money ${usd(p.post_money)} &middot; ${n0(p.post_money_shares)} fully diluted shares &middot; ${n0(p.authorized_remaining_pre_round)} authorized shares left before and ${n0(p.authorized_remaining)} after the new shares.</p>${holders(p.rows)}
         <h3>Model your own round</h3>${form("eqRound", [["investment", "Investment ($)", 1000000], ["price", "Price per share ($)", 2], ["pre_money", "or Pre-money ($)", ""], ["pool_increase", "Pool increase (shares)", 0]], "Calculate")}<div id="eqRoundOut"></div>
         <h3>Assumptions</h3><ul class="sub">${t.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`;
     },

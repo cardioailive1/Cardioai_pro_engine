@@ -4,7 +4,7 @@ from __future__ import annotations
 from .cap_table import CapTable
 
 DEFAULTS = [
-    {"name": "Planned pre-seed", "investment": 1_000_000, "price": 2.00},
+    {"name": "Proposed pre-seed (under negotiation)", "investment": 1_000_000, "price": 2.00},
     {"name": "Larger pre-seed", "investment": 2_000_000, "price": 2.00},
     {"name": "Lower price", "investment": 1_000_000, "price": 1.60},
     {"name": "Seed on a $20M pre-money", "investment": 3_000_000, "pre_money": 20_000_000, "pool_increase": 1_000_000},

@@ -14,10 +14,11 @@ from typing import Optional
 from .finmath import bisect
 
 ASSUMPTIONS = [
+    "Source: CAP_TABLE_V6A (in the Document Room). The pre-seed round is a proposal still under negotiation; every after-round figure is a projection at $2.00 per share.",
     "Grant dates for the four option grants are set to 5 Oct 2026 (Board consent effective date); confirm against the signed grant agreements.",
     "SAFEs convert in the next priced round at the lower of the discount price and the post-money cap price; "
     "the post-money capitalization includes the whole option pool and the converting SAFEs.",
-    "Pool shares not yet granted are counted in the fully diluted share count (as in the 409A report and the cap table workbook).",
+    "The Mayo Clinic Platform and Dr. Nahar SAFEs have not converted; they stay unconverted in today's table. Pool shares not yet granted are counted in the fully diluted share count (as in the 409A report and the cap table workbook).",
 ]
 
 
@@ -37,7 +38,7 @@ class Grant:
     shares: int
     strike: float
     grant_date: date
-    kind: str = "NSO"           # "ISO", "NSO" or "ISO/NSO" (ISO up to the $100K limit, the rest NSO)
+    kind: str = "NSO"           # "ISO" (any excess over the $100K yearly limit becomes NSO by law) or "NSO"
     role: str = ""
     cliff_months: int = 12
     vest_months: int = 48
@@ -165,10 +166,10 @@ def seed_cap_table() -> CapTable:
     gd = date(2026, 10, 5)
     t = CapTable(common={"Sampson Kontomah (Founder)": 12_750_000}, pool_reserve=3_108_696)
     t.grants = [
-        Grant("Everlyn Ndirangu", 594_348, 1.00, gd, "ISO/NSO", "CFO"),
-        Grant("Galax Womack", 594_348, 1.00, gd, "ISO/NSO", "CTO"),
-        Grant("Avi Patel", 445_761, 1.00, gd, "ISO/NSO", "VP Engineering"),
-        Grant("Dr. Tamanna Nahar", 400_000, 1.00, gd, "NSO", "Advisor / director",
+        Grant("Everlyn Ndirangu", 594_348, 1.00, gd, "ISO", "CFO"),
+        Grant("Galax Womack", 594_348, 1.00, gd, "ISO", "CTO"),
+        Grant("Avi Patel", 445_761, 1.00, gd, "ISO", "VP Engineering"),
+        Grant("Dr. Tamanna Nahar", 400_000, 1.00, gd, "NSO", "Chief Medical Advisor",
               fully_vested_at_grant=True, expected_term_years=10.0),
     ]
     t.safes = [Safe("Mayo Clinic Platform", 800_000, date=date(2026, 10, 5)), Safe("Dr. Tamanna Nahar", 30_000, date=date(2024, 1, 1))]

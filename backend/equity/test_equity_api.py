@@ -67,21 +67,29 @@ def test_iso_limit_and_vesting():
     assert plans.vested_shares(t.grants[0], date(2030, 10, 5)) == 594_348
 
 
-def test_compliance_statuses_are_honest():
-    items = {i["id"]: i for i in compliance.run(seed_cap_table(), date(2026, 10, 26))}
-    assert items["422-1"]["status"] == "warn" and items["409A-2"]["status"] == "ok"
-    assert items["FORMD-Mayo"]["status"] == "verify"          # unknown is never reported as ok
-    done = {i["id"]: i for i in compliance.run(seed_cap_table(), date(2026, 10, 26), {"stockholder_consent_on_file": True})}
-    assert done["422-1"]["status"] == "ok"
-    late = {i["id"]: i for i in compliance.run(seed_cap_table(), date(2027, 11, 1))}
+def test_compliance_follows_company_facts():
+    d = date(2026, 10, 26)
+    items = {i["id"]: i for i in compliance.run(seed_cap_table(), d)}
+    assert items["409A-1"]["status"] == "ok" and "under negotiation" in items["409A-1"]["detail"]   # round not closed: no refresh yet
+    assert items["422-1"]["status"] == "ok" and items["422-2"]["status"] == "verify"             # Board consent doubles as stockholder consent
+    assert items["R701-1"]["status"] == "ok" and "Counsel has confirmed" in items["R701-1"]["detail"]
+    assert items["ISO-1"]["status"] == "ok" and "Projected excess" in items["ISO-1"]["detail"]
+    assert items["FORMD-1"]["status"] == "verify"                                                 # unknown filing is never reported as ok
+    assert items["409A-2"]["status"] == "ok" and "projection" in items["CORP-1"]["title"].lower()
+    closed = {i["id"]: i for i in compliance.run(seed_cap_table(), d, {"round_closed": True})}
+    assert closed["409A-1"]["status"] == "warn"                                                   # refresh needed once the round closes
+    nocons = {i["id"]: i for i in compliance.run(seed_cap_table(), d, {"stockholder_consent_on_file": False})}
+    assert nocons["422-1"]["status"] == "warn"
+    late = {i["id"]: i for i in compliance.run(seed_cap_table(), date(2027, 11, 1), {"stockholder_consent_on_file": False})}
     assert late["422-1"]["status"] == "fail"
+    assert {i["id"]: i for i in compliance.run(seed_cap_table(), d, {"rule_701_confirmed_by_counsel": False})}["R701-1"]["status"] == "warn"
 
 
 def test_checklist_moves_with_facts():
     t = seed_cap_table()
     a = insights.checklist(t, date(2026, 10, 26))["score_pct"]
-    b = insights.checklist(t, date(2026, 10, 26), {"stockholder_consent_on_file": True, "rep_named": True})["score_pct"]
-    assert b > a
+    assert insights.checklist(t, date(2026, 10, 26), {"rep_named": True})["score_pct"] > a
+    assert insights.checklist(t, date(2026, 10, 26), {"round_closed": True})["score_pct"] < a
 
 
 def test_portfolio_and_rep():
