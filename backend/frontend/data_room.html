@@ -134,6 +134,22 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
 .bio-card .bio-body h4 { margin:0; font-size:0.95rem; color:var(--navy); }
 .bio-card .bio-body .rl { font-size:0.78rem; color:var(--blue); font-weight:700; margin:2px 0 8px; }
 .bio-card .bio-body p { margin:0; font-size:0.82rem; line-height:1.65; color:var(--ink); }
+.eq-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 16px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+.eq-tab { border:1px solid var(--line); background:#fff; color:var(--ink-soft); font-size:0.76rem; font-weight:600; padding:6px 12px; border-radius:20px; cursor:pointer; }
+.eq-tab:hover { border-color:var(--cyan); color:var(--navy); }
+.eq-tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+.eq-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+@media (max-width:900px) { .eq-grid { grid-template-columns:repeat(2,1fr); } .eq-scroll { overflow-x:auto; } }
+.eq-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin:8px 0 14px; }
+.eq-form label { display:flex; flex-direction:column; font-size:0.68rem; color:var(--ink-soft); gap:3px; font-weight:600; }
+.eq-form input { font-size:0.82rem; padding:6px 8px; border:1px solid var(--line); border-radius:7px; width:130px; }
+.eq-form button { background:var(--blue); color:#fff; border:none; padding:8px 14px; border-radius:7px; font-size:0.78rem; font-weight:700; cursor:pointer; }
+.eq-flag { border-left:4px solid var(--line); padding:8px 12px; margin:6px 0; background:#fafcfe; border-radius:0 8px 8px 0; font-size:0.8rem; line-height:1.55; }
+.eq-flag.fail { border-left-color:var(--err); } .eq-flag.warn { border-left-color:var(--warn); } .eq-flag.verify { border-left-color:var(--blue); } .eq-flag.ok { border-left-color:var(--ok); }
+.eq-flag small { display:block; color:var(--ink-soft); margin-top:2px; font-size:0.7rem; }
+.eq-bar { height:10px; background:#e9eef3; border-radius:6px; overflow:hidden; } .eq-bar > i { display:block; height:100%; background:var(--blue); }
+.pill.fail { background:#fde8e8; color:var(--err); } .pill.warn { background:#fff5e0; color:var(--warn); } .pill.verify { background:#e6f1fb; color:var(--blue); } .pill.ok { background:#e5f7ee; color:var(--ok); }
+table.dt td.num, table.dt th.num { text-align:right; font-family:var(--mono); }
 </style>
 </head>
 <body>
@@ -175,6 +191,7 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
       <button class="nav-item" data-page="market"><span class="ic">&#127760;</span> Market &amp; Competition</button>
       <button class="nav-item" data-page="terms"><span class="ic">&#128188;</span> Investment Structure</button>
       <button class="nav-item" data-page="valuation"><span class="ic">&#9878;</span> Valuation</button>
+      <button class="nav-item" data-page="equity"><span class="ic">&#128202;</span> Equity &amp; Valuation Suite</button>
       <button class="nav-item" data-page="traction"><span class="ic">&#9873;</span> Traction &amp; Status</button>
       <button class="nav-item" data-page="documents"><span class="ic">&#128193;</span> Document Room</button>
       <button class="nav-item" data-page="deck"><span class="ic">&#128202;</span> Investor Deck</button>
@@ -1728,6 +1745,27 @@ table.dt { width:100%; border-collapse:collapse; font-size:0.81rem; }
         </section>
       </section>
 
+      <section class="page" data-page="equity">
+        <section class="panel">
+          <h2>Equity &amp; Valuation Suite <span class="tag gold">Indicative &middot; rule-based</span></h2>
+          <p class="sub">Cap table, SAFE conversion, funding scenarios, liquidation waterfall, ASC 718 expense, 409A-style and ASC 820 valuation, equity plans, compliance checks, shareholder representative and investor portfolio. The engines are deterministic formulas and written rules, tested against the independent 409A report &mdash; they are not a language model. They are not a 409A valuation, an ASC 820 opinion, an audit or legal advice; the $0.75 fair market value is the appraiser's.</p>
+          <div class="eq-tabs" id="eqTabs">
+            <button class="eq-tab active" data-eq="overview">Overview</button>
+            <button class="eq-tab" data-eq="cap">Cap table</button>
+            <button class="eq-tab" data-eq="scen">Funding scenarios</button>
+            <button class="eq-tab" data-eq="wf">Waterfall</button>
+            <button class="eq-tab" data-eq="val">Valuation &amp; ASC 820</button>
+            <button class="eq-tab" data-eq="asc">ASC 718</button>
+            <button class="eq-tab" data-eq="plans">Equity plan</button>
+            <button class="eq-tab" data-eq="comp">Compliance</button>
+            <button class="eq-tab" data-eq="rep">Shareholder rep</button>
+            <button class="eq-tab" data-eq="port">Portfolio</button>
+          </div>
+          <div id="eqBody" class="eq-body">Loading&hellip;</div>
+          <p class="sub" id="eqDisc" style="margin-top:14px;font-size:0.74rem;"></p>
+        </section>
+      </section>
+
     </main>
   </div>
 </div>
@@ -1816,6 +1854,7 @@ function goToPage(pageName) {
   // stale data even when the underlying data had changed.
   if (pageName === "documents") loadDocuments();
   if (pageName === "checklist") loadChecklist();
+  if (pageName === "equity" && window.loadEquitySuite) window.loadEquitySuite();
 }
 
 document.querySelectorAll(".nav-item[data-page]").forEach(btn => {
@@ -2083,6 +2122,131 @@ document.getElementById("docUploadBtn").addEventListener("click", async () => {
   }
 });
 
+
+// ---- Equity & Valuation Suite ------------------------------------------------------------------------------
+(function () {
+  const EQ = API + "/data-room/equity";
+  const body = document.getElementById("eqBody");
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const n0 = v => v == null ? "–" : Math.round(v).toLocaleString("en-US");
+  const usd = v => v == null ? "–" : (v < 0 ? "-$" : "$") + Math.abs(Math.round(v)).toLocaleString("en-US");
+  const usd2 = v => v == null ? "–" : "$" + Number(v).toFixed(4).replace(/0+$/, "").replace(/\.$/, ".00");
+  const pct = (v, d = 1) => v == null ? "–" : (v * 100).toFixed(d) + "%";
+  const kpi = (val, lbl) => `<div class="hero-kpi"><div class="val" style="font-size:1.25rem">${esc(val)}</div><div class="lbl">${esc(lbl)}</div></div>`;
+  const table = (heads, rows) => `<div class="eq-scroll"><table class="dt"><thead><tr>${heads.map(h => `<th class="${h[1] ? "num" : ""}" ${h[1] ? "" : 'style="text-align:left"'}>${esc(h[0])}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${heads[i][1] ? "num" : ""}" ${heads[i][1] ? "" : 'style="text-align:left"'}>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  const flag = (s, title, detail, rule) => `<div class="eq-flag ${esc(s)}"><span class="pill ${esc(s)}">${esc(s.toUpperCase())}</span> <strong>${esc(title)}</strong> ${esc(detail)}${rule ? `<small>${esc(rule)}</small>` : ""}</div>`;
+  const form = (id, fields, label) => `<div class="eq-form" id="${id}">${fields.map(f => `<label>${esc(f[1])}<input data-k="${esc(f[0])}" value="${esc(f[2])}"></label>`).join("")}<button>${esc(label)}</button></div>`;
+  const vals = id => Object.fromEntries([...document.querySelectorAll(`#${id} input`)].map(i => [i.dataset.k, i.value.trim() === "" ? null : Number(i.value)]));
+  async function get(p) { const r = await fetch(EQ + p, { credentials: "same-origin" }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status); return r.json(); }
+  async function post(p, b) { const r = await fetch(EQ + p, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Check the numbers entered."); return j; }
+  const err = e => `<p class="sub" style="color:var(--err)">Could not calculate: ${esc(e.message)}</p>`;
+  const holders = rows => table([["Holder"], ["Class"], ["Shares", 1], ["% fully diluted", 1]], rows.map(r => [esc(r.holder), esc(r.class), n0(r.shares), pct(r.pct, 2)]));
+  const disc = j => { document.getElementById("eqDisc").textContent = j && j.disclaimer ? j.disclaimer + " Calculated " + j.as_of + "." : ""; };
+
+  const tabs = {
+    async overview() {
+      const j = await get("/overview"); disc(j);
+      const r = j.readiness, s = j.planned_round;
+      return `<div class="eq-grid">${kpi("$" + j.fmv_common.toFixed(2), "Common FMV (appraiser, 18 Sep 2026)")}${kpi(usd(j.equity_value), "Weighted equity value")}${kpi(n0(j.fully_diluted_today), "Fully diluted shares today")}${kpi(usd(j.asc718_total), "Total ASC 718 expense")}</div>
+        <div class="eq-grid">${kpi(pct(s.founder_pct, 1), "Founder after planned round")}${kpi(usd(s.post_money), "Post-money at $" + s.price.toFixed(2))}${kpi(n0(j.pool.available), "Pool shares still available")}${kpi(r.score_pct + "%", "Investor-readiness checklist (" + r.done + " of " + r.total + ")")}</div>
+        <h3>What needs attention</h3>${j.flags.map(f => flag(f.severity, f.area, f.message, f.rule)).join("")}
+        <h3>Investor-readiness checklist</h3>${table([["Item"], ["Area"], ["Status"]], r.items.map(i => [esc(i.item), esc(i.area), `<span class="pill ${i.done ? "ok" : "warn"}">${i.done ? "Done" : "Open"}</span>`]))}
+        <p class="sub">The score is the share of checklist items done. It is not a probability of raising or closing.</p>`;
+    },
+    async cap() {
+      const j = await get("/cap-table"); disc(j); const t = j.table, p = j.planned_round;
+      return `<div class="eq-grid">${kpi(n0(t.authorized_common), "Authorized common (par $" + t.par.toFixed(2) + ")")}${kpi(n0(t.issued), "Issued")}${kpi(n0(t.granted), "Options granted")}${kpi(n0(t.pool_available), "Pool available of " + n0(t.pool_reserve))}</div>
+        <h3>Today (SAFEs not yet converted)</h3>${holders(j.ownership_today)}
+        <h3>SAFE conversion at the planned $${p.price.toFixed(2)} round</h3>${table([["Holder"], ["Paid", 1], ["Conversion price", 1], ["Basis"], ["Shares", 1]], j.safe_conversion.map(c => [esc(c.holder), usd(c.purchase), "$" + c.price.toFixed(4), esc(c.basis), n0(c.shares)]))}
+        <h3>After the planned $${n0(p.investment)} round</h3><p class="sub">Pre-money ${usd(p.pre_money)} &middot; post-money ${usd(p.post_money)} &middot; ${n0(p.post_money_shares)} fully diluted shares &middot; ${n0(p.authorized_remaining)} authorized shares left.</p>${holders(p.rows)}
+        <h3>Model your own round</h3>${form("eqRound", [["investment", "Investment ($)", 1000000], ["price", "Price per share ($)", 2], ["pre_money", "or Pre-money ($)", ""], ["pool_increase", "Pool increase (shares)", 0]], "Calculate")}<div id="eqRoundOut"></div>
+        <h3>Assumptions</h3><ul class="sub">${t.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`;
+    },
+    async scen() {
+      const j = await get("/scenarios/default"); disc(j);
+      return `<p class="sub">Compare raises side by side. Edit the first row to test your own.</p>
+        ${table([["Scenario"], ["Raise", 1], ["Price", 1], ["Post-money", 1], ["New investors", 1], ["Founder", 1], ["Founder change (pts)", 1], ["SAFEs", 1], ["Options + pool", 1], ["Shares left", 1], ["Flags"]],
+        j.scenarios.map(s => [esc(s.name), usd(s.investment), "$" + s.price.toFixed(2), usd(s.post_money), pct(s.new_investor_pct), pct(s.founder_pct), (-s.founder_dilution_pts * 100).toFixed(1), pct(s.safes_pct), pct(s.options_and_pool_pct), n0(s.authorized_remaining), esc(s.flags.join("; ") || "–")]))}
+        <h3>Test a scenario</h3>${form("eqScen", [["investment", "Raise ($)", 3000000], ["pre_money", "Pre-money ($)", 20000000], ["price", "or Price ($)", ""], ["pool_increase", "Pool increase (shares)", 1000000]], "Compare")}<div id="eqScenOut"></div>`;
+    },
+    async wf() {
+      return `<p class="sub">Who is paid what at a given sale price. SAFEs are paid their purchase amount first or convert to common, whichever is better; options pay only above the $1.00 strike. Debt, fees, taxes and escrow are not netted unless entered.</p>
+        ${form("eqWf", [["equity_value", "Equity value ($)", 30000000], ["deductions_pct", "Fees/debt (% of value, 0-0.99)", 0], ["round_price", "Round price used for SAFEs ($)", 2]], "Run waterfall")}<div id="eqWfOut">Enter a value and run.</div>`;
+    },
+    async val() {
+      const j = await get("/valuation"); disc(j); const o = j.opm, r = j.refresh;
+      return `${flag(r.refresh_needed ? "warn" : "ok", "409A freshness:", `valuation date ${r.valuation_date}, reliable until ${r.reliable_until} (${r.days_left} days). ${r.reasons.join(" ")}`, "Treas. Reg. 1.409A-1(b)(5)(iv)(B)")}
+        <h3>Company valuation: four approaches (appraiser's report)</h3>${table([["Approach"], ["Equity value", 1], ["Weight", 1], ["Contribution", 1]], j.report.lines.map(l => [esc(l.approach), usd(l.value), pct(l.weight, 0), usd(l.contribution)]))}
+        <p class="sub">Weighted equity value ${usd(j.report.equity_value)}. The report concluded $15.7M, $${j.report.fmv_common.toFixed(2)} per common share after a ${pct(j.report.dlom, 0)} marketability discount.</p>
+        <h3>Option-pricing re-run (indicative)</h3><div class="eq-grid">${kpi(usd(o.equity_value), "Equity value")}${kpi("$" + o.marketable_value_per_share.toFixed(4), "Marketable value / common share")}${kpi(pct(o.dlom, 0), "DLOM")}${kpi("$" + o.common_fmv_per_share.toFixed(4), "Indicated common value")}</div>
+        <p class="sub">${esc(o.note)}</p>
+        ${form("eqOpm", [["equity_value", "Equity value ($)", o.equity_value], ["term_years", "Years to exit", 3], ["volatility", "Volatility", 0.7], ["dlom", "DLOM", 0.3]], "Re-run")}<div id="eqOpmOut"></div>
+        <h3>ASC 820 fair value of a SAFE (Level 3)</h3><p class="sub">Scenario-weighted. Probabilities, the exit value and the discount rate are management inputs, not data; they are the unobservable inputs to disclose. Nothing is pre-filled for them on purpose.</p>
+        ${form("eq820", [["exit_equity_value", "Exit equity value ($)", ""], ["discount_rate", "Discount rate (e.g. 0.25)", ""], ["p_financing", "P(financing)", ""], ["p_liquidity", "P(liquidity)", ""], ["p_dissolution", "P(dissolution)", ""], ["years_to_exit", "Years to exit", 5]], "Value SAFE")}<div id="eq820Out"></div>`;
+    },
+    async asc() {
+      const j = await get("/asc718"); disc(j); const je = j.journal_entry;
+      return `<div class="eq-grid">${kpi(usd(j.total_expense), "Total expense")}${kpi(usd(j.recognised_to_date), "Recognised to " + j.as_of)}${kpi(usd(j.unrecognised), "Still to recognise")}${kpi("$" + j.assumptions.fmv.toFixed(2), "FMV / vol " + pct(j.assumptions.volatility, 0))}</div>
+        ${table([["Holder"], ["Role"], ["Options", 1], ["Strike", 1], ["Term (yrs)", 1], ["Fair value / option", 1], ["Total expense", 1], ["Recognition"]], j.grants.map(g => [esc(g.holder), esc(g.role), n0(g.shares), "$" + g.strike.toFixed(2), g.term_years, "$" + g.fair_value_per_option.toFixed(4), usd(g.total_expense), esc(g.recognition)]))}
+        <h3>Expense by year</h3>${table([["Year"], ["Expense", 1]], Object.entries(j.by_year).map(([y, v]) => [y, usd(v)]))}
+        <h3>Journal entry, current quarter to date</h3>${table([["Account"], ["Debit", 1], ["Credit", 1]], je.lines.map(l => [esc(l.account), usd(l.debit), usd(l.credit)]))}<p class="sub">${esc(je.note)} Straight-line over the service period; forfeitures as they occur. Black-Scholes, 6.25-year simplified term for employees, 10 years for the fully vested grant.</p>`;
+    },
+    async plans() {
+      const j = await get("/plans"); disc(j);
+      return `<div class="eq-grid">${kpi(n0(j.reserve), j.plan + " reserve")}${kpi(n0(j.granted) + " (" + pct(j.pct_granted, 0) + ")", "Granted")}${kpi(n0(j.available), "Available")}${kpi(n0(j.totals.vested) + " / " + n0(j.totals.unvested), "Vested / unvested")}</div>
+        ${table([["Holder"], ["Type"], ["Shares", 1], ["Vested", 1], ["% vested", 1], ["Next vest"], ["ISO", 1], ["NSO", 1], ["Expires"]], j.grants.map(g => [esc(g.holder) + `<br><small>${esc(g.role)}</small>`, esc(g.type), n0(g.shares), n0(g.vested), pct(g.pct_vested, 0), esc(g.next_vest || "–"), n0(g.iso_nso.iso_shares), n0(g.iso_nso.nso_shares), esc(g.expires)]))}
+        <p class="sub">ISO/NSO split applies the $100,000 limit on shares first exercisable in a calendar year, valued at the $0.75 grant-date FMV (IRC 422(d)).</p>`;
+    },
+    async comp() {
+      const j = await get("/compliance"); disc(j);
+      return `<p class="sub">${j.counts.ok} ok &middot; ${j.counts.warn} to act on &middot; ${j.counts.fail} failing &middot; ${j.counts.verify} to verify. Anything the data room cannot confirm (a filing, a signed consent) shows as "verify" or "warn", never "ok". Not legal advice.</p>${j.items.map(i => flag(i.status, i.title + ".", i.detail + (i.due ? " Due " + i.due + "." : ""), i.rule)).join("")}`;
+    },
+    async rep() {
+      const j = await get("/shareholder-rep"); disc(j); const r = j.representative;
+      return `${flag("warn", "Representative:", r.status + ". Name one before any sale process; the role is appointed in the purchase agreement or a joinder.", "")}
+        <h3>Authority to document</h3><ul class="sub">${r.authority.map(a => `<li>${esc(a)}</li>`).join("")}</ul>
+        <h3>Approvals a sale needs</h3>${table([["Approval"], ["Threshold"]], j.approvals.map(a => [esc(a.approval), esc(a.threshold)]))}
+        <h3>Proceeds, escrow and expense fund</h3>${form("eqRep", [["equity_value", "Equity value ($)", 30000000], ["escrow_pct", "Escrow (0-0.5)", 0.1], ["expense_fund", "Expense fund ($)", 150000], ["holdback_pct", "Holdback (0-0.5)", 0]], "Allocate")}<div id="eqRepOut"></div>`;
+    },
+    async port() {
+      const j = await get("/portfolio"); disc(j);
+      return `<div class="eq-grid">${kpi(usd(j.total.invested), "Invested by SAFE holders")}${kpi(usd(j.total.mark_value), "Indicative mark at $" + j.mark_price.toFixed(2))}${kpi(j.total.moic.toFixed(2) + "x", "MOIC")}${kpi(j.mark_date, "Mark date")}</div>
+        ${table([["Investor"], ["Invested", 1], ["Date"], ["Conv. price", 1], ["Shares", 1], ["Ownership", 1], ["Mark value", 1], ["MOIC", 1], ["IRR", 1]], j.holdings.map(h => [esc(h.investor), usd(h.invested), esc(h.date || "–"), "$" + h.conversion_price.toFixed(2), n0(h.shares), pct(h.ownership, 2), usd(h.mark_value), h.moic.toFixed(2) + "x", h.irr == null ? "–" : pct(h.irr, 0)]))}
+        <p class="sub">${esc(j.note)} The 2024 date for Dr. Nahar's SAFE is an approximation in the model; the signed SAFE controls.</p>`;
+    },
+  };
+
+  const wire = {
+    eqRound: async (v) => { const b = { investment: v.investment, pool_increase: v.pool_increase || 0 }; if (v.pre_money) b.pre_money = v.pre_money; else b.price = v.price; const r = await post("/cap-table/round", b);
+      return `<p class="sub">Price $${r.price.toFixed(4)} &middot; pre-money ${usd(r.pre_money)} &middot; post-money ${usd(r.post_money)} &middot; ${n0(r.authorized_remaining)} authorized shares left</p>` + holders(r.rows); },
+    eqScen: async (v) => { const b = { investment: v.investment, pool_increase: v.pool_increase || 0, name: "Your scenario" }; if (v.price) b.price = v.price; else b.pre_money = v.pre_money; const r = await post("/scenarios", { scenarios: [b] }); const s = r.scenarios[0];
+      return `<p class="sub">Price $${s.price.toFixed(4)} &middot; post-money ${usd(s.post_money)} &middot; new investors ${pct(s.new_investor_pct)} &middot; founder ${pct(s.founder_pct)} (${(-s.founder_dilution_pts * 100).toFixed(1)} pts) &middot; ${esc(s.flags.join("; ") || "no flags")}</p>`; },
+    eqWf: async (v) => { const r = await post("/waterfall", { equity_value: v.equity_value, deductions_pct: v.deductions_pct || 0, round_price: v.round_price || 2 }); const d = r.distribution;
+      return `<p class="sub">Value per common share <strong>$${d.price_per_common_share.toFixed(4)}</strong> &middot; net proceeds ${usd(d.net_proceeds)}</p>` + table([["Holder"], ["Proceeds", 1], ["Share", 1]], d.payouts.map(p => [esc(p.holder), usd(p.amount), pct(p.pct)])) +
+        `<h3>Breakpoints</h3>` + table([["Equity value", 1], ["Per share", 1], ["What happens"]], r.breakpoints.map(b => [usd(b.equity_value), "$" + b.price_per_share.toFixed(4), esc(b.event)])); },
+    eqOpm: async (v) => { const r = await post("/valuation/opm", { equity_value: v.equity_value, term_years: v.term_years, volatility: v.volatility, dlom: v.dlom }); return `<p class="sub">Marketable $${r.marketable_value_per_share.toFixed(4)} &rarr; common value after ${pct(r.dlom, 0)} DLOM <strong>$${r.common_fmv_per_share.toFixed(4)}</strong> (indicative).</p>`; },
+    eq820: async (v) => { const r = await post("/valuation/asc820-safe", { exit_equity_value: v.exit_equity_value, discount_rate: v.discount_rate, p_financing: v.p_financing, p_liquidity: v.p_liquidity, p_dissolution: v.p_dissolution, years_to_exit: v.years_to_exit || 5 });
+      return `<p class="sub">Fair value <strong>${usd(r.fair_value)}</strong> against ${usd(r.purchase_price)} paid (${pct(r.premium_to_cost, 1)}). Level 3.</p>` + table([["Scenario"], ["Probability", 1], ["Present value", 1]], r.scenarios.map(s => [esc(s.name), pct(s.probability, 0), usd(s.pv)])); },
+    eqRep: async (v) => { const r = await post("/shareholder-rep/allocate", { equity_value: v.equity_value, escrow_pct: v.escrow_pct, expense_fund: v.expense_fund || 0, holdback_pct: v.holdback_pct || 0 });
+      return table([["Holder"], ["Gross", 1], ["Escrow", 1], ["Holdback", 1], ["Expense fund", 1], ["Paid at closing", 1]], r.rows.map(x => [esc(x.holder), usd(x.gross), usd(x.escrow), usd(x.holdback), usd(x.expense_fund), usd(x.paid_at_closing)])); },
+  };
+
+  let current = "overview";
+  async function show(name) {
+    current = name;
+    document.querySelectorAll("#eqTabs .eq-tab").forEach(b => b.classList.toggle("active", b.dataset.eq === name));
+    body.innerHTML = "Loading…";
+    try { body.innerHTML = await tabs[name](); } catch (e) { body.innerHTML = err(e); return; }
+    Object.keys(wire).forEach(id => {
+      const f = document.getElementById(id); if (!f) return;
+      const out = document.getElementById(id + "Out");
+      f.querySelector("button").addEventListener("click", async () => { out.innerHTML = "Calculating…"; try { out.innerHTML = await wire[id](vals(id)); } catch (e) { out.innerHTML = err(e); } });
+    });
+    if (wire.eqWf && document.getElementById("eqWf")) document.querySelector("#eqWf button").click();
+  }
+  document.querySelectorAll("#eqTabs .eq-tab").forEach(b => b.addEventListener("click", () => show(b.dataset.eq)));
+  window.loadEquitySuite = () => show(current);
+})();
 </script>
 </body>
 </html>
