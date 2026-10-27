@@ -99,11 +99,37 @@ def test_full_two_tier_flow(tmp_path):
     LabelValidator().validate_dataset(list(fixed.values()))                # corrected records go straight into the validator
 
 
+def test_auto_audit_is_required_for_mace(tmp_path):
+    from training.mayo.audit_gate import AutoAuditRequired, AuditedLabels
+    persons, meas, conds, deaths, visits = _cohort()
+    recs = build_mace_records(persons, meas, conds, deaths, MAP)
+    items = build_review_items(recs, conds, deaths, MAP)
+    aa = auto_audit(items)
+    partial = dict(list(aa.items())[:-1])
+    for bad in (None, {}, partial):
+        for call in (lambda b=bad: export_ds_audit(items, str(tmp_path / "x.csv"), b), lambda b=bad: route(items, {}, b)):
+            try:
+                call(); assert False, "ran without a full automatic audit"
+            except AutoAuditRequired:
+                pass
+    plan = route(items, {}, aa)
+    assert all(p["auto_audit"] in ("pass", "warn", "fail") for p in plan.values())
+    unaudited = {r: {k: v for k, v in p.items() if k != "auto_audit"} for r, p in plan.items()}
+    try:
+        export_cardiologist_queue(items, unaudited, str(tmp_path / "c.csv"), str(tmp_path / "k.csv")); assert False
+    except AutoAuditRequired:
+        pass
+    try:                                    # corrected records need labels from the audited finalize, not a hand-made dict
+        apply_to_records(recs, {"outcomes": {r.record_id: ("none", None) for r in recs}}); assert False
+    except AutoAuditRequired:
+        pass
+
+
 def test_pending_ds_blocks_cardiologist_queue(tmp_path):
     persons, meas, conds, deaths, visits = _cohort()
     recs = build_mace_records(persons, meas, conds, deaths, MAP)
     items = build_review_items(recs, conds, deaths, MAP)
-    plan = route(items, {})
+    plan = route(items, {}, auto_audit(items))
     try:
         export_cardiologist_queue(items, plan, str(tmp_path / "c.csv"), str(tmp_path / "k.csv"))
         assert False

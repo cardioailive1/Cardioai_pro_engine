@@ -11,7 +11,8 @@ what can go wrong with an OUTCOME label:
   * a death with no usable cause is silently labeled 'no event'
   * a prior event just outside the 90-day washout should have excluded the record
 
-  AUTOMATIC AUDIT (auto_audit)   machine checks on each record's evidence, pass/warn/fail.
+  AUTOMATIC AUDIT (auto_audit)   REQUIRED after automatic labeling. Machine checks on each record's evidence, pass/warn/fail.
+                                 Every later step refuses to run without a result for every record (audit_gate.py).
   TIER 1  data scientists audit EVERY record (or, opt-in, the non-pass ones plus a sample).
           Decision per record: agree / disagree (corrected event type + days) / uncertain / exclude.
   TIER 2  the cardiologist adjudicates disagreements, uncertain cases, automatic-audit fails,
@@ -35,6 +36,7 @@ from typing import Iterable, Optional
 
 from training.label_schema import MACELabelRecord, MACEEventType, MACE_QUALIFYING, compute_window
 from training.omop_adapter import OMOPConceptMapping, _to_date
+from training.mayo.audit_gate import AuditedLabels, audit_counts, require_audited_labels, require_auto_audit, require_plan_audited
 from training.mayo.label_audit import _wilson
 
 NONE = "none"
@@ -157,11 +159,11 @@ def triage_ds_scope(items: dict, aa: dict, sample_fraction: float = 0.20, min_sa
 
 
 # ---------------------------------------------------------------- tier 1
-def export_ds_audit(items: dict, path: str, aa: Optional[dict] = None, ds_scope: Optional[set] = None) -> int:
+def export_ds_audit(items: dict, path: str, aa: dict, ds_scope: Optional[set] = None) -> int:
+    require_auto_audit(items, aa, "record")      # the automatic audit is a required step after automatic labeling
     ids = [r for r in items if ds_scope is None or r in ds_scope]
-    if aa:
-        order = {"fail": 0, "warn": 1, "pass": 2}
-        ids.sort(key=lambda r: order[aa[r]["status"]])
+    order = {"fail": 0, "warn": 1, "pass": 2}
+    ids.sort(key=lambda r: order[aa[r]["status"]])
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=DS_COLS); w.writeheader()
         for rid in ids:
@@ -193,10 +195,11 @@ def read_ds_audits(paths: Iterable[str]) -> dict:
     return out
 
 
-def route(items: dict, audits: dict, aa: Optional[dict] = None, ds_scope: Optional[set] = None) -> dict:
+def route(items: dict, audits: dict, aa: dict, ds_scope: Optional[set] = None) -> dict:
     """state: pending_ds | agreed | adjudicate | excluded. Same rules as the echo design: uncertain or any
     disagreement or an automatic-audit fail goes to the cardiologist; outside an opt-in scope, a record that
     passed every check counts as audited by 'auto-audit' (auto_audit_only)."""
+    require_auto_audit(items, aa, "record")      # the automatic audit is a required step after automatic labeling
     plan = {}
     for rid, it in items.items():
         rows, aa_only = audits.get(rid, []), False
@@ -225,6 +228,8 @@ def route(items: dict, audits: dict, aa: Optional[dict] = None, ds_scope: Option
             plan[rid] = {"state": "adjudicate", "reason": reason, "value": None, "ds_values": vals, "auto_audit_only": aa_only}
         else:
             plan[rid] = {"state": "agreed", "reason": "", "value": vals[0], "ds_values": vals, "auto_audit_only": aa_only}
+    for rid in plan:
+        plan[rid]["auto_audit"] = aa[rid]["status"]    # recorded so later steps can verify the audit was run
     return plan
 
 
@@ -233,6 +238,7 @@ def export_cardiologist_queue(items: dict, plan: dict, path: str, key_path: str,
                               min_spot: int = 5, seed: int = 0, auto_only_spot_fraction: float = 0.15) -> dict:
     """Blinded queue: all 'adjudicate' records + spot-checks sampled SEPARATELY from agreed events and agreed
     non-events (and at a higher rate for records that skipped the human audit)."""
+    require_plan_audited(plan, "record")
     pending = [r for r, p in plan.items() if p["state"] == "pending_ds"]
     if pending:
         raise ValueError(f"{len(pending)} records not yet audited by data scientists (e.g. {pending[:3]})")
@@ -261,6 +267,7 @@ def export_cardiologist_queue(items: dict, plan: dict, path: str, key_path: str,
 def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: float = 0.95, min_spot_n: int = 20) -> dict:
     """Merge cardiologist decisions (cardiologist > consensus). Reports spot-check agreement overall and
     separately for events and non-events. Passes at >= target agreement over >= min_spot_n with nothing unresolved."""
+    require_plan_audited(plan, "record")
     key = {r["blind_id"]: r for r in csv.DictReader(open(key_path, newline="", encoding="utf-8"))}
     answers = {}
     for r in csv.DictReader(open(cardio_path, newline="", encoding="utf-8")):
@@ -305,7 +312,7 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
         final.pop(rid, None)
     n = st["event"][0] + st["none"][0]; ok = st["event"][1] + st["none"][1]
     agree = ok / n if n else None
-    return {"outcomes": final, "excluded": sorted(set(excluded)), "unresolved": unresolved,
+    return {"outcomes": AuditedLabels(final), "auto_audited": True, "auto_audit_counts": audit_counts(plan), "excluded": sorted(set(excluded)), "unresolved": unresolved,
             "spot_check": {"n": n, "agree": ok, "agreement": agree, "wilson95": _wilson(ok, n), "errors": errors,
                            "events": {"n": st["event"][0], "agree": st["event"][1]},
                            "non_events": {"n": st["none"][0], "agree": st["none"][1]}},
@@ -315,6 +322,7 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
 
 def apply_to_records(records: Iterable[MACELabelRecord], result: dict) -> list[MACELabelRecord]:
     """Corrected records for LabelValidator / training: reviewed outcomes applied, excluded and unresolved dropped."""
+    require_audited_labels(result.get("outcomes"))
     out = []
     for r in records:
         o = result["outcomes"].get(r.record_id)
