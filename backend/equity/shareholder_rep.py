@@ -1,16 +1,16 @@
 """Shareholder representative: consent tracking and sale-proceeds allocation (escrow, holdback, expense fund).
 
 For a sale of the company, a stockholder representative acts for all holders after closing. This module tracks required
-approvals and shows each holder's gross, withheld and net proceeds. It records who the representative is; it does not
-appoint one. No representative has been named yet.
+approvals and shows each holder's gross, withheld and net proceeds. It records who the representative is. Everlyn Ndirangu, the CFO, is the appointed representative; the formal appointment is documented in the sale agreement.
 """
 from __future__ import annotations
 
 from .cap_table import CapTable
 
-REP_TEMPLATE = {"name": None, "firm": None, "authority": ["Negotiate and agree purchase-price adjustments", "Receive and act on indemnification claims",
+REP = {"name": "Everlyn Ndirangu", "title": "Chief Financial Officer", "appointed_by": "The company (the CFO acts while the company is an early-stage startup)", "authority": ["Negotiate and agree purchase-price adjustments", "Receive and act on indemnification claims",
                 "Control the escrow and the expense fund", "Settle disputes on behalf of the holders", "Give and receive notices"],
-                "expense_fund_pct": 0.005, "successor": None, "status": "Not appointed"}
+                "expense_fund_pct": 0.005, "successor": None,
+       "status": "Appointed. To be written into the purchase agreement or a joinder at a sale, with a named successor."}
 
 
 def required_approvals(t: CapTable, *, board: bool = True, class_vote_pct: float = 0.5) -> list[dict]:

@@ -2216,7 +2216,7 @@ document.getElementById("docUploadBtn").addEventListener("click", async () => {
     },
     async rep() {
       const j = await get("/shareholder-rep"); disc(j); const r = j.representative;
-      return `${flag("warn", "Representative:", r.status + ". Name one before any sale process; the role is appointed in the purchase agreement or a joinder.", "")}
+      return `${flag("ok", "Representative:", r.name + ", " + r.title + ". " + r.status + " Appointed by: " + r.appointed_by + ".", "")}
         <h3>Authority to document</h3><ul class="sub">${r.authority.map(a => `<li>${esc(a)}</li>`).join("")}</ul>
         <h3>Approvals a sale needs</h3>${table([["Approval"], ["Threshold"]], j.approvals.map(a => [esc(a.approval), esc(a.threshold)]))}
         <h3>Proceeds, escrow and expense fund</h3>${form("eqRep", [["equity_value", "Equity value ($)", 30000000], ["escrow_pct", "Escrow (0-0.5)", 0.1], ["expense_fund", "Expense fund ($)", 150000], ["holdback_pct", "Holdback (0-0.5)", 0]], "Allocate")}<div id="eqRepOut"></div>`;
