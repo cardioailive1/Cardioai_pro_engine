@@ -74,7 +74,8 @@ def test_compliance_follows_company_facts():
     assert items["422-1"]["status"] == "ok" and items["422-2"]["status"] == "ok"             # Board consent doubles as stockholder consent
     assert items["R701-1"]["status"] == "ok" and "Counsel has confirmed" in items["R701-1"]["detail"]
     assert items["ISO-1"]["status"] == "ok" and "Projected excess" in items["ISO-1"]["detail"]
-    assert items["FORMD-1"]["status"] == "verify"                                                 # unknown filing is never reported as ok
+    assert items["FORMD-1"]["status"] == "ok"                                                     # the company reports Form D complete
+    assert {i["id"]: i for i in compliance.run(seed_cap_table(), d, {"form_d_filed": None})}["FORMD-1"]["status"] == "verify"   # unknown is never ok
     assert items["409A-2"]["status"] == "ok" and "projection" in items["CORP-1"]["title"].lower()
     closed = {i["id"]: i for i in compliance.run(seed_cap_table(), d, {"round_closed": True})}
     assert closed["409A-1"]["status"] == "warn"                                                   # refresh needed once the round closes
@@ -88,7 +89,7 @@ def test_compliance_follows_company_facts():
 def test_checklist_moves_with_facts():
     t = seed_cap_table()
     a = insights.checklist(t, date(2026, 10, 26))["score_pct"]
-    assert insights.checklist(t, date(2026, 10, 26), {"rep_named": True})["score_pct"] > a
+    assert insights.checklist(t, date(2026, 10, 26), {"rep_named": False})["score_pct"] < a
     assert insights.checklist(t, date(2026, 10, 26), {"round_closed": True})["score_pct"] < a
 
 

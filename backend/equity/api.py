@@ -87,11 +87,11 @@ class Safe820In(BaseModel):
 
 class FactsIn(BaseModel):
     stockholder_consent_on_file: bool = True
-    form_d_filed: Optional[bool] = None
+    form_d_filed: Optional[bool] = True
     total_assets: Optional[float] = Field(default=None, ge=0)
     round_closed: bool = False
     rule_701_confirmed_by_counsel: bool = True
-    rep_named: bool = False
+    rep_named: bool = True
 
 
 class AllocIn(BaseModel):
@@ -247,7 +247,7 @@ def portfolio_get(mark_price: float = 2.0, exit_value: Optional[float] = None):
 @router.get("/shareholder-rep")
 def rep_get():
     t = seed_cap_table()
-    return _wrap(representative=shareholder_rep.REP_TEMPLATE, approvals=shareholder_rep.required_approvals(t),
+    return _wrap(representative=shareholder_rep.REP, approvals=shareholder_rep.required_approvals(t),
                  holders={h: n for h, n in t.common.items()})
 
 

@@ -14,7 +14,8 @@ from .cap_table import CapTable
 from .finmath import add_months
 
 DEFAULT_FACTS = {"stockholder_consent_on_file": True,   # the Board consent doubles as the stockholder consent: the founder is sole stockholder and Board chair
-                 "form_d_filed": None, "total_assets": None,
+                 "form_d_filed": True,                    # the company reports Form D fully completed
+                 "total_assets": None,
                  "round_closed": False,                  # the $2.00 pre-seed is a proposal under negotiation
                  "rule_701_confirmed_by_counsel": True, "fmv_per_share": 0.75}
 
@@ -78,8 +79,8 @@ def run(t: CapTable, today: date, facts: Optional[dict] = None) -> list[dict]:
         "17 CFR 230.701(d). Over $10 million in 12 months triggers enhanced disclosure (230.701(e)).")
     # Form D
     if t.safes:
-        add("FORMD-1", "Form D / state notices for the SAFEs", "ok" if f["form_d_filed"] else "verify",
-            "The SAFEs have not converted; the company plans to file Form D when the Mayo Clinic Platform SAFE converts. Counsel should confirm the timing: where Form D is required, the 15-day clock normally runs from the first sale (when the investor is irrevocably committed), and state notice filings follow.",
+        add("FORMD-1", "Form D for the SAFEs", "ok" if f["form_d_filed"] else "verify",
+            "The company reports Form D fully completed." if f["form_d_filed"] else "Form D is not recorded as filed. Where required, the 15-day clock normally runs from the first sale (when the investor is irrevocably committed), and state notice filings follow.",
             "17 CFR 230.503")
     # Delaware franchise tax
     assumed_capital = t.authorized_common * t.par

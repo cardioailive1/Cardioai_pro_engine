@@ -25,9 +25,9 @@ def checklist(t: CapTable, today: date, facts: dict | None = None) -> dict:
         ("Option grants priced at or above FMV", comp["409A-2"]["status"] == "ok", "Compliance"),
         ("ISO limit reviewed and award letters note NSO excess", comp["ISO-1"]["status"] == "ok", "Compliance"),
         ("Securities exemption confirmed (Rule 701 / 4(a)(2))", comp["R701-1"]["status"] == "ok", "Compliance"),
-        ("Form D / state notices (filing on SAFE conversion; timing confirmed)", all(c["status"] == "ok" for k, c in comp.items() if k.startswith("FORMD")), "Compliance"),
+        ("Form D completed", all(c["status"] == "ok" for k, c in comp.items() if k.startswith("FORMD")), "Compliance"),
         ("Authorized shares cover the proposed round (projection)", comp["CORP-1"]["status"] == "ok", "Corporate"),
-        ("Shareholder representative named", bool(f.get("rep_named")), "Exit readiness"),
+        ("Shareholder representative appointed", bool(f.get("rep_named", True)), "Exit readiness"),
     ]
     done = sum(1 for _, ok, _ in items if ok)
     return {"done": done, "total": len(items), "score_pct": round(100 * done / len(items)),
