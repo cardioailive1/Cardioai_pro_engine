@@ -69,11 +69,12 @@ records = [{"study_id": r["ACCESSION_NBR"], "kind": "mri", "text": r["RADIOLOGY_
 auto = auto_label_all(records)      # LVEF + findings; addenda, ranges, prior-vs-current EF are flagged
 ```
 
-## 6. Automatic audit (optional)
+## 6. Automatic audit (required)
 ```python
 from training.mayo.label_auto_audit import auto_audit, summarize
 res = auto_audit(auto); print(summarize(res))       # pass / warn / fail counts
 ```
+This step cannot be skipped: `export_ds_audit`, `route`, the cardiologist queue, `finalize` and `build_lvef_examples` raise `AutoAuditRequired` if any study lacks an automatic-audit result or the labels did not come from `finalize`.
 
 ## 7. Tier 1 - data scientists audit
 ```python
@@ -152,7 +153,7 @@ Module: `training/mayo/mace_label_audit.py`. Run inside the Workspace; the files
 
 1. Rebuild records with the current `omop_adapter.build_mace_records` (they now carry `index_date`).
 2. `items = build_review_items(records, condition_rows, death_rows, mapping, visit_rows)` collects the OMOP evidence per record.
-3. `aa = auto_audit(items)`: automatic checks (death with no usable cause, event after death, window within a week of 30/90 days, single supporting code, non-inpatient setting, MI+stroke together, prior event at the washout edge, code present but labeled no event).
+3. `aa = auto_audit(items)` (required; the later steps refuse to run without it): automatic checks (death with no usable cause, event after death, window within a week of 30/90 days, single supporting code, non-inpatient setting, MI+stroke together, prior event at the washout edge, code present but labeled no event).
 4. Tier 1: `export_ds_audit(items, "ds.csv", aa)`. Each data scientist fills `ds_decision` (agree / disagree / uncertain / exclude); for disagree add `ds_event_type` (none, myocardial_infarction, stroke, all_cause_death, or cardiovascular_death if the batch uses that definition) and `ds_days_to_event`. Optional lighter pass: `triage_ds_scope` (always keeps events and non-pass records).
 5. `plan = route(items, read_ds_audits(["ds.csv", ...]), aa)`.
 6. Tier 2: `export_cardiologist_queue(items, plan, "card.csv", "key.csv")`. Blinded, shuffled; spot-check drawn separately from agreed events and agreed non-events. The cardiologist fills `cardiologist_decision` (event / none / exclude), plus type and days for an event. Keep `key.csv` with the data scientists.

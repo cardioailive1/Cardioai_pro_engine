@@ -2,6 +2,8 @@
 import csv, os, tempfile
 from training.mayo.label_audit import (auto_label_all, export_ds_audit, read_ds_audits, route,
                                        export_cardiologist_queue, finalize, audit_summary)
+from training.mayo.audit_gate import AutoAuditRequired, AuditedLabels
+from training.mayo.label_auto_audit import auto_audit
 
 
 def fill(path, rule):
@@ -21,7 +23,14 @@ def t():
              {"study_id": "NONE", "kind": "mri", "text": "Not reported."},        # DS excludes
              {"study_id": "NOAUDIT", "kind": "echo", "text": "LVEF 50%."}]        # never audited
     auto = auto_label_all(recs)
-    export_ds_audit(auto, P("ds.csv"))
+    res = auto_audit(auto)                                     # the automatic audit is required after automatic labeling
+    for bad in (None, {}, {k: v for k, v in list(res.items())[:-1]}):          # none, empty or partial audit: every step refuses
+        for call in (lambda b=bad: export_ds_audit(auto, P("x.csv"), b), lambda b=bad: route(auto, {}, b)):
+            try:
+                call(); assert False, "ran without a full automatic audit"
+            except AutoAuditRequired:
+                pass
+    export_ds_audit(auto, P("ds.csv"), res)
 
     def rule(r):
         s = r["study_id"]
@@ -32,7 +41,7 @@ def t():
         return ("agree", "")
     fill(P("ds.csv"), rule)
     audits = read_ds_audits([P("ds.csv")])
-    plan = route(auto, audits)
+    plan = route(auto, audits, res)
     assert plan["NOAUDIT"]["state"] == "pending_ds"
     assert plan["WRONG"]["state"] == "adjudicate" and "disagrees" in plan["WRONG"]["reason"]
     assert plan["RANGE"]["state"] == "adjudicate" and "labeler flagged" in plan["RANGE"]["reason"]
@@ -43,7 +52,13 @@ def t():
     except ValueError:
         pass
     audits["NOAUDIT"] = [{"auditor": "ds1", "decision": "agree", "lvef": None}]
-    plan = route(auto, audits)
+    plan = route(auto, audits, res)
+    unaudited_plan = {s: {k: v for k, v in p.items() if k != "auto_audit"} for s, p in plan.items()}   # a plan built without the audit
+    for call in (lambda: export_cardiologist_queue(auto, unaudited_plan, P("c0.csv"), P("k0.csv")), lambda: finalize(unaudited_plan, P("c0.csv"), P("k0.csv"))):
+        try:
+            call(); assert False
+        except AutoAuditRequired:
+            pass
     st = export_cardiologist_queue(auto, plan, P("c.csv"), P("k.csv"), spot_fraction=0.5, seed=1)
     assert st["adjudication"] == 3 and st["spot_check"] >= 5
     head = open(P("c.csv"), encoding="utf-8").readline()
@@ -60,6 +75,7 @@ def t():
     assert out["labels"]["WRONG"]["lvef"] == 36 and out["labels"]["RANGE"]["category"] == "preserved_ge50"
     assert "NONE" in out["excluded"] and not out["unresolved"]
     assert out["spot_check"]["agreement"] == 1.0 and out["passed"]
+    assert out["auto_audited"] and isinstance(out["labels"], AuditedLabels) and out["auto_audit_counts"]["studies"] == len(auto)
     assert abs(out["labels"]["A3"]["lvef"] - 43) < 1e-9          # un-spot-checked agreed labels pass through
     # a wrong consensus caught by the blinded spot-check fails the batch
     for r in rows:

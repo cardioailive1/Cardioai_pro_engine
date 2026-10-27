@@ -54,7 +54,7 @@ def t():
     for s in ("QUAL", "IMP", "STRUCT"):                                            # DS agreed, auto-audit failed -> cardiologist
         assert plan[s]["state"] == "adjudicate" and "automatic audit failed" in plan[s]["reason"]
     # without opt-in, studies outside scope are NOT auto-covered
-    plain = route(auto, audits)
+    plain = route(auto, audits, res)
     assert any(p["state"] == "pending_ds" for p in plain.values())
     # auto-audit-only studies are oversampled in the blinded spot-check and tracked separately
     q = export_cardiologist_queue(auto, plan, P("c.csv"), P("k.csv"), spot_fraction=0.2, min_spot=2, seed=3,

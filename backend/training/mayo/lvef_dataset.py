@@ -26,10 +26,13 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from training.mayo.audit_gate import require_audited_labels
+
 
 def build_lvef_examples(linked: dict, reviewed: dict, series_uid_for: Optional[Callable] = None) -> list[dict]:
     """linked: output['linked'] of link_reports_to_images. reviewed: apply_reviews(...)['labels'].
     One example per accession with a reviewed LVEF and at least one image instance."""
+    require_audited_labels(reviewed)     # only labels that went through the automatic audit and both review tiers
     out = []
     for acc, item in linked.items():
         lab = reviewed.get(acc)

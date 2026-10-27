@@ -1,12 +1,16 @@
 """
-CardioAI Pro - automatic label audit (optional, runs before the cardiologist)
-============================================================================
+CardioAI Pro - automatic label audit (REQUIRED after automatic labeling)
+=======================================================================
 An independent set of machine checks on each auto label, to help the data
-scientists audit faster and to catch the errors a single regex pass makes. It
-does NOT replace the data-scientist audit by default (see label_audit.route):
-by default the results are shown to the auditors as extra columns. Only if you
-opt in (label_audit.triage_ds_scope) do clean studies get a lighter human
-audit - and those are then oversampled in the blinded cardiologist spot-check.
+scientists audit faster and to catch the errors a single regex pass makes.
+It is a required step: export_ds_audit, route, the cardiologist queue,
+finalize and build_lvef_examples all refuse to run on labels that have not
+been through it (see audit_gate.py). It does NOT replace the data-scientist
+audit by default (see label_audit.route): the results are shown to the
+auditors as extra columns, and a 'fail' always goes to the cardiologist.
+Only if you opt in (label_audit.triage_ds_scope) do clean studies get a
+lighter human audit - and those are then oversampled in the blinded
+cardiologist spot-check.
 
 Checks (status pass / warn / fail):
   value_present       a numeric LVEF was found

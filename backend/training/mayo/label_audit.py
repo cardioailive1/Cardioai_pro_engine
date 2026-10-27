@@ -1,7 +1,9 @@
 """
 CardioAI Pro - two-tier label audit
 ===================================
-Automatic labels (report_labels.py) are audited before any training use:
+Automatic labels (report_labels.py) are audited before any training use. The AUTOMATIC AUDIT
+(label_auto_audit.py) is a required first step: every study must have a result, and each later step
+refuses to run without it (audit_gate.py).
 
   TIER 1 - data scientists audit EVERYTHING.
       Every auto-labeled study goes to at least one data-scientist auditor
@@ -36,6 +38,7 @@ import random
 import secrets
 from typing import Iterable, Optional
 
+from .audit_gate import AuditedLabels, audit_counts, require_auto_audit, require_plan_audited
 from .report_labels import annotate_report, ef_category
 
 TOL = 5.0  # LVEF points; two values within TOL AND in the same HF category "agree"
@@ -85,14 +88,14 @@ def triage_ds_scope(auto: dict, auto_audit: dict, sample_fraction: float = 0.20,
     return {s for s in auto if auto_audit[s]["status"] != "pass"} | set(rng.sample(clean, n))
 
 
-def export_ds_audit(auto: dict, path: str, auto_audit: Optional[dict] = None, ds_scope: Optional[set] = None) -> int:
+def export_ds_audit(auto: dict, path: str, auto_audit: dict, ds_scope: Optional[set] = None) -> int:
     """Studies for the data-scientist auditors (give each a copy; fill `auditor`). Every study by default;
     with `ds_scope` only those. With `auto_audit` results, adds auto_audit_status / notes / suggested LVEF
     columns and lists fails first so the auditors see the risky ones early."""
+    require_auto_audit(auto, auto_audit)          # the automatic audit is a required step after automatic labeling
     ids = [s for s in auto if ds_scope is None or s in ds_scope]
-    if auto_audit:
-        order = {"fail": 0, "warn": 1, "pass": 2}
-        ids.sort(key=lambda s: order[auto_audit[s]["status"]])
+    order = {"fail": 0, "warn": 1, "pass": 2}
+    ids.sort(key=lambda s: order[auto_audit[s]["status"]])
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=DS_COLS); w.writeheader()
         for sid in ids:
@@ -123,12 +126,13 @@ def read_ds_audits(paths: Iterable[str]) -> dict:
 
 
 # ---------------------------------------------------------------- routing
-def route(auto: dict, audits: dict, auto_audit: Optional[dict] = None, ds_scope: Optional[set] = None) -> dict:
+def route(auto: dict, audits: dict, auto_audit: dict, ds_scope: Optional[set] = None) -> dict:
     """Decide each study's path. -> {study_id: {state, reason, value, ds_values, auto_audit_only}}
     state: pending_ds | agreed | adjudicate | excluded
     Opt-in triage: with ds_scope + auto_audit, a study OUTSIDE the scope that passed every automatic check
     counts as audited by 'auto-audit' (auto_audit_only=True). Anything else still needs a human audit.
     An automatic 'fail' always sends the study to the cardiologist, even if a data scientist agreed."""
+    require_auto_audit(auto, auto_audit)          # the automatic audit is a required step after automatic labeling
     plan = {}
     for sid, a in auto.items():
         rows = audits.get(sid, [])
@@ -165,6 +169,8 @@ def route(auto: dict, audits: dict, auto_audit: Optional[dict] = None, ds_scope:
         else:
             plan[sid] = {"state": "agreed", "reason": "", "value": sum(ds_vals) / len(ds_vals), "ds_values": ds_vals,
                          "auto_audit_only": aa_only}
+    for sid in plan:
+        plan[sid]["auto_audit"] = auto_audit[sid]["status"]    # recorded so later steps can verify the audit was run
     return plan
 
 
@@ -174,6 +180,7 @@ def export_cardiologist_queue(auto: dict, plan: dict, path: str, key_path: str,
                               auto_only_spot_fraction: float = 0.10) -> dict:
     """Blinded, shuffled queue: all 'adjudicate' studies + a random spot-check of 'agreed' ones.
     Refuses if any study still lacks a data-scientist audit (tier 1 must cover everything)."""
+    require_plan_audited(plan)
     pending = [s for s, p in plan.items() if p["state"] == "pending_ds"]
     if pending:
         raise ValueError(f"{len(pending)} studies not yet audited by data scientists (e.g. {pending[:3]})")
@@ -205,6 +212,7 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
     """Merge cardiologist decisions. Precedence: cardiologist > agreed consensus. Reports coverage,
     auditor/spot-check agreement, and whether the batch passes (spot-check agreement >= target with
     enough samples)."""
+    require_plan_audited(plan)
     key = {}
     with open(key_path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -256,7 +264,8 @@ def finalize(plan: dict, cardio_path: str, key_path: str, target_agreement: floa
     for sid in unresolved:
         final.pop(sid, None)
     agree = spot_ok / spot_n if spot_n else None
-    return {"labels": final, "excluded": sorted(set(excluded)), "unresolved": unresolved,
+    return {"labels": AuditedLabels(final), "auto_audited": True, "auto_audit_counts": audit_counts(plan),
+            "excluded": sorted(set(excluded)), "unresolved": unresolved,
             "spot_check": {"n": spot_n, "agree": spot_ok, "agreement": agree, "wilson95": _wilson(spot_ok, spot_n),
                            "errors": spot_errors},
             "spot_check_auto_audit_only": {"n": aa_n, "agree": aa_ok, "agreement": (aa_ok / aa_n) if aa_n else None},
