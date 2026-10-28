@@ -2,7 +2,7 @@
 CardioAI Pro — OMOP CDM to MACELabelRecord Adapter
 =========================================================
 Bridges Mayo Clinic Platform_Discover's OMOP CDM-structured de-identified
-data (queried via SparkSQL in a Workspace Jupyter notebook) to
+data (queried with the BigQuery client in a Workspace Jupyter notebook) to
 training/label_schema.py's MACELabelRecord — the one piece of genuinely
 new code the Mayo training path needs. Everything downstream
 (LabelValidator, train_model.py) is unchanged; this module's whole job is
@@ -10,7 +10,7 @@ producing MACELabelRecord objects those already handle correctly.
 
 Expects rows shaped like OMOP CDM's standard tables — PERSON,
 MEASUREMENT, CONDITION_OCCURRENCE, DEATH — as plain dicts (what you get
-from a collected Spark DataFrame or a pandas DataFrame's
+from BigQuery query results (`training.mayo.bq.query_rows` returns them) or a pandas DataFrame's
 `.to_dict("records")`; this module doesn't depend on either library
 directly, so it works with whichever your Workspace notebook uses).
 
@@ -130,7 +130,7 @@ def _age_band(year_of_birth: int, index_year: int) -> str:
 
 
 def _to_date(value: Any) -> Optional[date_type]:
-    """Accepts a date, datetime, or ISO string (Spark/pandas can hand back any of these depending on the query) and normalizes to a plain date."""
+    """Accepts a date, datetime, or ISO string (BigQuery/pandas can hand back any of these depending on the query) and normalizes to a plain date."""
     if value is None:
         return None
     if isinstance(value, date_type):

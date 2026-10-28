@@ -37,6 +37,7 @@ Answered by Mayo (Adam Resnick, 2026-10-28), with the OMOP CDM ETL Mapping Pipel
 - Echo LVEF: filter `FACT_ECHO_RESULTS` to LVEF rows using `DIM_ECHO_TEST_RESULT_TYPE.ECHO_TEST_RESULT_NAME` or `.ECHO_TEST_RESULT_DESCRIPTION`; the number is `ECHO_RESULT_VALUE`. Several LVEF-type rows can exist for one study (method by result type); `lvef_result_types` lists them so a person confirms which to use.
 - Echo same-day studies: `FACT_ECHO_TEST.ECHO_PERFORMED_TEST_DK` joins to `DIM_ECHO_TEST` for the exact ordered test; its study description matches the exact DICOM study.
 - Echo DICOM: listed in `FACT_RADIOLOGY_DICOM_INVENTORY` with `MODALITY = 'US'`; find echo in `STUDY_DESCRIPTION` (`radiology_link.echo_dicom_study_sql`).
+- SQL: Mayo says the Workspace uses the **BigQuery client** to run SQL against the provisioned data, so the project SQL is BigQuery Standard SQL (`training/mayo/bq.query_rows`, dataset as `project.dataset`, tables in backticks).
 - Work schema: yes, the project can write saved tables (for example `cardioai_work`); described in `My_First_Query.ipynb`, walked through in the data environment session.
 - From the OMOP guide: the `death` table has a date only (`cause_concept_id` always 0) and keeps a death only if its date + 60 days is after the person's last clinical event, so all-cause death is the only workable definition. An unknown birth year is stored as **1800** (month and day NULL): the code treats it as unknown, never as an age. The `measurement` table can hold two rows per lab result (one with a real concept, one with concept 0): match on the concept id and de-duplicate before counting. Diagnoses land in the CDM table that matches the standard concept's domain, not the source table.
 
@@ -60,7 +61,9 @@ sig = resample(sig, sample_rate_hz, 500)            # 250 Hz ECGs are brought to
 ## 3. Select studies and link reports to images
 ```python
 from training.mayo.radiology_link import cardiac_mri_study_sql, link_reports_to_images
-df = spark.sql(cardiac_mri_study_sql("<schema>")).toPandas()     # (confirm) Spark session name; refine the LIKE terms against real PROCEDURE_CODE_TEXT values
+from training.mayo.bq import query_rows                  # Mayo (28 Oct): the Workspace runs SQL through the BigQuery client
+rows = query_rows(cardiac_mri_study_sql("<project>.<dataset>"))   # BigQuery SQL; (confirm) the project.dataset in the Workspace; refine the LIKE terms against real PROCEDURE_CODE_TEXT values
+import pandas as pd; df = pd.DataFrame(rows)
 reports   = df[["DICOM_ACCESSION_NUMBER", "RADIOLOGY_REPORT", "RADIOLOGY_IMPRESSION"]].rename(columns={"DICOM_ACCESSION_NUMBER": "ACCESSION_NBR"}).drop_duplicates().to_dict("records")
 inventory = df.to_dict("records")
 linked = link_reports_to_images(reports, inventory)
