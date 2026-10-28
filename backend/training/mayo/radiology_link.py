@@ -13,33 +13,52 @@ From Mayo's Radiology training slides (2026-10-15):
 Not covered by the slides: the echo-note (FACT_ECHO_TEST) link to images - still
 to confirm with Mayo. Echo DICOM may sit in the same inventory (ultrasound modality);
 check STUDY_DESCRIPTION / FACT_IMAGINGSTUDY.PROCEDURE_CODE_TEXT in the Workspace.
-Table/schema qualifiers are left to the caller; column names are as shown in the slides.
+Queries are BigQuery Standard SQL (Mayo: the Workspace runs SQL through the BigQuery client; see bq.query_rows). Pass the dataset as
+"project.dataset"; tables are quoted in backticks. Column names are as shown in the slides.
 """
 from __future__ import annotations
 
 from typing import Iterable
 
+from .bq import table_ref
+
 SUBMITTABLE = {"ready", "available"}
 
 
 def cardiac_mri_study_sql(schema: str = "") -> str:
-    """Spark SQL: cardiac MRI studies (curated header) joined to reports and inventory.
+    """BigQuery SQL: cardiac MRI studies (curated header) joined to reports and inventory. schema = "project.dataset".
     Refine the LIKE terms with PROCEDURE_CODE_TEXT values you actually see in FACT_IMAGINGSTUDY."""
-    q = (schema + ".") if schema else ""
+    T = lambda t: table_ref(schema, t)
     return f"""
 SELECT s.STUDY_INSTANCE_UID, s.PROCEDURE_CODE_TEXT, s.STUDY_DESCRIPTION, s.NUMBER_OF_SERIES, s.NUMBER_OF_INSTANCES,
        i.DICOM_ACCESSION_NUMBER, i.IMAGE_DEID_STATUS, i.SERIES_INSTANCE_UID, i.SERIES_DESCRIPTION,
        r.RADIOLOGY_REPORT, r.RADIOLOGY_IMPRESSION, r.RADIOLOGY_DTM
-FROM {q}FACT_IMAGINGSTUDY s
-JOIN {q}FACT_RADIOLOGY_DICOM_INVENTORY i
+FROM {T("FACT_IMAGINGSTUDY")} s
+JOIN {T("FACT_RADIOLOGY_DICOM_INVENTORY")} i
   ON  i.STMO_NAME_IN_ADL = s.STMO_NAME_IN_ADL
   AND i.MODALITY = s.MODALITY_1
   AND i.STUDY_INSTANCE_UID = s.STUDY_INSTANCE_UID
-JOIN {q}FACT_RADIOLOGY r ON r.ACCESSION_NBR = i.DICOM_ACCESSION_NUMBER
+JOIN {T("FACT_RADIOLOGY")} r ON r.ACCESSION_NBR = i.DICOM_ACCESSION_NUMBER
 WHERE s.MODALITY_1 = 'MR'
   AND (UPPER(s.PROCEDURE_CODE_TEXT) LIKE '%CARDIAC%' OR UPPER(s.STUDY_DESCRIPTION) LIKE '%CARDIAC%'
        OR UPPER(s.STUDY_DESCRIPTION) LIKE '%HEART%')
   AND UPPER(i.IMAGE_DEID_STATUS) IN ('READY','AVAILABLE')
+""".strip()
+
+
+def echo_dicom_study_sql(schema: str = "") -> str:
+    """BigQuery SQL: echocardiogram DICOM studies in the inventory. schema = "project.dataset". Mayo (Adam Resnick, 2026-10-28): echo is listed in
+    FACT_RADIOLOGY_DICOM_INVENTORY with DICOM modality 'US'; find echo by searching STUDY_DESCRIPTION. Exactly which
+    descriptions are echo (TTE, TEE, stress, contrast) is for a person to confirm from the distinct values - this lists them
+    so they can be counted before anything is requested. Confirm the column names in the Workspace."""
+    T = lambda t: table_ref(schema, t)
+    return f"""
+SELECT i.STUDY_DESCRIPTION, COUNT(DISTINCT i.STUDY_INSTANCE_UID) AS studies
+FROM {T("FACT_RADIOLOGY_DICOM_INVENTORY")} i
+WHERE i.MODALITY = 'US' AND UPPER(i.STUDY_DESCRIPTION) LIKE '%ECHO%'
+  AND UPPER(i.IMAGE_DEID_STATUS) IN ('READY','AVAILABLE')
+GROUP BY i.STUDY_DESCRIPTION
+ORDER BY studies DESC
 """.strip()
 
 

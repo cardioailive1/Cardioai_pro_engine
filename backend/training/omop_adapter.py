@@ -2,7 +2,7 @@
 CardioAI Pro — OMOP CDM to MACELabelRecord Adapter
 =========================================================
 Bridges Mayo Clinic Platform_Discover's OMOP CDM-structured de-identified
-data (queried via SparkSQL in a Workspace Jupyter notebook) to
+data (queried with the BigQuery client in a Workspace Jupyter notebook) to
 training/label_schema.py's MACELabelRecord — the one piece of genuinely
 new code the Mayo training path needs. Everything downstream
 (LabelValidator, train_model.py) is unchanged; this module's whole job is
@@ -10,7 +10,7 @@ producing MACELabelRecord objects those already handle correctly.
 
 Expects rows shaped like OMOP CDM's standard tables — PERSON,
 MEASUREMENT, CONDITION_OCCURRENCE, DEATH — as plain dicts (what you get
-from a collected Spark DataFrame or a pandas DataFrame's
+from BigQuery query results (`training.mayo.bq.query_rows` returns them) or a pandas DataFrame's
 `.to_dict("records")`; this module doesn't depend on either library
 directly, so it works with whichever your Workspace notebook uses).
 
@@ -65,7 +65,9 @@ class OMOPConceptMapping:
     mi_condition_concept_ids: set[int] = field(default_factory=set)
     stroke_condition_concept_ids: set[int] = field(default_factory=set)
     cv_death_cause_concept_ids: set[int] = field(default_factory=set)  # matched against the Death table's cause_concept_id
-    # "all_cause": any death after the index counts (Mayo's cause of death is not populated, and Mayo recommended this).
+    # "all_cause": any death after the index counts. Mayo's OMOP death table holds a date only (cause_concept_id is always 0) and
+    # keeps a death only if its date + 60 days falls after the person's last clinical event (OMOP ETL guide), so a cause-based
+    # definition is not possible there. Mayo recommended all-cause.
     # "cardiovascular": only deaths whose cause_concept_id is in cv_death_cause_concept_ids count.
     death_definition: str = "all_cause"
 
@@ -99,6 +101,25 @@ class OMOPConceptMapping:
         return issues
 
 
+UNKNOWN_YEAR_OF_BIRTH = 1800   # Mayo OMOP: a redacted or unknown birth year is stored as 1800 (month and day are NULL)
+
+
+def valid_year_of_birth(yob: Any) -> Optional[int]:
+    """The birth year, or None when it is missing or Mayo's 1800 'unknown' placeholder (or otherwise implausible)."""
+    try:
+        y = int(yob)
+    except (TypeError, ValueError):
+        return None
+    return y if 1900 <= y <= 2100 else None
+
+
+def age_on(yob: Any, when: Any) -> Optional[int]:
+    """Age in whole years on a date from the birth YEAR only (Mayo gives no month or day, so this can be one year off), or None."""
+    y = valid_year_of_birth(yob)
+    d = _to_date(when)
+    return None if y is None or d is None else d.year - y
+
+
 def _age_band(year_of_birth: int, index_year: int) -> str:
     age = index_year - year_of_birth
     if age < 50:
@@ -109,7 +130,7 @@ def _age_band(year_of_birth: int, index_year: int) -> str:
 
 
 def _to_date(value: Any) -> Optional[date_type]:
-    """Accepts a date, datetime, or ISO string (Spark/pandas can hand back any of these depending on the query) and normalizes to a plain date."""
+    """Accepts a date, datetime, or ISO string (BigQuery/pandas can hand back any of these depending on the query) and normalizes to a plain date."""
     if value is None:
         return None
     if isinstance(value, date_type):
@@ -168,9 +189,9 @@ def _subgroups(person: dict[str, Any], mapping: OMOPConceptMapping, index_date: 
     elif race_cid is not None and race_cid in mapping.race_concept_id_map:
         subgroups["race_ethnicity"] = mapping.race_concept_id_map[race_cid]
 
-    yob = person.get("year_of_birth")
+    yob = valid_year_of_birth(person.get("year_of_birth"))       # 1800 = unknown at Mayo: leave the age band missing, never "65+"
     if yob is not None:
-        subgroups["age_band"] = _age_band(int(yob), index_date.year)
+        subgroups["age_band"] = _age_band(yob, index_date.year)
 
     return subgroups
 

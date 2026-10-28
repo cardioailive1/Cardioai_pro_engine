@@ -32,9 +32,23 @@ Answered by Mayo (Adam Resnick and Tommy Stretch, 2026-10-21):
 - Dates are shifted by the same amount across a patient's whole record.
 - Echo images: link `FACT_ECHO_TEST` to the DICOM images by study date and `PATIENT_CLINIC_NUMBER` (Mayo will explore other ways if this is not enough).
 
+Answered by Mayo (Adam Resnick, 2026-10-28), with the OMOP CDM ETL Mapping Pipeline Guide (also in the Resource Hub):
+- OMOP `person_id`: `person.person_source_value` is `DIM_PATIENT.PATIENT_CLINIC_NUMBER`. Join OMOP to the FACT tables on that, never on `person_id` alone. (From the 15 Oct 2026 release the ETL uses `PATIENT_CLINIC_NUMBER` because `PATIENT_DK` is deprecated in some MCP tables.)
+- Echo LVEF: filter `FACT_ECHO_RESULTS` to LVEF rows using `DIM_ECHO_TEST_RESULT_TYPE.ECHO_TEST_RESULT_NAME` or `.ECHO_TEST_RESULT_DESCRIPTION`; the number is `ECHO_RESULT_VALUE`. Several LVEF-type rows can exist for one study (method by result type); `lvef_result_types` lists them so a person confirms which to use.
+- Echo same-day studies: `FACT_ECHO_TEST.ECHO_PERFORMED_TEST_DK` joins to `DIM_ECHO_TEST` for the exact ordered test; its study description matches the exact DICOM study.
+- Echo DICOM: listed in `FACT_RADIOLOGY_DICOM_INVENTORY` with `MODALITY = 'US'`; find echo in `STUDY_DESCRIPTION` (`radiology_link.echo_dicom_study_sql`).
+- SQL: Mayo (Adam Resnick, 28 Oct): "They use BigQuery client to enable SQL queries against your provisioned data." The Workspace uses the **BigQuery client** to run SQL against the provisioned data, so the project SQL is BigQuery Standard SQL (`training/mayo/bq.query_rows`, dataset as `project.dataset`, tables in backticks).
+- Work schema: yes, the project can write saved tables (for example `cardioai_work`); described in `My_First_Query.ipynb`, walked through in the data environment session.
+- From the OMOP guide: the `death` table has a date only (`cause_concept_id` always 0) and keeps a death only if its date + 60 days is after the person's last clinical event, so all-cause death is the only workable definition. An unknown birth year is stored as **1800** (month and day NULL): the code treats it as unknown, never as an age. The `measurement` table can hold two rows per lab result (one with a real concept, one with concept 0): match on the concept id and de-duplicate before counting. Diagnoses land in the CDM table that matches the standard concept's domain, not the source table.
+
+Still waiting on Mayo (Tommy Stretch, Adam is on PTO until the end of the week):
+- [ ] ECG records per lead: is there exactly one `Rhythm` row per acquisition and lead? (Tommy)
+- [ ] Which `FACT_ECG` column holds the cardiologist over-read interpretation, and which column tells a confirmed read from a machine-only one (Tommy)
+- [ ] Whether `FACT_ECG` and the de-identification request still carry `PATIENT_DK` now it is deprecated in some tables (our request CSV uses it)
+
 Still to find out:
 - [ ] How `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (the sample rate) joins to the waveform rows
-- [ ] Which `FACT_ECHO_RESULTS` column holds LVEF, and whether one study can have more than one value (not answered)
+- [ ] Whether one echo study holds several LVEF result types (biplane, visual, 3-D) and which to prefer; the exact `ECHO_TEST_RESULT_NAME` values (run `lvef_result_types`)
 - [ ] OMOP concept IDs for `training/omop_adapter.py` (CONCEPT table / Schema Visualizer)
 - [ ] Check one decoded Rhythm trace by eye against the signed ECG report, and confirm there is exactly one Rhythm record per lead (the loader refuses any lead that has several)
 
@@ -47,7 +61,9 @@ sig = resample(sig, sample_rate_hz, 500)            # 250 Hz ECGs are brought to
 ## 3. Select studies and link reports to images
 ```python
 from training.mayo.radiology_link import cardiac_mri_study_sql, link_reports_to_images
-df = spark.sql(cardiac_mri_study_sql("<schema>")).toPandas()     # (confirm) Spark session name; refine the LIKE terms against real PROCEDURE_CODE_TEXT values
+from training.mayo.bq import query_rows                  # Mayo (28 Oct): the Workspace runs SQL through the BigQuery client
+rows = query_rows(cardiac_mri_study_sql("<project>.<dataset>"))   # BigQuery SQL; (confirm) the project.dataset in the Workspace; refine the LIKE terms against real PROCEDURE_CODE_TEXT values
+import pandas as pd; df = pd.DataFrame(rows)
 reports   = df[["DICOM_ACCESSION_NUMBER", "RADIOLOGY_REPORT", "RADIOLOGY_IMPRESSION"]].rename(columns={"DICOM_ACCESSION_NUMBER": "ACCESSION_NBR"}).drop_duplicates().to_dict("records")
 inventory = df.to_dict("records")
 linked = link_reports_to_images(reports, inventory)
@@ -139,8 +155,8 @@ Only code, aggregate metrics (spot-check agreement, correlation) and approved mo
 
 Heart failure changes MACE risk, so the most recent EARLIER echo LVEF is added to the ECG network's score. Mayo: more than 100,000 patients have both; link on `PATIENT_CLINIC_NUMBER` and date (dates are shifted equally within a patient); LVEF is in `FACT_ECHO_RESULTS`.
 
-1. Pull echo rows from `FACT_ECHO_TEST` / `FACT_ECHO_RESULTS`: `patient_id` (PATIENT_CLINIC_NUMBER), `echo_date`, and the LVEF column. Run `find_lvef_columns(<the table's column names>)` to list likely columns and pick one (or several); the code does not guess. If a study has several values, the study value is their median (`multi_value="mean"` is the alternative).
-2. `studies, st = echo_study_lvef(echo_rows, lvef_column="<LVEF column>", study_column=None)` then `rows, ls = link_ecg_to_echo(ecg_rows, studies, max_days_before=365)` (from `training.mayo.ecg_echo_link`). Add `ecg_date` to each ECG row first. Only an echo ON OR BEFORE the ECG is used; an echo after it would leak the outcome. ECGs with no echo are kept (`has_echo` false). Read `ls["share_with_echo"]` and `ls["echo_only_after_the_ecg_not_used"]`.
+1. Pull echo rows: `FACT_ECHO_RESULTS` joined to `DIM_ECHO_TEST_RESULT_TYPE` (result type name and description) and to `FACT_ECHO_TEST` for the date, as `patient_id` (PATIENT_CLINIC_NUMBER), `echo_date`, `ECHO_RESULT_VALUE`, `ECHO_TEST_RESULT_NAME`, `ECHO_TEST_RESULT_DESCRIPTION` (confirm the join column names in the Workspace). Run `lvef_result_types(rows, type_columns=[...])` and have the clinical lead confirm which types are really LVEF. If a study has several values, the study value is their median (`multi_value="mean"` is the alternative).
+2. `studies, st = echo_study_lvef(echo_rows, lvef_column="ECHO_RESULT_VALUE", type_columns=["ECHO_TEST_RESULT_NAME", "ECHO_TEST_RESULT_DESCRIPTION"], study_column=None)` then `rows, ls = link_ecg_to_echo(ecg_rows, studies, max_days_before=365)` (from `training.mayo.ecg_echo_link`). Add `ecg_date` to each ECG row first. Only an echo ON OR BEFORE the ECG is used; an echo after it would leak the outcome. ECGs with no echo are kept (`has_echo` false). Read `ls["share_with_echo"]` and `ls["echo_only_after_the_ecg_not_used"]`.
 3. Build examples as usual (`build_examples` carries `echo` through), train the ECG network, then
    `r = fit_stage2(val, val_ecg_scores, test, test_ecg_scores)` (from `training.ecg_echo_stage2`), where the scores are the network's calibrated probabilities.
 4. Read `r["vs_ecg_only_all_test_patients"]` and `r["vs_ecg_only_patients_with_echo"]`. Keep the second stage only if `r["beats_ecg_only"]` (whole 95% interval above zero). Only aggregates leave the Workspace.

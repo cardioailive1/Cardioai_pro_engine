@@ -44,7 +44,7 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
   `monailabel`/`highdicom` are needed only for image outlines.
 - Image linking = `training/mayo/radiology_link.py` (from the Radiology slides): joins reports to the DICOM
   inventory on accession number, keeps only images with IMAGE_DEID_STATUS Ready/Available, and gives a starter
-  Spark SQL for cardiac MRI. Reports with an addendum/edit are always sent to review. Radiology reports are
+  BigQuery SQL for cardiac MRI and echo (run through `training/mayo/bq.query_rows`; Mayo's Workspace uses the BigQuery client). Reports with an addendum/edit are always sent to review. Radiology reports are
   also in OMOP `note.note_text`; the DICOM inventory is not in OMOP.
 - Training hookup = `training/mayo/lvef_dataset.py`: reviewed LVEF labels + linked DICOM -> a torch dataset that
   `train_mobile_echo_net(dataset=...)` accepts (default synthetic behaviour unchanged). Only human-reviewed

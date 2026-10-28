@@ -16,7 +16,7 @@ from datetime import timedelta
 from typing import Any, Iterable, Optional
 
 from claims_risk.features import vectorize
-from training.omop_adapter import OMOPConceptMapping, _subgroups, _to_date
+from training.omop_adapter import OMOPConceptMapping, _subgroups, _to_date, valid_year_of_birth
 
 
 @dataclass
@@ -45,7 +45,7 @@ def build_claims_risk_records(person_rows, condition_rows, visit_rows, observati
     out = []
     for p in person_rows:
         pid = p["person_id"]
-        yob = p.get("year_of_birth")
+        yob = valid_year_of_birth(p.get("year_of_birth"))      # Mayo stores an unknown birth year as 1800: skip those, never age them
         for as_of_raw in as_of_dates:
             as_of = _to_date(as_of_raw)
             lo, hi = as_of - timedelta(days=lookback_days), as_of + timedelta(days=horizon_days)
