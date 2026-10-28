@@ -1,7 +1,7 @@
 """
 CardioAI Pro - run BigQuery SQL in the Mayo Clinic Platform Workspace
 =====================================================================
-Mayo (Adam Resnick, 2026-10-28): the Workspace uses the BigQuery client to run SQL against the provisioned data. The SQL in
+Mayo (Adam Resnick, 2026-10-28): "They use BigQuery client to enable SQL queries against your provisioned data." (the Workspace uses the BigQuery client to run SQL against the provisioned data). The SQL in
 `radiology_link` is BigQuery Standard SQL, with the dataset given as `project.dataset` and every table quoted in backticks.
 
     from training.mayo.bq import query_rows
