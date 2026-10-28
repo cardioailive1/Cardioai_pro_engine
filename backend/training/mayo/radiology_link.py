@@ -43,6 +43,22 @@ WHERE s.MODALITY_1 = 'MR'
 """.strip()
 
 
+def echo_dicom_study_sql(schema: str = "") -> str:
+    """Spark SQL: echocardiogram DICOM studies in the inventory. Mayo (Adam Resnick, 2026-10-28): echo is listed in
+    FACT_RADIOLOGY_DICOM_INVENTORY with DICOM modality 'US'; find echo by searching STUDY_DESCRIPTION. Exactly which
+    descriptions are echo (TTE, TEE, stress, contrast) is for a person to confirm from the distinct values - this lists them
+    so they can be counted before anything is requested. Confirm the column names in the Workspace."""
+    q = (schema + ".") if schema else ""
+    return f"""
+SELECT i.STUDY_DESCRIPTION, COUNT(DISTINCT i.STUDY_INSTANCE_UID) AS studies
+FROM {q}FACT_RADIOLOGY_DICOM_INVENTORY i
+WHERE i.MODALITY = 'US' AND UPPER(i.STUDY_DESCRIPTION) LIKE '%ECHO%'
+  AND UPPER(i.IMAGE_DEID_STATUS) IN ('READY','AVAILABLE')
+GROUP BY i.STUDY_DESCRIPTION
+ORDER BY studies DESC
+""".strip()
+
+
 def link_reports_to_images(reports: Iterable[dict], inventory: Iterable[dict]) -> dict:
     """reports: rows with ACCESSION_NBR (+ RADIOLOGY_REPORT). inventory: rows with
     DICOM_ACCESSION_NUMBER, STUDY_INSTANCE_UID, SERIES_INSTANCE_UID, SOP_INSTANCE_UID, IMAGE_DEID_STATUS.

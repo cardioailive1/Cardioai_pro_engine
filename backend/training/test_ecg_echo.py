@@ -3,7 +3,7 @@ from datetime import date
 import numpy as np
 
 from training.ecg_echo_stage2 import fit_stage2
-from training.mayo.ecg_echo_link import echo_study_lvef, link_ecg_to_echo
+from training.mayo.ecg_echo_link import echo_study_lvef, link_ecg_to_echo, lvef_result_types
 
 
 def _echo(pid, d, v, study=None):
@@ -80,3 +80,28 @@ def test_column_candidates_several_columns_and_several_values():
     assert med[0]["lvef"] == 50.0 and med[0]["n_values"] == 3 and abs(avg[0]["lvef"] - 50.0) < 1e-9
     with pytest.raises(ValueError):
         echo_study_lvef(rows, lvef_column="BIPLANE", multi_value="max")
+
+
+def test_lvef_found_by_result_type_and_value_column():
+    """Mayo (2026-10-28): LVEF rows are picked by DIM_ECHO_TEST_RESULT_TYPE name/description; the number is ECHO_RESULT_VALUE."""
+    def row(name, desc, val, d="2026-01-10", study="S1"):
+        return {"patient_id": "P1", "echo_date": d, "ECHO_RESULT_VALUE": val, "ECHO_TEST_RESULT_NAME": name,
+                "ECHO_TEST_RESULT_DESCRIPTION": desc, "study": study}
+    rows = [row("LVEF biplane", "Left ventricular ejection fraction, biplane", "55%"),
+            row("LVEF visual", "LV EF visual estimate", "60"),
+            row("RVEF", "Right ventricular ejection fraction", "30"),          # another chamber: not used
+            row("LA volume", "Left atrial volume index", "40"),                # not an EF
+            row("MV E-F slope", "Mitral E-F slope", "12"),                     # contains "EF" but is not LVEF
+            row("LVEF 3D", "Left ventricular ejection fraction 3D", "see report")]   # not a number
+    cols = ["ECHO_TEST_RESULT_NAME", "ECHO_TEST_RESULT_DESCRIPTION"]
+    types = lvef_result_types(rows, type_columns=cols)
+    assert [t["type"].split(" | ")[0] for t in types] == ["LVEF biplane", "LVEF visual", "LVEF 3D"] and all(t["rows"] == 1 for t in types)
+    st, s = echo_study_lvef(rows, lvef_column="ECHO_RESULT_VALUE", study_column="study", type_columns=cols)
+    assert len(st) == 1 and st[0]["lvef"] == 57.5 and st[0]["n_values"] == 2          # median of the biplane and visual values
+    assert s["dropped_other_result_types"] == 3 and s["dropped_not_a_number"] == 1 and s["rows_used_by_type"]
+    # an extra filter, for example on the exact ordered test, narrows it further
+    st2, s2 = echo_study_lvef(rows, lvef_column="ECHO_RESULT_VALUE", type_columns=cols, keep=lambda r: "biplane" in r["ECHO_TEST_RESULT_DESCRIPTION"])
+    assert st2[0]["lvef"] == 55.0 and s2["dropped_by_keep_filter"] == 5
+    # without type_columns nothing is filtered by type (the old behaviour)
+    st3, _ = echo_study_lvef([row("anything", "x", "50")], lvef_column="ECHO_RESULT_VALUE")
+    assert st3[0]["lvef"] == 50.0

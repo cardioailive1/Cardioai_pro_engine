@@ -153,3 +153,13 @@ def test_death_definition_all_cause_counts_death_without_cause():
     assert et is None and censored
     bad = OMOPConceptMapping(heart_rate_concept_id=1, qtc_concept_id=2, mi_condition_concept_ids={5}, death_definition="cardiovascular")
     assert any("no death will count" in i for i in bad.validate())
+
+
+def test_unknown_birth_year_1800_is_not_an_age():
+    """Mayo stores a redacted birth year as 1800; it must never become an age of 226 or the 65+ band."""
+    from datetime import date
+    from training.omop_adapter import _subgroups, age_on, valid_year_of_birth
+    assert valid_year_of_birth(1800) is None and valid_year_of_birth(None) is None and valid_year_of_birth("1960") == 1960
+    assert age_on(1800, date(2026, 1, 1)) is None and age_on(1960, date(2026, 6, 1)) == 66
+    assert "age_band" not in _subgroups({"person_id": 1, "year_of_birth": 1800}, MAP, date(2026, 1, 1))
+    assert _subgroups({"person_id": 1, "year_of_birth": 1990}, MAP, date(2026, 1, 1))["age_band"] == "<50"
