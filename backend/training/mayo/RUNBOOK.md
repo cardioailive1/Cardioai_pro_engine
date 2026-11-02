@@ -44,7 +44,7 @@ Answered by Mayo (Adam Resnick, 2026-10-28), with the OMOP CDM ETL Mapping Pipel
 Still waiting on Mayo (Tommy Stretch, Adam is on PTO until the end of the week):
 - [ ] ECG records per lead: is there exactly one `Rhythm` row per acquisition and lead? (Tommy)
 - [ ] Which `FACT_ECG` column holds the cardiologist over-read interpretation, and which column tells a confirmed read from a machine-only one (Tommy)
-- [ ] Whether `FACT_ECG` and the de-identification request still carry `PATIENT_DK` now it is deprecated in some tables (our request CSV uses it)
+- [x] The de-identification request still uses `PATIENT_DK` (Mayo MCP, 2 Nov: CSV of STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL, required before image access). Still open: whether `FACT_ECG` carries it
 
 Still to find out:
 - [ ] How `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (the sample rate) joins to the waveform rows
@@ -73,10 +73,13 @@ print(len(linked["linked"]), "linked;", len(linked["no_images"]), "no images;", 
 ## 4. Request de-identified images (Mayo TSM)
 ```python
 from training.mayo.radiology_link import write_deid_request_csv
-# rows need STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL (join PATIENT_DK from the table found in step 2)
+# Mayo requires a CSV with STUDY_INSTANCE_UID, PATIENT_DK, MODALITY and STMO_NAME_IN_ADL for each selected study, sent to TSM
+# BEFORE image access is granted. The step 3 query returns all four (PATIENT_DK through DIM_PATIENT), so pass the selected rows.
+selected_rows = rows   # filter to the studies you chose
 print(write_deid_request_csv(selected_rows, "deid_request.csv"))   # written count + rejected rows with reasons
 ```
-Send `deid_request.csv` to TSM. Images arrive later; steps 5-9 work on report text meanwhile **(confirm reports are readable now)**.
+Where PATIENT_DK comes from: Mayo's Radiology slides (2 Nov) list `PATIENT_CLINIC_NUMBER` on the DICOM inventory, the header storage and `FACT_IMAGINGSTUDY`, not `PATIENT_DK`. The step 3 query therefore joins `DIM_PATIENT` on `PATIENT_CLINIC_NUMBER` (with `PATIENT_MERGED_FLAG = 'N'` for one row per patient) to get it. **(confirm in the Workspace)**
+Send `deid_request.csv` to TSM. The file must go before image access is granted; the writer refuses rows with a missing value or an image status other than Ready or Available, and removes duplicate studies. Images arrive later; steps 5-9 work on report text meanwhile **(confirm reports are readable now)**.
 
 ## 5. Automatic annotation
 ```python
