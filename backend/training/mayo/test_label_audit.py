@@ -92,3 +92,12 @@ def t():
 
 if __name__ == "__main__":
     t()
+
+
+def test_addendum_in_impression_or_narrative_is_flagged():
+    from training.mayo.label_audit import auto_label_all
+    base = {"study_id": "a", "kind": "mri", "text": "LVEF 55%."}
+    out = auto_label_all([base,
+                          dict(base, study_id="b", impression="Addendum: corrected value"),
+                          dict(base, study_id="c", narrative="This report was amended")])
+    assert not out["a"]["flagged"] and out["b"]["flagged"] and out["c"]["flagged"]

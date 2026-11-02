@@ -74,12 +74,11 @@ print(len(linked["linked"]), "linked;", len(linked["no_images"]), "no images;", 
 ```python
 from training.mayo.radiology_link import write_deid_request_csv
 # Mayo requires a CSV with STUDY_INSTANCE_UID, PATIENT_DK, MODALITY and STMO_NAME_IN_ADL for each selected study, sent to TSM
-# BEFORE image access is granted. The step 3 query returns STUDY_INSTANCE_UID, MODALITY and STMO_NAME_IN_ADL; add PATIENT_DK
-# (see below), then pass one row per study.
-selected_rows = [dict(r, PATIENT_DK=patient_dk_for[r["DICOM_ACCESSION_NUMBER"]]) for r in rows]
+# BEFORE image access is granted. The step 3 query returns all four (PATIENT_DK through DIM_PATIENT), so pass the selected rows.
+selected_rows = rows   # filter to the studies you chose
 print(write_deid_request_csv(selected_rows, "deid_request.csv"))   # written count + rejected rows with reasons
 ```
-Where PATIENT_DK comes from: check which table carries it, for example `SELECT table_name FROM `<project>.<dataset>`.INFORMATION_SCHEMA.COLUMNS WHERE column_name = 'PATIENT_DK'`. If the radiology table has it, select it in the step 3 query. If not, map `PATIENT_CLINIC_NUMBER` to `PATIENT_DK` through `DIM_PATIENT`. **(confirm in the Workspace)**
+Where PATIENT_DK comes from: Mayo's Radiology slides (2 Nov) list `PATIENT_CLINIC_NUMBER` on the DICOM inventory, the header storage and `FACT_IMAGINGSTUDY`, not `PATIENT_DK`. The step 3 query therefore joins `DIM_PATIENT` on `PATIENT_CLINIC_NUMBER` (with `PATIENT_MERGED_FLAG = 'N'` for one row per patient) to get it. **(confirm in the Workspace)**
 Send `deid_request.csv` to TSM. The file must go before image access is granted; the writer refuses rows with a missing value or an image status other than Ready or Available, and removes duplicate studies. Images arrive later; steps 5-9 work on report text meanwhile **(confirm reports are readable now)**.
 
 ## 5. Automatic annotation

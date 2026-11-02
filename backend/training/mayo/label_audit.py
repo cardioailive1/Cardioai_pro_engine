@@ -71,8 +71,12 @@ def auto_label_all(records: Iterable[dict]) -> dict:
     out = {}
     for r in records:
         a = annotate_report(r["text"], r["kind"])
+        # Mayo (Radiology slides, 2 Nov): an addendum or edit can sit in RADIOLOGY_REPORT, RADIOLOGY_IMPRESSION or
+        # RADIOLOGY_NARRATIVE, so all three are searched, not only the report body.
+        from .report_labels import _ADDENDUM
+        addendum_anywhere = any(_ADDENDUM.search(str(r.get(k) or "")) for k in ("text", "impression", "narrative"))
         out[r["study_id"]] = {"kind": r["kind"], "text": r["text"], "lvef": a["lvef"]["value"],
-                              "category": a["lvef"]["category"], "flagged": bool(a["needs_review"]),
+                              "category": a["lvef"]["category"], "flagged": bool(a["needs_review"] or addendum_anywhere),
                               "impression": r.get("impression"), "structured_lvef": r.get("structured_lvef")}
     return out
 
