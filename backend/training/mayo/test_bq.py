@@ -54,3 +54,10 @@ def test_query_rows_returns_plain_dicts_and_passes_parameters(monkeypatch):
     rows = query_rows("SELECT 1", client=Client(), params=[("since", "DATE", date(2026, 1, 1))])
     assert rows == [{"PATIENT_CLINIC_NUMBER": "7", "d": date(2026, 1, 2)}]
     assert seen["cfg"].query_parameters == [("since", "DATE", date(2026, 1, 1))]
+
+
+def test_mri_query_returns_the_columns_the_deid_request_needs():
+    from training.mayo.radiology_link import cardiac_mri_study_sql, DEID_COLUMNS
+    sql = cardiac_mri_study_sql("proj.ds")
+    for c in ("STUDY_INSTANCE_UID", "MODALITY", "STMO_NAME_IN_ADL"):
+        assert c in sql and c in DEID_COLUMNS
