@@ -71,6 +71,7 @@ print(len(linked["linked"]), "linked;", len(linked["no_images"]), "no images;", 
 ```
 
 ## 4. Request de-identified images (Mayo TSM)
+Order: build the cohort and the pool first (step 3: select the studies, link reports to images, count what is submittable), then choose the sample from the pool, and only then send this request. Request the selected studies only, not the whole pool.
 ```python
 from training.mayo.radiology_link import write_deid_request_csv
 # Mayo requires a CSV with STUDY_INSTANCE_UID, PATIENT_DK, MODALITY and STMO_NAME_IN_ADL for each selected study, sent to TSM
