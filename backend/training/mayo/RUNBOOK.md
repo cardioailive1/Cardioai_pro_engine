@@ -41,10 +41,18 @@ Answered by Mayo (Adam Resnick, 2026-10-28), with the OMOP CDM ETL Mapping Pipel
 - Work schema: yes, the project can write saved tables (for example `cardioai_work`); described in `My_First_Query.ipynb`, walked through in the data environment session.
 - From the OMOP guide: the `death` table has a date only (`cause_concept_id` always 0) and keeps a death only if its date + 60 days is after the person's last clinical event, so all-cause death is the only workable definition. An unknown birth year is stored as **1800** (month and day NULL): the code treats it as unknown, never as an age. The `measurement` table can hold two rows per lab result (one with a real concept, one with concept 0): match on the concept id and de-duplicate before counting. Diagnoses land in the CDM table that matches the standard concept's domain, not the source table.
 
+Answered by Mayo's ECG Data slides (3 Nov 2026):
+- `FACT_ECG` carries `PATIENT_DK`, and `DIM_PATIENT` holds both `PATIENT_CLINIC_NUMBER` and `PATIENT_DK`, so the waveform-to-ECG link in the join bullet above is confirmed: waveform `PATIENT_CLINIC_NUMBER` -> `DIM_PATIENT` -> `FACT_ECG.PATIENT_DK`, then `ACQUISITION_TS` = `ECG_DTM`. `ENCOUNTER_NUMBER` is available only after reaching `FACT_ECG`.
+- Use the physiological time: `ACQUISITION_TS` (bedside) and `FACT_ECG.ECG_DTM`. `DATA_AVAILABLE_DTM` and `ECG_DOCUMENT_UPDATE_DTM` are later filing times; do not use them for time-sensitive work such as outcome windows.
+- One ECG has several `FACT_ECG` rows: interpretation snippets are stored separately. Order `ECG_INTERPRET_TEXT` by `ECG_INTERPRET_SEQ_NBR`; study-level measurements repeat across those rows and are not separate ECG studies, so collapse to one row per ECG before counting.
+- Interpretation: the machine proposes codes and text, and the interpreting **cardiologist** (not the fellow) confirms, edits and signs in MUSE; validated results then flow to the platform. `ECG_INTERPRET_FULL_TEXT` is the combined, signed narrative. `ECG_INTERPRET_CODE_DK` / `DIM_ECG_INTERPRET_CODES` are machine-proposed codes confirmed or edited by the cardiologist. `ECG_INTERPRET_EXTENSION_TEXT` is cardiologist free text only. Searching codes alone misses clinician-added text.
+- Resting diagnostic ECGs only (not Holter or remote monitoring): `EKG_TYPE = 'resting'`, `WAVEFORM_TYPE = 'rhythm'`. 250 Hz = 2,500 samples per lead and 500 Hz = 5,000. Decode order: URL-decode, normalise Base64 (`%0A` is a line break), Base64-decode, read as `<i2`, multiply by 4.88. The four derived limb leads (III = II - I, aVR = -(I + II)/2, aVL = I - II/2, aVF = II - I/2) match `inference.ecg_leads.derive_twelve_lead`.
+- Heart rate exists in several columns (clinician-validated, cart-calculated, or computed from the signal); choose one on purpose and record which.
+
 Still waiting on Mayo (Tommy Stretch, Adam is on PTO until the end of the week):
 - [ ] ECG records per lead: is there exactly one `Rhythm` row per acquisition and lead? (Tommy)
-- [ ] Which `FACT_ECG` column holds the cardiologist over-read interpretation, and which column tells a confirmed read from a machine-only one (Tommy)
-- [x] The de-identification request still uses `PATIENT_DK` (Mayo MCP, 2 Nov: CSV of STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL, required before image access). Still open: whether `FACT_ECG` carries it
+- [ ] The over-read interpretation is `ECG_INTERPRET_FULL_TEXT` (3 Nov slides). Still ask Tommy: is there a column that tells a signed read from an unsigned or machine-only one, or does only signed data reach the platform?
+- [x] The de-identification request still uses `PATIENT_DK` (Mayo MCP, 2 Nov: CSV of STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL, required before image access). `FACT_ECG` also carries it (ECG slides, 3 Nov)
 
 Still to find out:
 - [ ] How `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (the sample rate) joins to the waveform rows
