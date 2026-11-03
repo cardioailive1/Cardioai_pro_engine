@@ -144,6 +144,18 @@ Plumbing only until there are hundreds of reviewed studies; do not quote results
 Only code, aggregate metrics (spot-check agreement, correlation) and approved model exports leave, via Mayo's export process. No report text, IDs, CSVs or images.
 
 
+## Linking waveforms to the clinical ECG (`training/mayo/ecg_fact_link.py`)
+```python
+from training.mayo.bq import query_rows
+from training.mayo.ecg_fact_link import (ecg_waveform_sql, fact_ecg_sql, group_waveform_acquisitions,
+                                         collapse_fact_ecg, link_waveform_to_fact_ecg)
+acq   = group_waveform_acquisitions(query_rows(ecg_waveform_sql("<project>.<dataset>")))   # resting rhythm rows, PATIENT_DK via DIM_PATIENT
+facts = collapse_fact_ecg(query_rows(fact_ecg_sql("<project>.<dataset>")))                  # several interpretation rows -> one ECG
+r = link_waveform_to_fact_ecg(acq, facts)       # ACQUISITION_TS = ECG_DTM; unmatched and ambiguous are listed, never guessed
+print(len(r["linked"]), "linked;", len(r["unmatched"]), "unmatched;", len(r["ambiguous"]), "ambiguous")
+```
+Each linked entry has `index_time` (the ECG time, never a filing time), the waveform `records` for `assemble_mayo_ecg`, and the collapsed clinical `ecg` (encounter, ordered interpretation text, codes). **(confirm the column names in the Workspace)**
+
 ## ECG -> MACE network
 
 1. Build `ecg_rows.csv` in the Workspace, one row per ECG: `patient_id` (PATIENT_CLINIC_NUMBER), `leads_json` (a JSON object `{"I": <WAVEFORM>, "II": ..., "V6": ...}` for the Rhythm recording, values exactly as stored), `sample_rate_hz` (ECGSAMPLEBASE), `label_window`, `age`, `sex_male`, `heart_rate_bpm`, `qt_interval_ms` (label_window from OMOP outcomes via `label_schema`; the last two columns feed the baseline). Skip any ECG that has more than one Rhythm record for a lead, and keep a count of them.
