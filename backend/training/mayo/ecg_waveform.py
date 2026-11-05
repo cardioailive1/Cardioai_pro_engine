@@ -14,7 +14,10 @@ CONFIRMED BY MAYO (Adam Resnick and Tommy Stretch, 2026-10-21) for FACT_ECG_WAVE
     (the 'median' type is one synthesized beat);
   * sample rate is ECGSAMPLEBASE in FACT_ECG_WAVEFORM_RESTING_MEASUREMENT (250 or 500 Hz);
     `resample` brings every ECG to one rate.
-Still unconfirmed: how the resting-measurement table joins to the waveform rows.
+Mayo (Tommy Stretch, 2026-11-05): usually one Rhythm record is the complete lead; occasionally a lead has several records for one
+acquisition. A record is COMPLETE when it holds the expected 2,500 or 5,000 samples. Complete records are never combined: identical
+copies are collapsed to one, different ones are refused (each is its own waveform). Partial records are refused, since there is no chunk
+order. The resting-measurement table (ECGSAMPLEBASE) joins to the waveform on PATIENT_DK and ACQUISITION_TS.
 
 The older generic helpers below (`decode_waveform`, `probe_waveform`) take the layout as
 explicit arguments and remain for other sources. A wrong layout produces plausible-looking
@@ -34,6 +37,7 @@ _DTYPES = {"int16": "i2", "int32": "i4", "float32": "f4", "float64": "f8"}
 MAYO_LEAD_IDS = ("I", "II", "V1", "V2", "V3", "V4", "V5", "V6")
 MAYO_UV_PER_COUNT = 4.88
 MAYO_FULL_RECORDING_TYPE = "rhythm"
+MAYO_COMPLETE_SAMPLES = (2500, 5000)   # 10 s at 250 or 500 Hz
 
 
 def b64_to_bytes(s: str) -> bytes:
@@ -104,8 +108,8 @@ def decode_mayo_lead(value: str) -> np.ndarray:
 def assemble_mayo_ecg(records: Iterable[dict]) -> np.ndarray:
     """records: dicts with LEAD_ID, WAVEFORM and (optionally) WAVEFORM_TYPE, all for ONE ECG acquisition.
     Keeps only 'Rhythm' records when a type is given. Returns (8, n) microvolts in the order I, II, V1-V6.
-    Refuses (ValueError) a missing lead, unequal lead lengths, or more than one record for a lead:
-    Mayo defines no order between records, so they must not be joined."""
+    Refuses (ValueError) a missing lead, unequal lead lengths, several partial records for a lead (no chunk order), or several
+    complete records that differ. Identical complete copies are collapsed to one."""
     by_lead: dict = {}
     for r in records:
         t = r.get("WAVEFORM_TYPE")
@@ -116,10 +120,17 @@ def assemble_mayo_ecg(records: Iterable[dict]) -> np.ndarray:
     missing = [l for l in MAYO_LEAD_IDS if l not in by_lead]
     if missing:
         raise ValueError(f"missing leads {missing}")
-    many = [l for l in MAYO_LEAD_IDS if len(by_lead[l]) > 1]
-    if many:
-        raise ValueError(f"more than one Rhythm record for leads {many}; Mayo defines no chunk order, inspect these rows")
-    sigs = [decode_mayo_lead(by_lead[l][0]) for l in MAYO_LEAD_IDS]
+    sigs = []
+    for l in MAYO_LEAD_IDS:
+        decoded = [decode_mayo_lead(v) for v in by_lead[l]]
+        if len(decoded) > 1:
+            complete = all(d.size in MAYO_COMPLETE_SAMPLES for d in decoded)
+            if not complete:
+                raise ValueError(f"lead {l}: several partial Rhythm records; Mayo defines no chunk order, so they are not joined")
+            if not all(np.array_equal(decoded[0], d) for d in decoded[1:]):
+                raise ValueError(f"lead {l}: several complete Rhythm records with different values; each is its own waveform, "
+                                 "so they are not combined. Inspect these rows")
+        sigs.append(decoded[0])
     if len({s.size for s in sigs}) != 1:
         raise ValueError(f"lead lengths differ: {[s.size for s in sigs]}")
     return np.vstack(sigs)

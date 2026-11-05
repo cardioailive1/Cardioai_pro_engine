@@ -46,3 +46,12 @@ def test_unmatched_and_ambiguous_are_reported_not_guessed():
 def test_sql_joins_dim_patient_and_filters_resting_rhythm():
     s = ecg_waveform_sql("p.d")
     assert "DIM_PATIENT" in s and "'rhythm'" in s and "'resting'" in s and "PATIENT_MERGED_FLAG = 'N'" in s
+
+
+def test_sample_rate_and_heart_rate_are_carried_through():
+    acq = group_waveform_acquisitions([{"PATIENT_DK": 7, "ACQUISITION_TS": T0, "LEAD_ID": "I", "WAVEFORM_TYPE": "rhythm",
+                                        "WAVEFORM": "x", "ECGSAMPLEBASE": 500}])
+    assert acq[0]["sample_rate_hz"] == 500.0
+    e = next(iter(collapse_fact_ecg([_fact(1, "a", HEART_RATE=72)]).values()))
+    assert e["heart_rate_bpm"] == 72.0
+    assert "FACT_ECG_WAVEFORM_RESTING_MEASUREMENT" in ecg_waveform_sql("p.d") and "e.HEART_RATE" in fact_ecg_sql("p.d")
