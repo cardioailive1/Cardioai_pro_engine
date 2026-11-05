@@ -19,8 +19,8 @@ Mayo (Adam Resnick, 2026-10-28) answered where LVEF is: FACT_ECHO_RESULTS holds 
 DIM_ECHO_TEST_RESULT_TYPE (ECHO_TEST_RESULT_NAME or ECHO_TEST_RESULT_DESCRIPTION), then the number is in ECHO_RESULT_VALUE.
 So call `echo_study_lvef(rows, lvef_column="ECHO_RESULT_VALUE", type_columns=["ECHO_TEST_RESULT_NAME",
 "ECHO_TEST_RESULT_DESCRIPTION"])`. `lvef_result_types` lists the matching types and counts so a person confirms which are really
-LVEF (and which method each is: biplane, visual, 3-D) before use; `keep` takes any extra row filter (for example on the exact
-ordered test from DIM_ECHO_TEST).
+LVEF (and which method each is: biplane, visual, 3-D) before use; `keep` takes any extra row filter. Note (Adam, 2026-11-04):
+DIM_ECHO_TEST is only a lookup of test types and holds nothing about a specific exam, so it cannot pick the exact study.
 
 Still to confirm (not decided here): whether one study holds several LVEF types (`multi_value` says what to do if it does:
 median, or mean), which of them to prefer, and the `max_days_before` window (default 365).

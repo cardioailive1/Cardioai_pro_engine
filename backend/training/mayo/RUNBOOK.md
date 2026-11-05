@@ -35,7 +35,7 @@ Answered by Mayo (Adam Resnick and Tommy Stretch, 2026-10-21):
 Answered by Mayo (Adam Resnick, 2026-10-28), with the OMOP CDM ETL Mapping Pipeline Guide (also in the Resource Hub):
 - OMOP `person_id`: `person.person_source_value` is `DIM_PATIENT.PATIENT_CLINIC_NUMBER`. Join OMOP to the FACT tables on that, never on `person_id` alone. (From the 15 Oct 2026 release the ETL uses `PATIENT_CLINIC_NUMBER` because `PATIENT_DK` is deprecated in some MCP tables.)
 - Echo LVEF: filter `FACT_ECHO_RESULTS` to LVEF rows using `DIM_ECHO_TEST_RESULT_TYPE.ECHO_TEST_RESULT_NAME` or `.ECHO_TEST_RESULT_DESCRIPTION`; the number is `ECHO_RESULT_VALUE`. Several LVEF-type rows can exist for one study (method by result type); `lvef_result_types` lists them so a person confirms which to use.
-- Echo same-day studies: `FACT_ECHO_TEST.ECHO_PERFORMED_TEST_DK` joins to `DIM_ECHO_TEST` for the exact ordered test; its study description matches the exact DICOM study.
+- Echo same-day studies: superseded by Adam's 4 Nov answer below (`DIM_ECHO_TEST` is only a lookup of test types, so it cannot pick the exact study).
 - Echo DICOM: listed in `FACT_RADIOLOGY_DICOM_INVENTORY` with `MODALITY = 'US'`; find echo in `STUDY_DESCRIPTION` (`radiology_link.echo_dicom_study_sql`).
 - SQL: Mayo (Adam Resnick, 28 Oct): "They use BigQuery client to enable SQL queries against your provisioned data." The Workspace uses the **BigQuery client** to run SQL against the provisioned data, so the project SQL is BigQuery Standard SQL (`training/mayo/bq.query_rows`, dataset as `project.dataset`, tables in backticks).
 - Work schema: yes, the project can write saved tables (for example `cardioai_work`); described in `My_First_Query.ipynb`, walked through in the data environment session.
@@ -55,12 +55,23 @@ Answered by Mayo (Tommy Stretch, 2026-11-05):
 - Every ECG interpretation on the platform was reviewed and signed by a cardiologist in MUSE before it came over; `ECG_INTERPRET_FULL_TEXT` can be the same report as in MUSE. No signed or unsigned flag is needed.
 - Heart rate: use `FACT_ECG.HEART_RATE`, the final clinician-validated value (`ecg_fact_link` returns it as `heart_rate_bpm`).
 
-Still waiting on Mayo (Adam: imaging and echo questions):
+Answered by Mayo (Adam Resnick, 2026-11-04):
+- `PATIENT_DK` for the de-identification CSV comes from `DIM_PATIENT` through `PATIENT_CLINIC_NUMBER` (`PATIENT_MERGED_FLAG = 'N'`). Confirmed.
+- Which echo `STUDY_DESCRIPTION` or procedure values count as a transthoracic echo is **our decision**. Use the Term Finder tool in the My First Query notebook (`/data/intro/Introduction_Notebooks/Accelerate`) to find the right ones for our criteria, then have the clinical lead approve the list.
+- Same-day echo matching: **correction to the 28 Oct note.** `DIM_ECHO_TEST` is a lookup table for the test type; it holds no information for a specific patient or exam, so `ECHO_PERFORMED_TEST_DK` -> `DIM_ECHO_TEST` cannot identify the exact DICOM study. Do not rely on it. Mayo will discuss this further (4 Nov afternoon).
+- Which LVEF result types to prefer is up to our team (`lvef_result_types` lists them).
+- The project and dataset names are in the My First Query notebook outline, and Mayo will also send them by email.
+- OMOP concepts: the `CONCEPT` table is in BigQuery and many codes map to standard vocabularies (LOINC, SNOMED and others). See the Concept Reference tab of the OMOP CDM ETL Mapping Pipeline Guide. Mayo will run an ATLAS training (it has concept search); https://omophub.com/tools/concept-lookup is an online reference.
+
+Still open:
+- [ ] How to match the exact same-day echo study to its DICOM images (Adam: to be discussed with Mayo)
+- [ ] Pick the echo `STUDY_DESCRIPTION` values with Term Finder and get the clinical lead to approve them
+- [ ] Pick which LVEF result types to use (our team)
+- [ ] Read the project and dataset names from the My First Query notebook or Mayo's email
 - [x] The de-identification request still uses `PATIENT_DK` (Mayo MCP, 2 Nov: CSV of STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL, required before image access). `FACT_ECG` also carries it (ECG slides, 3 Nov)
 
 Still to find out:
-- [ ] Whether one echo study holds several LVEF result types (biplane, visual, 3-D) and which to prefer; the exact `ECHO_TEST_RESULT_NAME` values (run `lvef_result_types`)
-- [ ] OMOP concept IDs for `training/omop_adapter.py` (CONCEPT table / Schema Visualizer)
+- [ ] OMOP concept IDs for `training/omop_adapter.py`: look them up in the `CONCEPT` table, the Concept Reference tab, ATLAS or omophub
 - [ ] Check one decoded Rhythm trace by eye against the signed ECG report, (the loader collapses identical complete duplicates and refuses other duplicates)
 
 ```python
@@ -90,7 +101,7 @@ from training.mayo.radiology_link import write_deid_request_csv
 selected_rows = rows   # filter to the studies you chose
 print(write_deid_request_csv(selected_rows, "deid_request.csv"))   # written count + rejected rows with reasons
 ```
-Where PATIENT_DK comes from: Mayo's Radiology slides (2 Nov) list `PATIENT_CLINIC_NUMBER` on the DICOM inventory, the header storage and `FACT_IMAGINGSTUDY`, not `PATIENT_DK`. The step 3 query therefore joins `DIM_PATIENT` on `PATIENT_CLINIC_NUMBER` (with `PATIENT_MERGED_FLAG = 'N'` for one row per patient) to get it. **(confirm in the Workspace)**
+Where PATIENT_DK comes from: Mayo's Radiology slides (2 Nov) list `PATIENT_CLINIC_NUMBER` on the DICOM inventory, the header storage and `FACT_IMAGINGSTUDY`, not `PATIENT_DK`. The step 3 query therefore joins `DIM_PATIENT` on `PATIENT_CLINIC_NUMBER` (with `PATIENT_MERGED_FLAG = 'N'` for one row per patient) to get it. **(confirmed by Mayo, 4 Nov)**
 Send `deid_request.csv` to TSM. The file must go before image access is granted; the writer refuses rows with a missing value or an image status other than Ready or Available, and removes duplicate studies. Images arrive later; steps 5-9 work on report text meanwhile **(confirm reports are readable now)**.
 
 ## 5. Automatic annotation
