@@ -9,6 +9,9 @@ From Mayo's ECG Data slides (3 Nov 2026):
     values repeat across them, so the rows are collapsed to ONE ECG before anything is counted.
   * Use the physiological time (ACQUISITION_TS / ECG_DTM). DATA_AVAILABLE_DTM and ECG_DOCUMENT_UPDATE_DTM are later
     filing times and are never used as the ECG time (outcome windows start at the ECG time).
+  * Mayo (Tommy Stretch, 5 Nov): every interpretation on the platform was reviewed and signed by a cardiologist in MUSE, and the
+    resting measurement (ECGSAMPLEBASE) joins the waveform on PATIENT_DK and ACQUISITION_TS. Heart rate: use FACT_ECG.HEART_RATE
+    (the final clinician-validated value).
   * The interpretation is machine-proposed, then confirmed, edited and signed by the cardiologist in MUSE.
 Column names are as shown in the slides; confirm them in the Workspace. The SQL runs through the BigQuery client (bq.py).
 """
@@ -26,9 +29,11 @@ def ecg_waveform_sql(schema: str = "") -> str:
     """Resting rhythm waveform rows (one row per lead, decoded on its own), with PATIENT_DK from DIM_PATIENT."""
     T = lambda t: table_ref(schema, t)
     return f"""
-SELECT w.ECG_WAVEFORM_FPK, w.PATIENT_CLINIC_NUMBER, p.PATIENT_DK, w.ACQUISITION_TS, w.LEAD_ID, w.WAVEFORM_TYPE, w.WAVEFORM
+SELECT w.ECG_WAVEFORM_FPK, w.PATIENT_CLINIC_NUMBER, p.PATIENT_DK, w.ACQUISITION_TS, w.LEAD_ID, w.WAVEFORM_TYPE, w.WAVEFORM,
+       m.ECGSAMPLEBASE
 FROM {T("FACT_ECG_WAVEFORM")} w
 JOIN {T("DIM_PATIENT")} p ON p.PATIENT_CLINIC_NUMBER = w.PATIENT_CLINIC_NUMBER AND p.PATIENT_MERGED_FLAG = 'N'
+LEFT JOIN {T("FACT_ECG_WAVEFORM_RESTING_MEASUREMENT")} m ON m.PATIENT_DK = p.PATIENT_DK AND m.ACQUISITION_TS = w.ACQUISITION_TS
 WHERE LOWER(w.WAVEFORM_TYPE) = 'rhythm' AND LOWER(w.EKG_TYPE) = 'resting'
 """.strip()
 
@@ -37,7 +42,7 @@ def fact_ecg_sql(schema: str = "") -> str:
     """FACT_ECG interpretation rows (several per ECG). Filing times are deliberately not selected."""
     T = lambda t: table_ref(schema, t)
     return f"""
-SELECT e.PATIENT_DK, e.ECG_DTM, e.ENCOUNTER_NUMBER, e.ECG_INTERPRET_SEQ_NBR, e.ECG_INTERPRET_TEXT,
+SELECT e.PATIENT_DK, e.ECG_DTM, e.ENCOUNTER_NUMBER, e.HEART_RATE, e.ECG_INTERPRET_SEQ_NBR, e.ECG_INTERPRET_TEXT,
        e.ECG_INTERPRET_FULL_TEXT, e.ECG_INTERPRET_CODE_DK, e.ECG_INTERPRET_EXTENSION_TEXT
 FROM {T("FACT_ECG")} e
 """.strip()
@@ -69,7 +74,9 @@ def group_waveform_acquisitions(rows: Iterable[dict]) -> list:
             continue
         key = (str(r.get("PATIENT_DK")), ts)
         g = out.setdefault(key, {"PATIENT_DK": str(r.get("PATIENT_DK")), "PATIENT_CLINIC_NUMBER": r.get("PATIENT_CLINIC_NUMBER"),
-                                 "acquisition_ts": ts, "records": []})
+                                 "acquisition_ts": ts, "records": [], "sample_rate_hz": None})
+        if r.get("ECGSAMPLEBASE") not in (None, ""):
+            g["sample_rate_hz"] = float(r["ECGSAMPLEBASE"])
         g["records"].append({"LEAD_ID": r["LEAD_ID"], "WAVEFORM_TYPE": r["WAVEFORM_TYPE"], "WAVEFORM": r["WAVEFORM"]})
     return list(out.values())
 
@@ -91,7 +98,8 @@ def collapse_fact_ecg(rows: Iterable[dict]) -> dict:
         enc = {r.get("ENCOUNTER_NUMBER") for r in rs if r.get("ENCOUNTER_NUMBER") not in (None, "")}
         codes = sorted({str(r["ECG_INTERPRET_CODE_DK"]) for r in rs if r.get("ECG_INTERPRET_CODE_DK") not in (None, "")})
         out[key] = {"PATIENT_DK": key[0], "ecg_time": key[1], "ENCOUNTER_NUMBER": next(iter(enc)) if len(enc) == 1 else None,
-                    "encounter_conflict": len(enc) > 1, "interpretation_snippets": snippets, "interpretation_full_text": full,
+                    "encounter_conflict": len(enc) > 1,
+                    "heart_rate_bpm": next((float(r["HEART_RATE"]) for r in rs if r.get("HEART_RATE") not in (None, "")), None), "interpretation_snippets": snippets, "interpretation_full_text": full,
                     "interpretation_code_dks": codes,
                     "extension_text": next((r["ECG_INTERPRET_EXTENSION_TEXT"] for r in rs if r.get("ECG_INTERPRET_EXTENSION_TEXT")), None),
                     "source_rows": len(rs)}

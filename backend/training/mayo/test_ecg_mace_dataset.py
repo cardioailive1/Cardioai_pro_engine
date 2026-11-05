@@ -97,3 +97,14 @@ def test_build_examples_from_mayo_rows_mixed_rates():
     ex, skipped = build_examples(rows, length=5000, target_rate_hz=500)
     assert [e["x"].shape for e in ex] == [(12, 5000), (12, 5000)]
     assert skipped["bad_waveform"] == 1
+
+
+def test_complete_duplicate_records_collapse_if_identical_and_refuse_if_different():
+    import pytest
+    from training.mayo.ecg_waveform import assemble_mayo_ecg
+    full = {"LEAD_ID": "I", "WAVEFORM_TYPE": "Rhythm", "WAVEFORM": _mayo_value(np.ones(2500))}
+    base = [{"LEAD_ID": l, "WAVEFORM_TYPE": "Rhythm", "WAVEFORM": _mayo_value(np.ones(2500))} for l in ("I", "II", "V1", "V2", "V3", "V4", "V5", "V6")]
+    assert assemble_mayo_ecg(base + [full]).shape == (8, 2500)          # identical complete copy: one waveform
+    other = dict(full, WAVEFORM=_mayo_value(np.zeros(2500)))
+    with pytest.raises(ValueError, match="different values"):          # complete but different: never combined
+        assemble_mayo_ecg(base + [other])

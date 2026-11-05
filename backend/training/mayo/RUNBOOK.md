@@ -49,16 +49,19 @@ Answered by Mayo's ECG Data slides (3 Nov 2026):
 - Resting diagnostic ECGs only (not Holter or remote monitoring): `EKG_TYPE = 'resting'`, `WAVEFORM_TYPE = 'rhythm'`. 250 Hz = 2,500 samples per lead and 500 Hz = 5,000. Decode order: URL-decode, normalise Base64 (`%0A` is a line break), Base64-decode, read as `<i2`, multiply by 4.88. The four derived limb leads (III = II - I, aVR = -(I + II)/2, aVL = I - II/2, aVF = II - I/2) match `inference.ecg_leads.derive_twelve_lead`.
 - Heart rate exists in several columns (clinician-validated, cart-calculated, or computed from the signal); choose one on purpose and record which.
 
-Still waiting on Mayo (Tommy Stretch, Adam is on PTO until the end of the week):
-- [ ] ECG records per lead: is there exactly one `Rhythm` row per acquisition and lead? (Tommy)
-- [ ] The over-read interpretation is `ECG_INTERPRET_FULL_TEXT` (3 Nov slides). Still ask Tommy: is there a column that tells a signed read from an unsigned or machine-only one, or does only signed data reach the platform?
+Answered by Mayo (Tommy Stretch, 2026-11-05):
+- Rhythm records: usually one record is the complete waveform for a lead. Occasionally a lead has several records for one acquisition. If they are partial, aggregation may be appropriate; if each holds the expected 2,500 or 5,000 samples, treat each as a complete waveform and do not combine. The loader collapses identical complete copies, refuses complete records that differ, and refuses partial records (there is still no chunk order).
+- `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (`ECGSAMPLEBASE`) joins `FACT_ECG_WAVEFORM` on `PATIENT_DK` and `ACQUISITION_TS` (`ecg_fact_link.ecg_waveform_sql` does this and returns `ECGSAMPLEBASE`).
+- Every ECG interpretation on the platform was reviewed and signed by a cardiologist in MUSE before it came over; `ECG_INTERPRET_FULL_TEXT` can be the same report as in MUSE. No signed or unsigned flag is needed.
+- Heart rate: use `FACT_ECG.HEART_RATE`, the final clinician-validated value (`ecg_fact_link` returns it as `heart_rate_bpm`).
+
+Still waiting on Mayo (Adam: imaging and echo questions):
 - [x] The de-identification request still uses `PATIENT_DK` (Mayo MCP, 2 Nov: CSV of STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL, required before image access). `FACT_ECG` also carries it (ECG slides, 3 Nov)
 
 Still to find out:
-- [ ] How `FACT_ECG_WAVEFORM_RESTING_MEASUREMENT` (the sample rate) joins to the waveform rows
 - [ ] Whether one echo study holds several LVEF result types (biplane, visual, 3-D) and which to prefer; the exact `ECHO_TEST_RESULT_NAME` values (run `lvef_result_types`)
 - [ ] OMOP concept IDs for `training/omop_adapter.py` (CONCEPT table / Schema Visualizer)
-- [ ] Check one decoded Rhythm trace by eye against the signed ECG report, and confirm there is exactly one Rhythm record per lead (the loader refuses any lead that has several)
+- [ ] Check one decoded Rhythm trace by eye against the signed ECG report, (the loader collapses identical complete duplicates and refuses other duplicates)
 
 ```python
 from training.mayo.ecg_waveform import assemble_mayo_ecg, resample
