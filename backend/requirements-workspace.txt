@@ -1,0 +1,18 @@
+# Minimal, version-flexible dependencies for running the training/mayo code inside a Mayo Clinic Platform Workspace.
+# Use this instead of requirements.txt (the web service: FastAPI, Postgres, boto3 and so on) and instead of the pinned
+# requirements-training.txt, whose exact torch pin may not exist on the Workspace's package index.
+#
+#   pip install -r requirements-workspace.txt
+#
+# Install in two steps if one fails, so numpy always lands first:
+#   pip install numpy && pip install -r requirements-workspace.txt
+numpy>=1.26
+pydicom>=3.0
+scikit-learn>=1.5
+
+# torch and torchvision must come from the same release; pip picks a matching pair from whatever the index offers.
+torch>=2.5
+torchvision>=0.20
+
+# Usually already present in the Workspace notebooks; remove this line if the index refuses it.
+google-cloud-bigquery>=3.0
