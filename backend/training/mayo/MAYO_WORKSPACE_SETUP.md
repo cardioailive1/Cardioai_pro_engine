@@ -81,3 +81,9 @@ Source: email from Adam Resnick (Mayo Clinic Platform), 2026-10-14.
    (3D Slicer/OHIF); GPU pre-drawing runs on the A100.
 3. Fill the OMOP concept_ids in `training/omop_adapter.py` from the Workspace CONCEPT table.
 4. Keep PHI out of this repo: report text stays in the Workspace; only code leaves.
+
+## Installing the Python packages
+Use `pip install -r requirements-workspace.txt` from `backend/` (not `requirements.txt`, which is the web service, and not the pinned
+`requirements-training.txt`). If `torch==2.5.1` is not offered on the Workspace's package index, the pinned file fails and installs nothing,
+which then shows up as `ModuleNotFoundError: No module named 'numpy'`. The workspace file lets pip choose a torch release the index has.
+Install `numpy` first if you only need the label and ECG code: `pip install numpy`.
