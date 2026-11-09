@@ -136,6 +136,18 @@ def assemble_mayo_ecg(records: Iterable[dict]) -> np.ndarray:
     return np.vstack(sigs)
 
 
+def resolve_sample_rate(n_samples: int, labeled_hz=None, duration_s: float = 10.0, allowed=(250, 500)) -> Optional[int]:
+    """Sample rate of one resting ECG, taken from its length: Mayo resting ECGs are `duration_s` long, so rate = n_samples / duration_s.
+    Checked on 484 Workspace acquisitions (9 Nov 2026): ECGSAMPLEBASE was 500 for 57 recordings that held 2500 samples and had a
+    physiological heart rate only at 250 Hz, and was 0 or missing for others. The label is therefore NOT trusted over the length.
+    Returns None when the length does not give an allowed rate (the ECG should be excluded and counted)."""
+    rate = n_samples / duration_s
+    for a in allowed:
+        if abs(rate - a) <= 0.01 * a:
+            return int(a)
+    return None
+
+
 def resample(sig: np.ndarray, src_hz: float, dst_hz: float) -> np.ndarray:
     """(leads, n) at src_hz -> (leads, n') at dst_hz. Whole-number downsampling averages blocks; everything else interpolates linearly."""
     if src_hz <= 0 or dst_hz <= 0:

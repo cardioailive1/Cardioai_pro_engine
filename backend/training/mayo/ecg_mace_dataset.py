@@ -20,7 +20,7 @@ import numpy as np
 
 from training.label_schema import LabelWindow
 from inference.ecg_leads import derive_twelve_lead
-from training.mayo.ecg_waveform import assemble_mayo_ecg, decode_waveform, resample
+from training.mayo.ecg_waveform import assemble_mayo_ecg, decode_waveform, resample, resolve_sample_rate
 
 
 FEATURE_COLUMNS = ("heart_rate_bpm", "qt_interval_ms", "hrv_sdnn_ms")   # optional, for the baseline
@@ -57,9 +57,10 @@ def build_examples(rows, *, length: int = 5000, leads=None, target_rate_hz: floa
             if "leads" in r or "records" in r:
                 recs = r.get("records") or [{"LEAD_ID": k, "WAVEFORM": v} for k, v in r["leads"].items()]
                 sig = assemble_mayo_ecg(recs)
-                if not r.get("sample_rate_hz"):
-                    raise ValueError("sample_rate_hz (ECGSAMPLEBASE) is required")
-                sig = resample(sig, float(r["sample_rate_hz"]), target_rate_hz)
+                src_hz = resolve_sample_rate(sig.shape[1], r.get("sample_rate_hz"))   # from the length, not the ECGSAMPLEBASE label
+                if src_hz is None:
+                    raise ValueError(f"{sig.shape[1]} samples is not a 10 s ECG at 250 or 500 Hz")
+                sig = resample(sig, src_hz, target_rate_hz)
             else:
                 sig = decode_waveform(r["waveform_b64"], **layout)
             if sig.shape[0] == 8:                      # Mayo stores I, II, V1-V6 only; rebuild the standard 12
