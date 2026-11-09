@@ -108,3 +108,26 @@ def test_complete_duplicate_records_collapse_if_identical_and_refuse_if_differen
     other = dict(full, WAVEFORM=_mayo_value(np.zeros(2500)))
     with pytest.raises(ValueError, match="different values"):          # complete but different: never combined
         assemble_mayo_ecg(base + [other])
+
+
+def test_resolve_sample_rate_trusts_length_over_label():
+    from training.mayo.ecg_waveform import resolve_sample_rate
+    assert resolve_sample_rate(5000, 500) == 500
+    assert resolve_sample_rate(2500, 250) == 250
+    assert resolve_sample_rate(2500, 500) == 250      # seen in the Workspace: labelled 500, really 250 Hz
+    assert resolve_sample_rate(2500, 0) == 250        # label 0
+    assert resolve_sample_rate(5000, None) == 500     # no measurement row
+    assert resolve_sample_rate(3000, 500) is None     # not a 10 s ECG at an allowed rate
+
+
+def test_build_examples_uses_length_when_label_is_wrong_or_missing():
+    from training.label_schema import LabelWindow
+    rows = []
+    for pid, label, n in (("a", 500, 2500), ("b", 0, 2500), ("c", None, 5000), ("d", 500, 3000)):
+        recs = _mayo_records(n)
+        rows.append({"patient_id": pid, "leads": {r["LEAD_ID"]: r["WAVEFORM"] for r in recs}, "sample_rate_hz": label,
+                     "label_window": LabelWindow.NONE_OBSERVED.value})
+    ex, skipped = build_examples(rows, length=5000, target_rate_hz=500)
+    assert [e["patient_id"] for e in ex] == ["a", "b", "c"]
+    assert all(e["x"].shape == (12, 5000) for e in ex)
+    assert skipped["bad_waveform"] == 1
