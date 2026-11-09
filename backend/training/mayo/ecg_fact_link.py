@@ -10,7 +10,8 @@ From Mayo's ECG Data slides (3 Nov 2026):
   * Use the physiological time (ACQUISITION_TS / ECG_DTM). DATA_AVAILABLE_DTM and ECG_DOCUMENT_UPDATE_DTM are later
     filing times and are never used as the ECG time (outcome windows start at the ECG time).
   * Mayo (Tommy Stretch, 5 Nov): every interpretation on the platform was reviewed and signed by a cardiologist in MUSE, and the
-    resting measurement (ECGSAMPLEBASE) joins the waveform on PATIENT_DK and ACQUISITION_TS. Heart rate: use FACT_ECG.HEART_RATE
+    resting measurement (ECGSAMPLEBASE) joins the waveform on the patient and ACQUISITION_TS. In the Workspace dataset
+    (verified 9 Nov 2026) FACT_ECG_WAVEFORM_RESTING_MEASUREMENT has no PATIENT_DK; it joins on PATIENT_CLINIC_NUMBER + ACQUISITION_TS. Heart rate: use FACT_ECG.HEART_RATE
     (the final clinician-validated value).
   * The interpretation is machine-proposed, then confirmed, edited and signed by the cardiologist in MUSE.
 Column names are as shown in the slides; confirm them in the Workspace. The SQL runs through the BigQuery client (bq.py).
@@ -30,10 +31,10 @@ def ecg_waveform_sql(schema: str = "") -> str:
     T = lambda t: table_ref(schema, t)
     return f"""
 SELECT w.ECG_WAVEFORM_FPK, w.PATIENT_CLINIC_NUMBER, p.PATIENT_DK, w.ACQUISITION_TS, w.LEAD_ID, w.WAVEFORM_TYPE, w.WAVEFORM,
-       m.ECGSAMPLEBASE
+       m.ECGSAMPLEBASE, m.ECGSAMPLEEXPONENT
 FROM {T("FACT_ECG_WAVEFORM")} w
 JOIN {T("DIM_PATIENT")} p ON p.PATIENT_CLINIC_NUMBER = w.PATIENT_CLINIC_NUMBER AND p.PATIENT_MERGED_FLAG = 'N'
-LEFT JOIN {T("FACT_ECG_WAVEFORM_RESTING_MEASUREMENT")} m ON m.PATIENT_DK = p.PATIENT_DK AND m.ACQUISITION_TS = w.ACQUISITION_TS
+LEFT JOIN {T("FACT_ECG_WAVEFORM_RESTING_MEASUREMENT")} m ON m.PATIENT_CLINIC_NUMBER = w.PATIENT_CLINIC_NUMBER AND m.ACQUISITION_TS = w.ACQUISITION_TS
 WHERE LOWER(w.WAVEFORM_TYPE) = 'rhythm' AND LOWER(w.EKG_TYPE) = 'resting'
 """.strip()
 
