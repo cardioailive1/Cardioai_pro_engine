@@ -181,7 +181,8 @@ Each linked entry has `index_time` (the ECG time, never a filing time), the wave
 
 ## ECG -> MACE network
 
-1. Build `ecg_rows.csv` in the Workspace, one row per ECG: `patient_id` (PATIENT_CLINIC_NUMBER), `leads_json` (a JSON object `{"I": <WAVEFORM>, "II": ..., "V6": ...}` for the Rhythm recording, values exactly as stored), `sample_rate_hz` (ECGSAMPLEBASE), `label_window`, `age`, `sex_male`, `heart_rate_bpm`, `qt_interval_ms` (label_window from OMOP outcomes via `label_schema`; the last two columns feed the baseline). Skip any ECG that has more than one Rhythm record for a lead, and keep a count of them.
+0. No image request is needed for this model. The ECG waveforms and labels are tables in the Workspace; the TSM de-identified-image request (step 4) is only for radiology / echo images (the LVEF image model).
+1. Build `ecg_rows.csv` in the Workspace, one row per ECG: `patient_id` (PATIENT_CLINIC_NUMBER), `leads_json` (a JSON object `{"I": <WAVEFORM>, "II": ..., "V6": ...}` for the Rhythm recording, values exactly as stored), `sample_rate_hz`, `label_window`, `age`, `sex_male`, `heart_rate_bpm`, `qt_interval_ms`. Take `sample_rate_hz` from the waveform length (`resolve_sample_rate`: 5000 samples = 500 Hz, 2500 = 250 Hz), NOT from `ECGSAMPLEBASE`: in a 484-ECG check, 57 labelled 500 Hz were really 250 Hz. `label_window` comes from `mace_label_rules.mace_label_sql` (positive = first MI/stroke/death 30-89 days after the ECG; imminent, prior-event and no-follow-up ECGs are excluded), then the audit below. Death is `FACT_MORTALITY_STATUS` (OMOP `death` holds only about 10% of deaths). Skip any ECG that has more than one Rhythm record for a lead, and keep a count of them. Split by patient and cap ECGs per patient.
 2. Train both variants (12-lead and the single-lead wearable proxy). `--sample-rate` is the common rate every ECG is resampled to:
    `python -m training.train_ecg_mace_mayo --rows ecg_rows.csv --mayo-leads --sample-rate 500 --out weights`
 3. Read the printed network-vs-baseline comparison and `weights/cutoff_proposals_*.json`. Only these aggregates leave the Workspace.
@@ -205,7 +206,9 @@ Heart failure changes MACE risk, so the most recent EARLIER echo LVEF is added t
 
 Module: `training/mayo/mace_label_audit.py`. Run inside the Workspace; the files hold patient-level evidence.
 
-1. Rebuild records with the current `omop_adapter.build_mace_records` (they now carry `index_date`).
+0. Sample and records: `audit_sample_sql` / `build_audit_records` (`mace_audit_sample.py`) draw a stratified one-ECG-per-patient sample (about 700) and build the records and evidence. This is a SAMPLE audit: it measures how often the rule agrees with reviewers; systematic errors are fixed in the rule, not by hand.
+0b. Corroboration (`mace_corroboration.py`): `corroboration_sql` + `tier_records` tier each positive as corroborated (elevated troponin or PCI/CABG for MI, brain imaging for stroke, consensus source for death), conflict, or code_only. Send only conflict, code_only and flagged rows to the data scientists; the cardiologist sample stays.
+1. Records come from step 0 (they carry `index_date`).
 2. `items = build_review_items(records, condition_rows, death_rows, mapping, visit_rows)` collects the OMOP evidence per record.
 3. `aa = auto_audit(items)` (required; the later steps refuse to run without it): automatic checks (death with no usable cause, event after death, window within a week of 30/90 days, single supporting code, non-inpatient setting, MI+stroke together, prior event at the washout edge, code present but labeled no event).
 4. Tier 1: `export_ds_audit(items, "ds.csv", aa)`. Each data scientist fills `ds_decision` (agree / disagree / uncertain / exclude); for disagree add `ds_event_type` (none, myocardial_infarction, stroke, all_cause_death, or cardiovascular_death if the batch uses that definition) and `ds_days_to_event`. Optional lighter pass: `triage_ds_scope` (always keeps events and non-pass records).
