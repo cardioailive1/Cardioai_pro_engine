@@ -78,3 +78,13 @@ def test_stroke_vs_mi_and_non_sample_classes():
     assert recs[0].event_type.value == "stroke"
     with pytest.raises(ValueError, match="not part of the audit sample"):
         build_audit_records([row("P1", 1, "4_excluded_imminent_0_30d")], [], [], MI, STROKE)
+
+
+def test_type_comes_from_inpatient_er_codes_only_when_visits_are_given():
+    rows = [row("P1", 1, POSITIVE, 85, "condition")]
+    conds = [cond(1, 312327, 85, 10), cond(1, 443454, 85, 11)]       # outpatient MI + inpatient stroke on the event day
+    visits = [{"visit_occurrence_id": 10, "visit_concept_id": 9202}, {"visit_occurrence_id": 11, "visit_concept_id": 9201}]
+    recs, _, _ = build_audit_records(rows, conds, [], MI, STROKE, visits)
+    assert recs[0].event_type.value == "stroke"
+    recs, _, _ = build_audit_records(rows, conds, [], MI, STROKE)      # old behaviour without visit rows
+    assert recs[0].event_type.value == "myocardial_infarction"

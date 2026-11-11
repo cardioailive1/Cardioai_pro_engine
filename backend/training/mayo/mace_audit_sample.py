@@ -27,7 +27,7 @@ from training.label_schema import MACEEventType, MACELabelRecord
 from training.omop_adapter import OMOPConceptMapping, _to_date
 
 from .bq import table_ref
-from .mace_label_rules import HORIZON_DAYS, NEGATIVE, POSITIVE, mace_label_sql
+from .mace_label_rules import HORIZON_DAYS, INPATIENT_ER_VISIT_CONCEPTS, NEGATIVE, POSITIVE, mace_label_sql
 
 DEFAULT_PER_STRATUM = {"pos_condition": 200, "pos_death": 200, "negative": 300}
 _SAFE = re.compile(r"^[A-Za-z0-9_\-]+$")
@@ -115,11 +115,16 @@ def audit_mapping(mi_ids: Iterable[int], stroke_ids: Iterable[int]) -> OMOPConce
                               stroke_condition_concept_ids=set(map(int, stroke_ids)), death_definition="all_cause")
 
 
-def build_audit_records(sample_rows: list, condition_rows: list, death_rows: list, mi_ids: Iterable[int], stroke_ids: Iterable[int]):
+def build_audit_records(sample_rows: list, condition_rows: list, death_rows: list, mi_ids: Iterable[int], stroke_ids: Iterable[int],
+                        visit_rows: Optional[list] = None):
     """-> (records, condition_rows_by_pcn, death_rows) ready for `build_review_items`.
     A positive condition record takes MI or stroke from the code on the event day (MI if both); a record with no code on that day
-    is a data error and raises.  Negatives carry 90 days of confirmed follow-up (LabelValidator needs >= 90)."""
+    is a data error and raises.  Pass `visit_rows` (visit_occurrence_id, visit_concept_id from `evidence_sql`) so only inpatient / ER
+    codes decide the type, as in the labeling rule; without it, an outpatient MI code on the same day as an inpatient stroke would
+    wrongly make the record an MI.  Negatives carry 90 days of confirmed follow-up (LabelValidator needs >= 90)."""
     mi, stroke = set(map(int, mi_ids)), set(map(int, stroke_ids))
+    ip_visits = None if visit_rows is None else {str(v["visit_occurrence_id"]) for v in visit_rows
+                                                 if int(v["visit_concept_id"]) in INPATIENT_ER_VISIT_CONCEPTS}
     pcn_of = {str(r["person_id"]): str(r["pcn"]) for r in sample_rows}
     conds = [{**c, "person_id": pcn_of[str(c["person_id"])]} for c in condition_rows if str(c["person_id"]) in pcn_of]
     by_pcn: dict = {}
@@ -135,7 +140,8 @@ def build_audit_records(sample_rows: list, condition_rows: list, death_rows: lis
             if r.get("positive_kind") == "death":
                 et = MACEEventType.ALL_CAUSE_DEATH
             else:
-                on_day = {int(c["condition_concept_id"]) for c in by_pcn.get(pcn, []) if (_to_date(c["condition_start_date"]) - d0).days == days}
+                on_day = {int(c["condition_concept_id"]) for c in by_pcn.get(pcn, []) if (_to_date(c["condition_start_date"]) - d0).days == days
+                          and (ip_visits is None or str(c.get("visit_occurrence_id")) in ip_visits)}
                 if on_day & mi:
                     et = MACEEventType.MYOCARDIAL_INFARCTION
                 elif on_day & stroke:
