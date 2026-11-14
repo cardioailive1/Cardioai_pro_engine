@@ -185,6 +185,19 @@ Each linked entry has `index_time` (the ECG time, never a filing time), the wave
 1. Build `ecg_rows.csv` in the Workspace, one row per ECG: `patient_id` (PATIENT_CLINIC_NUMBER), `leads_json` (a JSON object `{"I": <WAVEFORM>, "II": ..., "V6": ...}` for the Rhythm recording, values exactly as stored), `sample_rate_hz`, `label_window`, `age`, `sex_male`, `heart_rate_bpm`, `qt_interval_ms`. Take `sample_rate_hz` from the waveform length (`resolve_sample_rate`: 5000 samples = 500 Hz, 2500 = 250 Hz), NOT from `ECGSAMPLEBASE`: in a 484-ECG check, 57 labelled 500 Hz were really 250 Hz. `label_window` comes from `mace_label_rules.mace_label_sql` (positive = first MI/stroke/death 30-89 days after the ECG; imminent, prior-event and no-follow-up ECGs are excluded), then the audit below. Death is `FACT_MORTALITY_STATUS` (OMOP `death` holds only about 10% of deaths). Skip any ECG that has more than one Rhythm record for a lead, and keep a count of them. Split by patient and cap ECGs per patient.
 2. Train both variants (12-lead and the single-lead wearable proxy). `--sample-rate` is the common rate every ECG is resampled to:
    `python -m training.train_ecg_mace_mayo --rows ecg_rows.csv --mayo-leads --sample-rate 500 --out weights`
+
+   **Optional: outcome-stratified diagnostic variants** — if the `ecg_rows.csv` includes an `event_type` column
+   (the `MACEEventType` string for each positive, empty for negatives — add it from `mace_label_rules`), you can
+   also train deaths-only and nonfatal MI/stroke models on the same patient split in one run:
+   `python -m training.train_ecg_mace_mayo --rows ecg_rows.csv --mayo-leads --sample-rate 500 --out weights --outcome-stratify`
+
+   This writes six checkpoints total (12-lead and 1-lead for each of composite, deaths, nonfatal). The deaths and
+   nonfatal variants are **diagnostic only** — `approved_for_live` is permanently `False` and `approve_checkpoint`
+   refuses them. Only the composite `ecg_mace_v1.pt` / `ecg_mace_1lead_v1.pt` go through the approval gate.
+   The shared patient split means AUC differences across variants reflect real signal differences, not sampling noise.
+   Use this when you want to characterize whether ECG predicts death vs. non-fatal MI/stroke differently (the smoke
+   test showed AUC 0.668 for non-fatal vs. OR 3.01 for the composite, so a dedicated analysis is warranted).
+
 3. Read the printed network-vs-baseline comparison and `weights/cutoff_proposals_*.json`. Only these aggregates leave the Workspace.
 4. Clinical team picks cutoffs from the proposal table: `ecg_models.checkpoint.set_tier_cutoffs(path, moderate, high, set_by, note)`.
 5. If the network beat the baseline: `approve_checkpoint(path, approver, note)`. Approval is refused for synthetic data, no baseline win, or unset cutoffs. Only then does the live engine load it.
