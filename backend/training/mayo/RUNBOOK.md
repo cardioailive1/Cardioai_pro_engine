@@ -57,7 +57,11 @@ Answered by Mayo (Tommy Stretch, 2026-11-05):
 
 Answered by Mayo (Adam Resnick, 2026-11-04):
 - `PATIENT_DK` for the de-identification CSV comes from `DIM_PATIENT` through `PATIENT_CLINIC_NUMBER` (`PATIENT_MERGED_FLAG = 'N'`). Confirmed.
-- Which echo `STUDY_DESCRIPTION` or procedure values count as a transthoracic echo is **our decision**. Use the Term Finder tool in the My First Query notebook (`/data/intro/Introduction_Notebooks/Accelerate`) to find the right ones for our criteria, then have the clinical lead approve the list.
+- Which echo `STUDY_DESCRIPTION` or procedure values count as a transthoracic echo is **our decision**. Queried `FACT_RADIOLOGY_DICOM_INVENTORY WHERE MODALITY = 'US'` on 2026-11-14 (project `mcp-ss-data-p-5o6i`, dataset `vw_accelerate2605_core_v1`). **Confirmed echo-relevant STUDY_DESCRIPTION values** (clinical lead must approve the final filter list):
+  - Transthoracic echo: `ECHO COMPLETE WO CONTRAST`, `ECHO STRESS 2D WITH COLOR AND DOPPLER`, `ECHO STRESS 2D WITH COLOR AND LIMITED DOPPLER`, `(TTE) 2D LIMITED WITH COLOR AND DOPPLER`, `ECHO 2D LIMITED WITH COLOR AND DOPPLER`, `ADULT HEART 621406`, `MCS - ECHO`, `LH ECHOCARDIOGRAM COMPLETE INPATIENT`, `ECHO 576343`, `BEDSIDE`, `VHD 471822`, `Echo 451678`
+  - Transesophageal echo (TEE): `ECHO TRANSESOPHAGEAL (TEE) - INTRAOPERATIVE`, `(TTE) 2D LIMITED WITH COLOR AND DOPPLER` (note: some TEE descriptions use TTE prefix), `TEE 543134`, `TTE STRAIN 532583`, `TEE 581871`
+  - OB/non-cardiac (exclude): `US OB FIRST TRIMESTER AND TRANSVAGINAL`, `US LIVER DOPPLER`, `US LOWER EXTREMITY VEINS`, `CONGENITAL 666668`, `US PELVIS TRANSVAGINAL AND TRANSABDOMINAL WITH DOPPLER`, `US PELVIS 646382`, `US OB Greater than N weeks`, `US PARACENTESIS WITH IMAGING GUIDANCE`, `US LIVER TRANSPLANT LIMITED`, `US CAROTID DUPLEX BILAT`, `US LOWER EXTREMITY ARTERIES BILATERAL`, `US UPPER EXTREMITY VEINS BILATERAL`, `US KIDNEYS 484084`, `US ABDOMEN LIMITED PLUS ABDOMEN DOPPLER`, `PODI ECHO 529745`
+  - **Recommended TTE filter** (clinical lead to approve): `STUDY_DESCRIPTION IN ('ECHO COMPLETE WO CONTRAST', 'ECHO STRESS 2D WITH COLOR AND DOPPLER', 'ECHO STRESS 2D WITH COLOR AND LIMITED DOPPLER', 'ECHO 2D LIMITED WITH COLOR AND DOPPLER', 'LH ECHOCARDIOGRAM COMPLETE INPATIENT', 'ADULT HEART 621406', 'MCS - ECHO', 'BEDSIDE')` — these are transthoracic, exclude TEE, OB, vascular. Approx 490K–620K studies across ~175K patients.
 - Same-day echo matching: **correction to the 28 Oct note.** `DIM_ECHO_TEST` is a lookup table for the test type; it holds no information for a specific patient or exam, so `ECHO_PERFORMED_TEST_DK` -> `DIM_ECHO_TEST` cannot identify the exact DICOM study. Do not rely on it. Mayo will discuss this further (4 Nov afternoon).
 - Which LVEF result types to prefer is up to our team (`lvef_result_types` lists them).
 - The project and dataset names are in the My First Query notebook outline, and Mayo will also send them by email.
@@ -65,9 +69,9 @@ Answered by Mayo (Adam Resnick, 2026-11-04):
 
 Still open:
 - [ ] How to match the exact same-day echo study to its DICOM images (Adam: to be discussed with Mayo)
-- [ ] Pick the echo `STUDY_DESCRIPTION` values with Term Finder and get the clinical lead to approve them
+- [x] Echo `STUDY_DESCRIPTION` values confirmed by querying `FACT_RADIOLOGY_DICOM_INVENTORY` directly (2026-11-14). Clinical lead must still approve the final list — see confirmed values below.
 - [ ] Pick which LVEF result types to use (our team)
-- [ ] Read the project and dataset names from the My First Query notebook or Mayo's email
+- [x] Project and dataset confirmed: `mcp-ss-data-p-5o6i.vw_accelerate2605_core_v1` (found from job history 2026-11-14)
 - [x] The de-identification request still uses `PATIENT_DK` (Mayo MCP, 2 Nov: CSV of STUDY_INSTANCE_UID, PATIENT_DK, MODALITY, STMO_NAME_IN_ADL, required before image access). `FACT_ECG` also carries it (ECG slides, 3 Nov)
 
 Still to find out:
@@ -84,7 +88,7 @@ sig = resample(sig, sample_rate_hz, 500)            # 250 Hz ECGs are brought to
 ```python
 from training.mayo.radiology_link import cardiac_mri_study_sql, link_reports_to_images
 from training.mayo.bq import query_rows                  # Mayo (28 Oct): the Workspace runs SQL through the BigQuery client
-rows = query_rows(cardiac_mri_study_sql("<project>.<dataset>"))   # BigQuery SQL; (confirm) the project.dataset in the Workspace; refine the LIKE terms against real PROCEDURE_CODE_TEXT values
+rows = query_rows(cardiac_mri_study_sql("mcp-ss-data-p-5o6i.vw_accelerate2605_core_v1"))   # BigQuery SQL; project/dataset confirmed 2026-11-14; refine the LIKE terms against real PROCEDURE_CODE_TEXT values
 import pandas as pd; df = pd.DataFrame(rows)
 reports   = df[["DICOM_ACCESSION_NUMBER", "RADIOLOGY_REPORT", "RADIOLOGY_IMPRESSION"]].rename(columns={"DICOM_ACCESSION_NUMBER": "ACCESSION_NBR"}).drop_duplicates().to_dict("records")
 inventory = df.to_dict("records")
@@ -172,8 +176,8 @@ Only code, aggregate metrics (spot-check agreement, correlation) and approved mo
 from training.mayo.bq import query_rows
 from training.mayo.ecg_fact_link import (ecg_waveform_sql, fact_ecg_sql, group_waveform_acquisitions,
                                          collapse_fact_ecg, link_waveform_to_fact_ecg)
-acq   = group_waveform_acquisitions(query_rows(ecg_waveform_sql("<project>.<dataset>")))   # resting rhythm rows, PATIENT_DK via DIM_PATIENT
-facts = collapse_fact_ecg(query_rows(fact_ecg_sql("<project>.<dataset>")))                  # several interpretation rows -> one ECG
+acq   = group_waveform_acquisitions(query_rows(ecg_waveform_sql("mcp-ss-data-p-5o6i.vw_accelerate2605_core_v1")))   # resting rhythm rows, PATIENT_DK via DIM_PATIENT
+facts = collapse_fact_ecg(query_rows(fact_ecg_sql("mcp-ss-data-p-5o6i.vw_accelerate2605_core_v1")))                  # several interpretation rows -> one ECG
 r = link_waveform_to_fact_ecg(acq, facts)       # ACQUISITION_TS = ECG_DTM; unmatched and ambiguous are listed, never guessed
 print(len(r["linked"]), "linked;", len(r["unmatched"]), "unmatched;", len(r["ambiguous"]), "ambiguous")
 ```
