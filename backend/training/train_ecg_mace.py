@@ -65,10 +65,24 @@ def wearable_augment(x: torch.Tensor) -> torch.Tensor:
     return x * (0.7 + 0.6 * torch.rand(B, 1, 1, device=x.device)) + wander + noise
 
 
-def train_ecg_mace_net(examples, n_epochs=15, batch_size=32, lr=1e-3, use_context=False, seed=23, device=None, wearable_aug=False):
+def train_ecg_mace_net(examples, n_epochs=15, batch_size=32, lr=1e-3, use_context=False, seed=23, device=None,
+                       wearable_aug=False, shared_split=None):
+    """Train the ECG-MACE network.
+
+    shared_split: optional (train_ids, val_ids, test_ids) tuple of patient_id sets.
+    When provided, the same patients are used for train/val/test as in the reference run,
+    so outcome-stratified variants (deaths-only, nonfatal-only) are evaluated on the
+    exact same test patients as the composite model — making AUC differences interpretable
+    as genuine signal differences, not sampling variance.
+    """
     torch.manual_seed(seed)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    train, val, test = split_by_patient(examples, seed=seed)
+    if shared_split is not None:
+        train_ids, val_ids, test_ids = shared_split
+        pick = lambda s: [e for e in examples if e["patient_id"] in s]
+        train, val, test = pick(train_ids), pick(val_ids), pick(test_ids)
+    else:
+        train, val, test = split_by_patient(examples, seed=seed)
     n_leads = examples[0]["x"].shape[0]
     model = ECGMACENet(n_leads=n_leads, n_context=2 if use_context else 0).to(device)
     y_tr = np.array([e["y"] for e in train])

@@ -12,23 +12,37 @@ from ecg_models.ecg_mace_net import ECGMACENet
 
 
 def save_checkpoint(model: ECGMACENet, path: str, *, sample_rate_hz: float, length: int, platt: dict,
-                    trained_on: str, metrics: dict, comparison: dict | None = None, tier_cutoffs: dict | None = None):
+                    trained_on: str, metrics: dict, comparison: dict | None = None,
+                    tier_cutoffs: dict | None = None, approvable: bool = True):
+    """Write model weights + metadata JSON.
+
+    approvable=False marks outcome-stratified diagnostic variants (deaths-only, nonfatal-only)
+    that must never be loaded by the live engine, even after a human call to approve_checkpoint.
+    The flag is recorded in the JSON so approve_checkpoint can refuse immediately.
+    """
     p = Path(path); p.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), p)
     meta = {"n_leads": model.n_leads, "n_context": model.n_context, "sample_rate_hz": sample_rate_hz,
             "length": length, "platt": platt, "trained_on": trained_on, "metrics": metrics,
             "comparison_to_baseline": comparison, "tier_cutoffs": tier_cutoffs,
-            "created": time.strftime("%Y-%m-%d"), "approved_for_live": False, "approved_by": None}
+            "created": time.strftime("%Y-%m-%d"), "approved_for_live": False, "approved_by": None,
+            "approvable": approvable}
     p.with_suffix(".json").write_text(json.dumps(meta, indent=2))
     return meta
 
 
 def approve_checkpoint(path: str, approver: str, note: str):
-    """Deliberate human step. Refuses synthetic data or a model that did not beat the baseline."""
+    """Deliberate human step. Refuses synthetic data, non-approvable variants, or a model that did not beat the baseline."""
     mp = Path(path).with_suffix(".json"); meta = json.loads(mp.read_text())
     cmp_ = meta.get("comparison_to_baseline") or {}
     if "synthetic" in meta["trained_on"].lower():
         raise ValueError("refusing to approve a checkpoint trained on synthetic data")
+    if not meta.get("approvable", True):
+        raise ValueError(
+            "refusing to approve: this checkpoint is a diagnostic-only outcome-stratified variant "
+            "(deaths-only or nonfatal-only) and is permanently marked approvable=False. "
+            "Only the composite ecg_mace_v1.pt / ecg_mace_1lead_v1.pt can be approved for live scoring."
+        )
     if not cmp_.get("beats_baseline"):
         raise ValueError("refusing to approve: no paired comparison showing the network beats the feature baseline")
     if not meta.get("tier_cutoffs"):
