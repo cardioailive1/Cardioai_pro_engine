@@ -17,6 +17,7 @@ import numpy as np
 import torch
 
 from ecg_models.checkpoint import load_checkpoint
+from ecg_models.ecg_v2_stacker import calibrated_logit, load_v2, missing_inputs, predict_v2, recalibrated_probability
 from ecg_models.explain import explain
 from ecg_models.stage2_checkpoint import FILE_NAME as STAGE2_FILE, file_sha256, load_stage2, predict_stage2, valid_echo
 from inference.ecg_leads import to_lead_array
@@ -53,6 +54,9 @@ def build_runtime(weights_dir: Optional[str] = None) -> Optional[Callable[[dict[
     if stage2 and (12 not in loaded or stage2.get("ecg_checkpoint_sha256") != file_sha256(os.path.join(weights_dir, CHECKPOINTS[12]))):
         stage2 = None
 
+    # Optional v2: the same 12-lead network plus the history stacker. Used only when fully approved and every checksum matches (ecg_models/ecg_v2_stacker.py).
+    v2 = load_v2(weights_dir, os.path.join(weights_dir, CHECKPOINTS[12])) if 12 in loaded else None
+
     def run(record: dict[str, Any]) -> Optional[dict[str, Any]]:
         wf = record.get("waveform")
         if wf is None:
@@ -69,6 +73,23 @@ def build_runtime(weights_dir: Optional[str] = None) -> Optional[Callable[[dict[
             logit = model(torch.tensor(x).unsqueeze(0)).item()
         p = float(1 / (1 + np.exp(-(meta["platt"]["a"] * logit + meta["platt"]["b"]))))
         extra: dict = {}
+        if v2 and wave.shape[0] == 12:
+            miss = missing_inputs(v2, record)
+            if not miss:
+                p_raw = predict_v2(v2, record, calibrated_logit(logit, meta["platt"]))
+                prob = recalibrated_probability(v2, p_raw)
+                conds = list(v2["conditions"])
+                return {"model": "ecg_mace_risk", "model_version": f"ecg-mace-v2-{v2['created']}", "score": round(p_raw, 4),
+                        "risk_tier": _tier(p_raw, v2["tier_cutoffs"]), "window_days": "30-90",
+                        "calibrated_probability": None if prob is None else round(prob, 4),
+                        "probability_note": ("recalibrated to the natural event rate; not yet verified on newer data" if prob is not None
+                                             else "no recalibration file loaded: the score ranks risk but is not a stated probability"),
+                        "inputs_used": [f"raw_ecg_{meta['n_leads']}_lead", "age", "sex", "heart_rate", "qt", "qrs", "history_conditions", "visit_counts"],
+                        "history_conditions_used": conds, "explanation": explain(model, x, meta["sample_rate_hz"]),
+                        "approved_by": v2["approval"]["approved_by"], "trained_on": meta["trained_on"],
+                        "second_stage": "not applied: the ECG + echo second stage was fitted on the v1 score",
+                        "note": "ECG v2 (network + history stacker); approved per approval_v2.json; see the locked-set report."}
+            extra = {"v2_not_used": "v2 needs these inputs and did not get them: " + ", ".join(miss) + "; scored with the v1 network"}
         if stage2 and wave.shape[0] == 12:
             echo = record.get("echo_lvef") or {}
             age, sex = record.get("age"), record.get("sex_male")
