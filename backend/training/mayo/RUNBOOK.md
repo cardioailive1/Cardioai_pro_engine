@@ -207,6 +207,10 @@ Each linked entry has `index_time` (the ECG time, never a filing time), the wave
 5. If the network beat the baseline: `approve_checkpoint(path, approver, note)`. Approval is refused for synthetic data, no baseline win, or unset cutoffs. Only then does the live engine load it.
 
 
+## ECG v2 in the live runtime (network + history stacker)
+
+`inference/ecg_mace_runtime.py` scores with v2 only when `weights/ecg_mace_v2/` holds `frozen_ecg_v2.json`, `stacker_v2.joblib` and `approval_v2.json` (optional: `recalibration_v2.json`), the stacker and network SHA-256 values match the card and the approval, and the approval names who approved. Any gap and v1 keeps scoring, with the reason in `v2_not_used`. A record needs `age`, `sex_male`, `heart_rate_bpm`, `qt_interval_ms`, `n_acute_visits_365`, `n_visits_365` and a `history` object stating all 12 conditions (`qrs_ms` is optional). `score` is the raw v2 score the tier cutoffs were set on; `calibrated_probability` appears only with a matching recalibration file. The ECG + echo second stage is not applied with v2 (it was fitted on the v1 score). The files are built in the Workspace by the v2 freeze, approval and recalibration cells; no patient-level file goes in this folder.
+
 ## ECG + echo: second-stage MACE model (LVEF as an input)
 
 Heart failure changes MACE risk, so the most recent EARLIER echo LVEF is added to the ECG network's score. Mayo: more than 100,000 patients have both; link on `PATIENT_CLINIC_NUMBER` and date (dates are shifted equally within a patient); LVEF is in `FACT_ECHO_RESULTS`.
