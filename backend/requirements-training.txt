@@ -8,7 +8,9 @@
 #
 #   pip install -r requirements.txt -r requirements-training.txt
 #
-scikit-learn==1.5.2
+# 1.9.1 = the version the approved models (claims-risk v1, ECG v2 stacker) were trained and saved with in the Mayo
+# Workspace. A scikit-learn pickle generally does not load on an older version, so the live pin must equal it.
+scikit-learn==1.9.1
 
 # CPU-only build. Swap for a CUDA build when actually pretraining on GPU
 # hardware (see imaging_models/'s docstrings — real DINO/MAE pretraining
