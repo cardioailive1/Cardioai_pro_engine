@@ -266,5 +266,5 @@ The claims model (claims_risk_candidate_v1, trained on Mayo OMOP 2022-2023) is l
 
 - Label: first MI or ischemic stroke, or death, in the next 12 months; probable cancer deaths are excluded, not relabelled.
 - `score` and the tier use the Platt-calibrated score; tiers are the 90% (moderate) and 80% (high) sensitivity rows. `calibrated_probability` (if the sidecar has `recalibration`) is rate-adjusted to all Mayo adults in 2022-2023: it is not verified on newer data and is not a payer-population rate.
-- The scikit-learn version of the service must match the one in the sidecar (`sklearn_version`); on a mismatch the model fails to load and the placeholder keeps running.
+- The scikit-learn version of the service must match the one in the sidecar (`sklearn_version`); on a mismatch the model fails to load and the placeholder keeps running. The pin in `requirements-inference.txt` and `requirements-training.txt` is 1.9.1 (the Workspace version the approved models were saved with). If the Workspace is upgraded and a model is retrained, bump the pin in the same PR.
 - Validate on payer claims before relying on it for payer decisions.

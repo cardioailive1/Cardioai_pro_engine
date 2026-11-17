@@ -6,6 +6,7 @@
 # Build with it:   docker build --build-arg WITH_MODEL_RUNTIME=1 .     (Render: set the env var WITH_MODEL_RUNTIME=1)
 # Pins match requirements-training.txt, so the live service loads checkpoints with the version that wrote them.
 --extra-index-url https://download.pytorch.org/whl/cpu
-scikit-learn==1.5.2
+# Must equal the scikit-learn version recorded in each approved model's sidecar/card (sklearn_version): currently 1.9.1.
+scikit-learn==1.9.1
 torch==2.5.1
 torchvision==0.20.1
