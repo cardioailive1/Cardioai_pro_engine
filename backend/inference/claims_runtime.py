@@ -1,6 +1,7 @@
 """
-Live scoring for payer members with the trained claims-risk model: 12-month probability of MI / stroke /
-cardiovascular death. Loads weights/claims_risk_v1.joblib only if a human-approved checkpoint exists; otherwise
+Live scoring for payer members with the trained claims-risk model: 12-month probability of MI, ischemic stroke or
+death (probable cancer deaths were excluded from the training label, not relabelled). Loads weights/claims_risk_v1.joblib only if a human-approved checkpoint exists whose
+SHA-256 matches the one recorded at approval; otherwise
 load_trained_model('claims') returns None and the placeholder keeps running.
 
 The record must carry the member's diagnosis history (`history_diagnosis_codes`, ICD-10) and age; `sex` and
@@ -35,9 +36,14 @@ def build_claims_runtime(weights_dir: Optional[str] = None):
         male = True if str(sex).upper() in ("M", "MALE") else False if str(sex).upper() in ("F", "FEMALE") else None
         x = np.array([vectorize(age, male, codes, record.get("inpatient_visits_12m"), record.get("ed_visits_12m"))])
         p = float(1 / (1 + np.exp(-np.clip(meta["platt"]["a"] * model.decision_function(x)[0] + meta["platt"]["b"], -30, 30))))
-        c = meta["tier_cutoffs"]
+        c = meta["tier_cutoffs"]; rc = meta.get("recalibration") or {}
+        extra = {}
+        if rc.get("intercept_shift") is not None:   # stated probability at the all-adults development rate; tiers and score are unchanged
+            z = meta["platt"]["a"] * model.decision_function(x)[0] + meta["platt"]["b"] + rc["intercept_shift"]
+            extra = {"calibrated_probability": round(float(1 / (1 + np.exp(-np.clip(z, -30, 30)))), 4),
+                     "probability_note": "Rate-adjusted to all adults seen at Mayo in 2022-2023; NOT verified on newer data and NOT a payer-population rate. Tiers use the score, not this probability."}
         return {"model": "population_risk_stratifier", "model_version": f"claims-risk-{meta['created']}", "score": round(p, 4),
                 "risk_tier": "high" if p >= c["high"] else "moderate" if p >= c["moderate"] else "low", "window_days": meta["horizon_days"],
                 "inputs_used": ["age", "sex", "icd10_history", "visit_counts"], "approved_by": meta["approved_by"], "trained_on": meta["trained_on"],
-                "note": "Approved checkpoint trained on Mayo OMOP history using claims-style inputs; validate on payer claims before relying on it."}
+                "note": "Approved checkpoint trained on Mayo OMOP history using claims-style inputs; label = first MI or ischemic stroke or death in 12 months (probable cancer deaths excluded). Validate on payer claims before relying on it.", **extra}
     return run

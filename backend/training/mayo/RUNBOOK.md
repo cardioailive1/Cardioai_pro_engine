@@ -258,3 +258,13 @@ model resamples to its training rate.
 
 The member roster for the payer panel is a .csv: `member_id, age, sex, diagnosis_codes (ICD-10, semicolon separated), inpatient_visits_12m, ed_visits_12m`.
 The controlled estimate takes `member_id, treated, pre_pmpm, post_pmpm` plus any numeric pre-program covariates (age, risk_score...).
+
+
+## Claims risk v1 in the live runtime
+
+The claims model (claims_risk_candidate_v1, trained on Mayo OMOP 2022-2023) is loaded by `inference/claims_runtime.py` only when `weights/claims_risk_v1.joblib` and `weights/claims_risk_v1.json` are both present, the sidecar says `approved_for_live` with a **named** `approved_by`, and the model file's SHA-256 equals `model_sha256` in the sidecar (the pickle is opened only after that check). Anything else keeps the placeholder running. The Workspace cell that records the approval and builds both files writes `deploy_claims_risk_v1/`; copy only those two small files.
+
+- Label: first MI or ischemic stroke, or death, in the next 12 months; probable cancer deaths are excluded, not relabelled.
+- `score` and the tier use the Platt-calibrated score; tiers are the 90% (moderate) and 80% (high) sensitivity rows. `calibrated_probability` (if the sidecar has `recalibration`) is rate-adjusted to all Mayo adults in 2022-2023: it is not verified on newer data and is not a payer-population rate.
+- The scikit-learn version of the service must match the one in the sidecar (`sklearn_version`); on a mismatch the model fails to load and the placeholder keeps running.
+- Validate on payer claims before relying on it for payer decisions.
