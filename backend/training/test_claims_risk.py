@@ -96,3 +96,22 @@ def test_inference_agent_adds_history():
             seen.update(record); return None
     asyncio.run(InferenceAgent(Reg(), agg).handle({"normalized": {"modality": "claims", "record": {"member_id": "M1", "member_age": 70, "diagnosis_codes": ["E11.9"]}}}))
     assert seen["history_diagnosis_codes"] == ["E11.9", "I10"]
+
+
+def test_loader_checks_checksum_name_and_recalibration(trained, tmp_path):
+    import shutil
+    p, _ = trained
+    q = tmp_path / "claims_risk_v1.joblib"; shutil.copy(p, q); shutil.copy(p.with_suffix(".json"), q.with_suffix(".json"))
+    from claims_risk.checkpoint import load_claims_checkpoint
+    from inference.claims_runtime import build_claims_runtime
+    m = json.loads(q.with_suffix(".json").read_text()); assert m["approved_for_live"] and m["model_sha256"]
+    rec = {"member_age": 78, "history_diagnosis_codes": ["I50.9", "E11.9"], "sex": "M"}
+    base = build_claims_runtime(str(tmp_path))(rec); assert "calibrated_probability" not in base
+    m["recalibration"] = {"intercept_shift": -0.2}; q.with_suffix(".json").write_text(json.dumps(m))
+    out = build_claims_runtime(str(tmp_path))(rec); assert 0 < out["calibrated_probability"] < base["score"] and out["score"] == base["score"] and out["risk_tier"] == base["risk_tier"]
+    with pytest.raises(ValueError, match="named person"):
+        approve_claims_checkpoint(str(q), " ", "x")
+    q.write_bytes(q.read_bytes() + b"0")                                     # file changed after approval: refused, pickle not opened
+    assert load_claims_checkpoint(str(q)) is None and build_claims_runtime(str(tmp_path)) is None
+    q.write_bytes(p.read_bytes()); m["approved_by"] = ""; q.with_suffix(".json").write_text(json.dumps(m))   # no named approver: refused
+    assert load_claims_checkpoint(str(q)) is None

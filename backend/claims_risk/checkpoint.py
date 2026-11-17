@@ -1,13 +1,22 @@
 """Checkpoint with provenance for the claims-risk model. Same rules as the ECG network: the live engine only loads
 an approved checkpoint; approval refuses synthetic data, no paired win over the baseline, a missing subgroup report,
-or unset tier cutoffs."""
+or unset tier cutoffs. The approval stores the model file's SHA-256; the loader refuses a file that no longer matches it."""
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
 
 import joblib
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 24), b""):
+            h.update(b)
+    return h.hexdigest()
 
 
 def save_claims_checkpoint(result: dict, path: str, *, trained_on: str):
@@ -39,7 +48,9 @@ def approve_claims_checkpoint(path: str, approver: str, note: str):
         raise ValueError("refusing to approve: no subgroup report")
     if not m.get("tier_cutoffs"):
         raise ValueError("refusing to approve: tier cutoffs not set")
-    m.update(approved_for_live=True, approved_by=approver, approval_note=note, approved_on=time.strftime("%Y-%m-%d"))
+    if not (approver or "").strip():
+        raise ValueError("refusing to approve: approver must be a named person")
+    m.update(approved_for_live=True, approved_by=approver, approval_note=note, approved_on=time.strftime("%Y-%m-%d"), model_sha256=_sha256(Path(path)))
     mp.write_text(json.dumps(m, indent=2)); return m
 
 
@@ -48,4 +59,12 @@ def load_claims_checkpoint(path: str):
     if not (p.exists() and mp.exists()):
         return None
     m = json.loads(mp.read_text())
-    return (joblib.load(p), m) if m.get("approved_for_live") else None
+    if not m.get("approved_for_live"):
+        return None
+    # the pickle is opened only after the file matches the checksum recorded at approval, and only for a named approver
+    if not (m.get("approved_by") or "").strip() or not m.get("model_sha256") or _sha256(p) != m["model_sha256"]:
+        return None
+    try:
+        return joblib.load(p), m
+    except Exception:   # e.g. a scikit-learn version the pickle was not made with: keep the placeholder running
+        return None
