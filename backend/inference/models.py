@@ -15,6 +15,7 @@ be presented to a clinician or consumer as a real risk prediction.
 """
 from __future__ import annotations
 
+import os
 from typing import Any, Callable, Optional
 
 MODEL_VERSION = "0.0.0-untrained-placeholder"
@@ -160,10 +161,23 @@ class ModelRegistry:
         if trained is not None:
             out = trained(record)
             if out is not None:
-                return out
+                return self._with_review(modality, record, out)
 
         fn = self._placeholders.get(modality)
-        return fn(record) if fn else None
+        return self._with_review(modality, record, fn(record)) if fn else None
+
+    @staticmethod
+    def _with_review(modality: str, record: dict[str, Any], out: dict[str, Any]) -> dict[str, Any]:
+        """Adds out["review"]: a rules-based read-out for the clinician or analyst (review/reviewer.py). It never changes the score or tier,
+        and a failure in it never blocks the prediction. Switch off with CARDIOAI_REVIEW=0."""
+        if os.environ.get("CARDIOAI_REVIEW", "1") == "0":
+            return out
+        try:
+            from review import review_prediction
+            rv = review_prediction(modality, record, out)
+            return {**out, "review": rv} if rv else out
+        except Exception:                                   # the review is an extra; the prediction must still go out
+            return out
 
     def predict_echo(self, frames) -> dict[str, Any]:
         """Standalone echo LVEF. Never fused into the MACE score (see multimodal_fusion.py). Without an

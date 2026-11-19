@@ -268,3 +268,13 @@ The claims model (claims_risk_candidate_v1, trained on Mayo OMOP 2022-2023) is l
 - `score` and the tier use the Platt-calibrated score; tiers are the 90% (moderate) and 80% (high) sensitivity rows. `calibrated_probability` (if the sidecar has `recalibration`) is rate-adjusted to all Mayo adults in 2022-2023: it is not verified on newer data and is not a payer-population rate.
 - The scikit-learn version of the service must match the one in the sidecar (`sklearn_version`); on a mismatch the model fails to load and the placeholder keeps running. The pin in `requirements-inference.txt` and `requirements-training.txt` is 1.9.1 (the Workspace version the approved models were saved with). If the Workspace is upgraded and a model is retrained, bump the pin in the same PR.
 - Validate on payer claims before relying on it for payer decisions.
+
+## Prediction reviewer (rules-based, after the score)
+
+`backend/review/reviewer.py` adds a `review` block to every ECG and claims prediction from `ModelRegistry.predict`: input checks (missing or out-of-range values, placeholder instead of the trained model, ECG v1 fallback), what the tier means in plain numbers from the locked-set results, known limits, and questions for the reader. It never changes the score or tier, never states a diagnosis or a treatment, and a failure in it never blocks a prediction. No LLM and no patient identifiers.
+
+- Wording is a DRAFT until the clinical lead approves it: set `REVIEW_WORDING_APPROVED_BY` in `review/reviewer.py` by name (the block says "DRAFT" until then).
+- `record_decision(review, reader, decision, reason)` builds the audit entry (accepted, overridden with a reason, or needs more information); storing it is up to the caller.
+- The tier numbers in the module are copied from the locked-set reports. Update them only from a new locked-set result (for example the ECG v3 clean test, if it passes).
+- Switch off with `CARDIOAI_REVIEW=0`.
+- Not wired to the dashboards yet; the API response carries `review` and the UI can show it.
