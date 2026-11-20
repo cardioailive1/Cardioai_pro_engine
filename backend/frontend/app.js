@@ -163,6 +163,8 @@
     tierEl.className = `risk-pill ${tier}`;
     barEl.style.width = `${Math.round((prediction.score || 0) * 100)}%`;
     detailEl.textContent = `score ${prediction.score ?? "—"} · model ${prediction.model || "n/a"} (${prediction.model_version || "placeholder"})`;
+    // reviewer read-out (ECG and claims only); a missing review simply hides the panel
+    if (typeof renderReview === "function") renderReview(document.getElementById(`${prefix}-review`), prediction.review);
   }
 
   // ---------------- Vitals + result routing per modality ----------------

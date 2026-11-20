@@ -308,11 +308,13 @@
             <div class="head"><strong>Clinical alert (EHR)</strong><span class="risk-pill low" id="ecg-tier">—</span></div>
             <div class="bar-track"><div class="bar-fill" id="ecg-bar" style="width:0%"></div></div>
             <div style="font-size:0.72rem; color:var(--ink-soft); margin-top:6px;" id="ecg-detail">Waiting for ECG data…</div>
+            <div class="rv-box" id="ecg-review" hidden></div>
           </div>
           <div class="result-card">
             <div class="head"><strong>Population risk report</strong><span class="risk-pill low" id="claims-tier">—</span></div>
             <div class="bar-track"><div class="bar-fill" id="claims-bar" style="width:0%"></div></div>
             <div style="font-size:0.72rem; color:var(--ink-soft); margin-top:6px;" id="claims-detail">Waiting for claims data…</div>
+            <div class="rv-box" id="claims-review" hidden></div>
           </div>
           <div class="result-card">
             <div class="head"><strong>Personal cardiac score</strong><span class="risk-pill low" id="wearable-tier">—</span></div>
@@ -581,6 +583,7 @@
 
 <footer class="foot">Cardio AI · invest@cardioailive.com · cardioailive.com · +1 614-967-8728</footer>
 
+<script src="review_panel.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
