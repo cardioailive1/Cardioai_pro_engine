@@ -611,3 +611,22 @@ footer.foot {
 .staff-card .meta { font-size: 0.7rem; color: var(--ink-soft); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .status-dot.on { background: var(--ok); } .status-dot.off { background: #c7d6e3; }
+
+/* ---------- Prediction reviewer panel (review_panel.js) ---------- */
+.rv-box { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #f8fafc; font-size: 0.74rem; color: var(--ink); }
+.rv-box[hidden] { display: none; }
+.rv-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.rv-head strong { font-size: 0.78rem; color: var(--navy); }
+.rv-badge { font-size: 0.64rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.rv-badge.ok { background: #e5f7ee; color: var(--ok); }
+.rv-badge.check { background: #fff5e0; color: var(--warn); }
+.rv-badge.warning { background: #fde7e5; color: var(--err); }
+.rv-tier { margin: 0 0 6px; line-height: 1.4; }
+.rv-checks, .rv-fold ul { margin: 0 0 6px; padding-left: 18px; line-height: 1.4; }
+.rv-checks li.rv-warning { color: var(--err); font-weight: 600; }
+.rv-checks li.rv-check { color: var(--warn); }
+.rv-checks li.rv-info { color: var(--ink-soft); }
+.rv-fold { margin-bottom: 4px; }
+.rv-fold summary { cursor: pointer; font-weight: 600; color: var(--navy); }
+.rv-note { margin-top: 6px; color: var(--ink-soft); font-style: italic; }
+.rv-draft { margin-top: 6px; display: inline-block; font-size: 0.64rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #eef2f7; color: var(--ink-soft); }
